@@ -2,6 +2,9 @@
 
 **← [Back to README](README.md)**
 
+## v2.2.3 (December 23, 2025)
+- **🌐 Internationalization:** Added localisation: French and German.
+
 ## v2.2.2 (December 2, 2025)
 - **🪲Bugfix:** Checking group chat box should not affect single chats. Fixed.
 
