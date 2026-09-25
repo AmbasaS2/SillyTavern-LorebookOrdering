@@ -1827,6 +1827,8 @@ function registerPerLoopBudgetTrimmer() {
                         console.info('[STLO] Trimmed WI entry:', { world: e.world, uid: e.uid, comment: e?.comment ?? null, tokens });
 
                         entriesMap.delete(`${e.world}.${e.uid}`);
+                        // This entry is a scan-local clone. Keep it ineligible for later recursion passes.
+                        e.disable = true;
                         const slice = typeof e.content === 'string' ? e.content : '';
                         if (!slice) continue;
 

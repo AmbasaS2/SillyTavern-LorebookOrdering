@@ -2,6 +2,9 @@
 
 **← [Back to README](README.md)**
 
+## v2.2.4 (September 24, 2026)
+- **🪲Bugfix:** Entries removed for budget reasons during recursion returned for rescan each time, causing infinite loops. Fixed.
+
 ## v2.2.3 (December 23, 2025)
 - **🌐 Internationalization:** Added localisation: French and German.
 
