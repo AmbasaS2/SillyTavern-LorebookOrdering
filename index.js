@@ -276,7 +276,7 @@ function installStloModalStyles() {
         .stlo-modal-ui .checkbox_label > .checkmark { display: none; }
         .stlo-modal-ui .stlo-info { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; margin: 0; padding: 0; }
         .stlo-modal-ui .stlo-info > summary { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; box-sizing: border-box; border: 0; border-radius: 50%; font-size: 0; line-height: 1; opacity: .8; list-style: none; cursor: pointer; user-select: none; }
-        .stlo-modal-ui .stlo-info > summary::before { content: "i"; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid currentColor; border-radius: 50%; box-sizing: border-box; font-size: 10px; font-style: normal; font-weight: 700; line-height: 1; }
+        .stlo-modal-ui .stlo-info > summary::before { content: "i"; display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; border: 1px solid currentColor; border-radius: 50%; box-sizing: border-box; font-size: 9px; font-style: normal; font-weight: 700; line-height: 1; }
         .stlo-modal-ui .stlo-info > summary::-webkit-details-marker { display: none; }
         .stlo-modal-ui .stlo-info > summary::marker { content: ""; }
         .stlo-modal-ui .stlo-info > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
@@ -284,7 +284,7 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-info-body { display: none; }
         .stlo-info-popup { position: fixed; z-index: 2147483000; width: min(270px, calc(100vw - 24px)); max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--SmartThemeBorderColor); border-radius: 7px; background: var(--SmartThemeBlurTintColor, #f8f3e9); color: var(--SmartThemeBodyColor, #333); box-shadow: 0 3px 12px rgba(0,0,0,.18); text-align: left; }
         .stlo-info-popup[hidden] { display: none !important; }
-        .stlo-info-popup small { display: block; margin: 0; line-height: 1.45; color: inherit; }
+        .stlo-info-popup small { display: block; margin: 0; font-size: 14px; line-height: 1.5; color: inherit; }
         .stlo-info-popup small + small { margin-top: 6px; }
         .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 3px 0 0; padding: 7px 0 0 12px; width: 100%; box-sizing: border-box; }
         .stlo-modal-ui .stlo-order-controls[hidden] { display: none !important; }
