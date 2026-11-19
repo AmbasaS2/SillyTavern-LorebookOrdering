@@ -285,7 +285,7 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-inline-number input { width: 110px; max-width: 100%; }
         .stlo-modal-ui .stlo-budget-options { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
         .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; }
-        .stlo-modal-ui .stlo-budget-value input { width: 150px; max-width: 100%; }
+        .stlo-modal-ui .stlo-budget-value input[type="number"] { width: 150px; max-width: 100%; }
         .stlo-modal-ui .stlo-advanced-drawer { width: 100%; }
         .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-content { padding-top: 10px; }
         .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 16px; }
@@ -707,7 +707,7 @@ async function openLorebookSettings(worldName = null) {
                 <h4>벡터 유사도 임계값</h4>
                 <small>값이 높을수록 관련성이 높은 기억만 불러옵니다. 비워 두면 Vector Storage의 전역 임계값을 사용합니다. (0~1)</small>
                 <input type="number" id="${SELECTORS.LOREBOOK_VECTOR_THRESHOLD}" class="text_pole textarea_compact"
-                       min="0" max="1" step="0.01" placeholder="전역 설정 사용"
+                       min="0" max="1" step="0.01" placeholder="미입력시 전역 설정 사용"
                        value="${typeof currentSettings.vectorThreshold === 'number' ? currentSettings.vectorThreshold : ''}">
             </div>
 
