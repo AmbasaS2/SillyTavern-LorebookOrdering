@@ -1222,6 +1222,7 @@ function createBudgetControls(scope, currentSettings = {}) {
                 </div>
             </div>
             <small class="stlo-budget-note" data-i18n="stlo.budget.tip">Tip: default (0) lets ST decide; Fixed with 1 effectively chokes off this lorebook.</small>
+            <small class="stlo-budget-note">재귀 검색 사용 시, 예산에서 제외된 로어가 다른 로어의 활성화에 영향을 줄 수 있습니다. 최종 주입에는 예산 제한이 적용됩니다.</small>
         </div>
     `;
 }
