@@ -1,6 +1,6 @@
 import { event_types, eventSource } from '../../../events.js';
 import { getTokenCount } from '../../../tokenizers.js';
-import { getStringHash, getCharaFilename } from '../../../utils.js';
+import { getCharaFilename } from '../../../utils.js';
 import { getContext } from '../../../extensions.js';
 import { characters, this_chid, getMaxContextSize } from '../../../../script.js';
 import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names } from '../../../world-info.js';
@@ -17,8 +17,7 @@ const SELECTORS = {
     LOREBOOK_BUDGET_MODE: 'lorebook_budget_mode',
     LOREBOOK_BUDGET_VALUE: 'lorebook_budget_value',
     LOREBOOK_BUDGET_VALUE_CONTAINER: 'lorebook_budget_value_container',
-    LOREBOOK_RANDOM_TRIM: 'lorebook_random_trim',
-    LOREBOOK_VECTOR_THRESHOLD: 'lorebook_vector_threshold'
+    LOREBOOK_RANDOM_TRIM: 'lorebook_random_trim'
 };
 
 // Default settings for lorebooks
@@ -30,8 +29,7 @@ const DEFAULT_LOREBOOK_SETTINGS = {
     orderAdjustmentGroupOnly: false, // Only apply order adjustment in group chats
     characterOverrides: {},  // Character-specific priority overrides for group chats
     onlyWhenSpeaking: false,  // Only activate in group chats when assigned characters are speaking
-    randomTrim: false,
-    vectorThreshold: null // null = use the Vector Storage global score threshold
+    randomTrim: false
 };
 
 // Cleanup tracking
@@ -99,16 +97,18 @@ function scheduleBackground(fn) {
     return setTimeout(run, 0);
 }
 
-// Cross-event token count cache
-const TOKEN_COUNT_CACHE = new Map(); // key: `${uid}:${len}`
+// Token counts are cached by the exact entry object and content, not by UID
+// and length (which can collide across lorebooks or edited content).
+let TOKEN_COUNT_CACHE = new WeakMap();
 function getEntryTokenCountCached(entry) {
     try {
-        const uid = entry?.uid ?? '';
-        const content = typeof entry?.content === 'string' ? entry.content : '';
-        const key = `${uid}:${content.length}`;
-        if (TOKEN_COUNT_CACHE.has(key)) return TOKEN_COUNT_CACHE.get(key);
-        const tokens = Number(getTokenCount(content || '')) || 0;
-        TOKEN_COUNT_CACHE.set(key, tokens);
+        if (!entry || typeof entry !== 'object') return 0;
+        const content = typeof entry.content === 'string' ? entry.content : '';
+        const cached = TOKEN_COUNT_CACHE.get(entry);
+        if (cached && cached.content === content) return cached.tokens;
+
+        const tokens = Number(getTokenCount(content)) || 0;
+        TOKEN_COUNT_CACHE.set(entry, { content, tokens });
         return tokens;
     } catch {
         return 0;
@@ -436,86 +436,6 @@ function addLorebookBudgetMenuItem() {
 }
 
 /**
- * Vector Storage requests every lorebook at one global threshold. For World Info
- * queries only, group collections by their STLO per-lorebook override, then query
- * each threshold group and merge the results. Other vector searches are untouched.
- * Each threshold group retains the Vector Storage topK setting.
- */
-function installPerLorebookVectorThresholds() {
-    if (window.fetch.__stloPerLorebookThresholds) return;
-    const originalFetch = window.fetch.bind(window);
-    const wrappedFetch = async (input, init) => {
-        if (typeof input !== 'string' ||
-            !/^\/api\/vector\/query-multi(?:\?|$)/.test(input) ||
-            !init || typeof init.body !== 'string') {
-            return originalFetch(input, init);
-        }
-
-        let request;
-        try {
-            request = JSON.parse(init.body);
-        } catch {
-            return originalFetch(input, init);
-        }
-
-        if (!Array.isArray(request.collectionIds) ||
-            request.collectionIds.length === 0 ||
-            !request.collectionIds.every(id => typeof id === 'string' && id.startsWith('world_'))) {
-            return originalFetch(input, init);
-        }
-
-        const worlds = Array.isArray(world_names) ? world_names : [];
-        const worldByCollection = new Map(
-            worlds.filter(name => typeof name === 'string')
-                .map(name => ['world_' + getStringHash(name), name])
-        );
-        const groups = new Map();
-        const globalThreshold = Number.isFinite(Number(request.threshold))
-            ? Number(request.threshold) : 0;
-        let hasOverride = false;
-
-        for (const id of request.collectionIds) {
-            const world = worldByCollection.get(id);
-            const loreSettings = world ? await getLorebookSettings(world) : null;
-            const cutoff = loreSettings?.vectorThreshold;
-            const overridden = typeof cutoff === 'number' &&
-                Number.isFinite(cutoff) && cutoff >= 0 && cutoff <= 1;
-            if (overridden) hasOverride = true;
-            const threshold = overridden ? cutoff : globalThreshold;
-            if (!groups.has(threshold)) groups.set(threshold, []);
-            groups.get(threshold).push(id);
-        }
-
-        // Keep the original Vector Storage behavior when no book has an override.
-        if (!hasOverride) return originalFetch(input, init);
-
-        const responses = await Promise.all(
-            Array.from(groups, async ([threshold, collectionIds]) => {
-                return originalFetch(input, {
-                    ...init,
-                    body: JSON.stringify({ ...request, collectionIds, threshold }),
-                });
-            })
-        );
-
-        // Propagate the actual server error rather than silently dropping memories.
-        const failed = responses.find(response => !response.ok);
-        if (failed) return failed;
-        const merged = {};
-        for (const response of responses) {
-            Object.assign(merged, await response.json());
-        }
-        return new Response(JSON.stringify(merged), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-        });
-    };
-
-    wrappedFetch.__stloPerLorebookThresholds = true;
-    window.fetch = wrappedFetch;
-}
-
-/**
  * Handle the WORLDINFO_ENTRIES_LOADED event to apply our sorting
  * @param {Object} eventData - Contains globalLore, characterLore, chatLore, personaLore arrays
  */
@@ -543,9 +463,13 @@ async function getLorebookSettings(worldName) {
     try {
         // Cache-first: avoid backend fetches that may be gated by permissions/visibility
         if (worldInfoCache.has(worldName)) {
-            const worldData = worldInfoCache.get(worldName);
+            // StructuredCloneMap.get() clones the whole lorebook. Read the
+            // underlying Map value without mutating it; only copy STLO settings.
+            const worldData = worldInfoCache instanceof Map
+                ? Map.prototype.get.call(worldInfoCache, worldName)
+                : worldInfoCache.get(worldName);
             const extensionData = worldData && typeof worldData === 'object' ? worldData[EXTENSION_NAME] : null;
-            return { ...DEFAULT_LOREBOOK_SETTINGS, ...(extensionData || {}) };
+            return { ...DEFAULT_LOREBOOK_SETTINGS, ...(extensionData ? structuredClone(extensionData) : {}) };
         }
 
         // Not in cache: intentionally return defaults without fetching
@@ -786,14 +710,6 @@ async function openLorebookSettings(worldName = null) {
                 ${createBudgetControls('lorebook', currentSettings)}
             </div>
 
-            <div class="world_entry_form_control stlo-section">
-                <h4>벡터 유사도 임계값</h4>
-                <small>값이 높을수록 관련성이 높은 기억만 불러옵니다. 비워 두면 Vector Storage의 전역 임계값을 사용합니다. (0~1)</small>
-                <input type="number" id="${SELECTORS.LOREBOOK_VECTOR_THRESHOLD}" class="text_pole textarea_compact"
-                       min="0" max="1" step="0.01" placeholder="미입력시 전역 설정 사용"
-                       value="${typeof currentSettings.vectorThreshold === 'number' ? currentSettings.vectorThreshold : ''}">
-            </div>
-
             <!-- Only When Speaking Toggle -->
             <div class="world_entry_form_control stlo-section">
                 <div class="stlo-toggle-block">
@@ -846,7 +762,6 @@ async function openLorebookSettings(worldName = null) {
                 const orderAdjustmentGroupOnly = document.getElementById('lorebook-order-adjustment-group-only');
                 const onlyWhenSpeaking = document.getElementById('lorebook-only-when-speaking');
                 const randomTrimEl = document.getElementById(SELECTORS.LOREBOOK_RANDOM_TRIM);
-                const vectorThresholdInput = document.getElementById(SELECTORS.LOREBOOK_VECTOR_THRESHOLD);
 
                 if (prioritySelect && budgetModeSelect && budgetValueInput && orderAdjustmentEnabled && orderAdjustmentInput && orderAdjustmentGroupOnly && onlyWhenSpeaking) {
                     return {
@@ -858,7 +773,6 @@ async function openLorebookSettings(worldName = null) {
                         orderAdjustmentGroupOnly: orderAdjustmentGroupOnly.checked,
                         onlyWhenSpeaking: onlyWhenSpeaking.checked,
                         randomTrim: Boolean(randomTrimEl?.checked),
-                        vectorThreshold: vectorThresholdInput?.value ?? '',
                         timestamp: Date.now()
                     };
                 }
@@ -926,19 +840,7 @@ async function openLorebookSettings(worldName = null) {
                     validatedBudget = 0; // default mode
                 }
 
-                const rawThreshold = String(formState.vectorThreshold ?? '').trim();
-                let validatedThreshold = null;
-                if (rawThreshold !== '') {
-                    const parsedThreshold = Number(rawThreshold);
-                    if (!Number.isFinite(parsedThreshold) || parsedThreshold < 0 || parsedThreshold > 1) {
-                        toastr.error('벡터 임계값은 0부터 1까지 입력해 주세요.', 'Validation Error');
-                        return null;
-                    }
-                    validatedThreshold = parsedThreshold;
-                }
-
                 const validatedForm = {
-                    vectorThreshold: validatedThreshold,
                     priority: validatedPriority,
                     budgetMode: mode,
                     budget: validatedBudget,
@@ -1660,6 +1562,27 @@ async function applyPriorityOrdering(eventData) {
             }
         }
 
+        // Always-on entries must reserve their place before vector/keyword
+        // entries, regardless of their lorebook priority. Keep the relative
+        // priority/order of entries within each group unchanged.
+        let lowestConstant = Infinity;
+        let highestOther = -Infinity;
+        for (const entry of processedEntries) {
+            if (entry?.constant === true) {
+                lowestConstant = Math.min(lowestConstant, entry.order);
+            } else {
+                highestOther = Math.max(highestOther, entry.order);
+            }
+        }
+        if (Number.isFinite(lowestConstant) && Number.isFinite(highestOther)) {
+            const boost = Math.max(0, highestOther - lowestConstant + 1);
+            if (boost > 0) {
+                for (const entry of processedEntries) {
+                    if (entry?.constant === true) entry.order += boost;
+                }
+            }
+        }
+
         // Sort processed entries by new order (highest first) with deterministic tie-breakers
         processedEntries.sort((a, b) => {
             const ao = (a?.order ?? 100);
@@ -1738,7 +1661,6 @@ async function init() {
             await loadStloLocale();
             addLorebookBudgetMenuItem();
             installStloModalStyles();
-            installPerLorebookVectorThresholds();
             registerStloSlashCommand();
             registerBudgetEnforcementHandlers();
             // Register per-loop trimmer only on newer branches
@@ -1787,13 +1709,16 @@ async function onWorldInfoActivated(activatedEntries) {
             const perBudget = await calculateLorebookBudget(settings, totalBudget);
             if (!(perBudget > 0)) continue;
 
-            // Sort by new order (desc) or randomize if enabled, fallback to 100 if undefined
-            const sorted = list.slice();
+            // Constants always precede optional memories, even with random trim.
+            const always = list.filter(e => e?.constant === true)
+                .sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
+            const optional = list.filter(e => e?.constant !== true);
             if (settings.randomTrim) {
-                shuffleInPlace(sorted);
+                shuffleInPlace(optional);
             } else {
-                sorted.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
+                optional.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
             }
+            const sorted = [...always, ...optional];
 
             let usedTokens = 0;
 
@@ -1803,6 +1728,12 @@ async function onWorldInfoActivated(activatedEntries) {
 
                 if (ignore) {
                     // keep entry; do not consume budget
+                    continue;
+                }
+                if (e.constant === true) {
+                    // Count constant content against this book's limit, but
+                    // never evict it in favor of optional vector/keyword lore.
+                    usedTokens += tokens;
                     continue;
                 }
 
@@ -1883,10 +1814,8 @@ function onChatCompletionPromptReady(eventData) {
 function resetBudgetState() {
     EXTENSION_STATE.dropSet = null;
     EXTENSION_STATE.dropEntries = [];
-    // Periodically clear token cache to avoid unbounded growth between generations/chats
-    try {
-        TOKEN_COUNT_CACHE.clear();
-    } catch {}
+    // A new WeakMap drops old references without retaining entry objects.
+    TOKEN_COUNT_CACHE = new WeakMap();
 }
 
 // Compute total World Info budget (tokens) from base ST config
@@ -2031,19 +1960,26 @@ function registerPerLoopBudgetTrimmer() {
                     // Only trim when an explicit budget is set (> 0). Default mode returns 0.
                     if (!(perBudget > 0)) continue;
 
-                    // Sort entries by order desc (mirrors final assembly ordering) or randomize if enabled
-                    let sorted = list.slice();
+                    // Keep always-on entries first even when optional trim is randomized.
+                    const always = list.filter(e => e?.constant === true)
+                        .sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
+                    const optional = list.filter(e => e?.constant !== true);
                     if (settings.randomTrim) {
-                        shuffleInPlace(sorted);
+                        shuffleInPlace(optional);
                     } else {
-                        sorted.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
+                        optional.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
                     }
+                    const sorted = [...always, ...optional];
 
                     let used = 0;
                     const toDrop = [];
                     for (const e of sorted) {
                         if (e?.ignoreBudget === true) continue; // keep without consuming budget
                         const tokens = getEntryTokenCountCached(e);
+                        if (e.constant === true) {
+                            used += tokens;
+                            continue;
+                        }
                         if ((used + tokens) <= perBudget) {
                             used += tokens;
                         } else {
