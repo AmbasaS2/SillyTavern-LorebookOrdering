@@ -1,5 +1,6 @@
 import { event_types, eventSource } from '../../../events.js';
 import { getTokenCount } from '../../../tokenizers.js';
+import { getStringHash } from '../../../utils.js';
 import { getContext } from '../../../extensions.js';
 import { characters, getMaxContextSize } from '../../../../script.js';
 import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names } from '../../../world-info.js';
@@ -11,14 +12,13 @@ import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/Sla
 
 const EXTENSION_NAME = 'stlo';
 const SELECTORS = {
-    WORLD_INFO_SEARCH: 'world_info_search',
-    LOREBOOK_ORDERING_BUTTON: 'lorebook_ordering_button',
     WORLD_EDITOR_SELECT: '#world_editor_select',
     LOREBOOK_PRIORITY_SELECT: 'lorebook_priority_select',
     LOREBOOK_BUDGET_MODE: 'lorebook_budget_mode',
     LOREBOOK_BUDGET_VALUE: 'lorebook_budget_value',
     LOREBOOK_BUDGET_VALUE_CONTAINER: 'lorebook_budget_value_container',
-    LOREBOOK_RANDOM_TRIM: 'lorebook_random_trim'
+    LOREBOOK_RANDOM_TRIM: 'lorebook_random_trim',
+    LOREBOOK_VECTOR_THRESHOLD: 'lorebook_vector_threshold'
 };
 
 // Default settings for lorebooks
@@ -30,7 +30,8 @@ const DEFAULT_LOREBOOK_SETTINGS = {
     orderAdjustmentGroupOnly: false, // Only apply order adjustment in group chats
     characterOverrides: {},  // Character-specific priority overrides for group chats
     onlyWhenSpeaking: false,  // Only activate in group chats when assigned characters are speaking
-    randomTrim: false
+    randomTrim: false,
+    vectorThreshold: null // null = use the Vector Storage global score threshold
 };
 
 // Cleanup tracking
@@ -263,59 +264,148 @@ function setupEventHandlers() {
     );
 }
 
+
 /**
- * Add the lorebook ordering button to the world info panel
+ * Open the existing STLO editor from the extensions menu without requiring the
+ * World Info tab to be open. The selected lorebook is passed directly to the editor.
  */
-function addLorebookOrderingButton() {
-    const createButton = () => {
-        const worldInfoSearch = document.getElementById(SELECTORS.WORLD_INFO_SEARCH);
-
-        // Check if button already exists or world info search not available
-        if (!worldInfoSearch || document.getElementById(SELECTORS.LOREBOOK_ORDERING_BUTTON)) {
-            return false;
-        }
-
-        // Create the button
-        const button = document.createElement('div');
-        button.id = SELECTORS.LOREBOOK_ORDERING_BUTTON;
-        button.className = 'menu_button fa-solid fa-bars-staggered';
-        button.setAttribute('data-i18n', '[title]stlo.button.configure; [aria-label]stlo.button.configure');
-        button.title = translate('Configure STLO Priority & Budget', 'stlo.button.configure');
-        button.setAttribute('aria-label', translate('Configure STLO Priority & Budget', 'stlo.button.configure'));
-
-        // Add click handler
-        button.addEventListener('click', async () => {
-            await openLorebookSettings();
-        });
-
-        worldInfoSearch.parentNode.insertBefore(button, worldInfoSearch);
-        return true;
-    };
-
-    // Try to create button immediately (in case world info panel is already open)
-    if (createButton()) {
+async function openLorebookBudgetFromMenu() {
+    const available = (Array.isArray(world_names) ? world_names : [])
+        .filter(name => typeof name === 'string' && name.trim() !== '');
+    if (available.length === 0) {
+        toastr.info(translate('Create or select a World Info file first.', 'stlo.info.noLorebook'));
         return;
     }
 
-    // If immediate creation failed, wait for world info panel to be loaded
-    const handleWorldInfoLoaded = () => {
-        if (createButton()) {
-            // Button created successfully, remove this listener
-            eventSource.removeListener(event_types.WORLDINFO_UPDATED, handleWorldInfoLoaded);
-            // Also remove from tracking array
-            const index = eventListeners.findIndex(listener =>
-                listener.source === eventSource &&
-                listener.event === event_types.WORLDINFO_UPDATED &&
-                listener.handler === handleWorldInfoLoaded
-            );
-            if (index !== -1) {
-                eventListeners.splice(index, 1);
-            }
+    const form = document.createElement('div');
+    form.className = 'world_entry_form_control';
+    const label = document.createElement('label');
+    label.htmlFor = 'stlo_menu_lorebook_select';
+    label.textContent = '로어북 선택';
+    const select = document.createElement('select');
+    select.id = 'stlo_menu_lorebook_select';
+    select.className = 'text_pole textarea_compact';
+    for (const name of available) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+    }
+    const current = getCurrentLorebookName();
+    if (current && available.includes(current)) select.value = current;
+    form.append(label, select);
+
+    const selected = await new Promise(resolve => {
+        const popup = new Popup(form, POPUP_TYPE.CONFIRM, '', {
+            okButton: '설정 열기',
+            cancelButton: translate('Cancel', 'stlo.modal.cancel'),
+            onClosing: closingPopup => {
+                resolve(closingPopup.result === 1 ? select.value : null);
+                return true;
+            },
+        });
+        popup.show();
+    });
+    if (selected) await openLorebookSettings(selected);
+}
+
+/** Add a Font Awesome book entry only to SillyTavern's extensions menu. */
+function addLorebookBudgetMenuItem() {
+    const menu = document.getElementById('extensionsMenu');
+    if (!menu || document.getElementById('stlo_budget_menu_item')) return;
+    const container = document.createElement('div');
+    container.className = 'extension_container';
+    const item = document.createElement('div');
+    item.id = 'stlo_budget_menu_item';
+    item.className = 'list-group-item flex-container flexGap5';
+    const icon = document.createElement('div');
+    icon.className = 'fa-solid fa-book extensionsMenuExtensionButton';
+    const label = document.createElement('span');
+    label.textContent = '로어북 예산';
+    item.append(icon, label);
+    item.addEventListener('click', openLorebookBudgetFromMenu);
+    container.appendChild(item);
+    menu.appendChild(container);
+}
+
+/**
+ * Vector Storage requests every lorebook at one global threshold. For World Info
+ * queries only, group collections by their STLO per-lorebook override, then query
+ * each threshold group and merge the results. Other vector searches are untouched.
+ * Each threshold group retains the Vector Storage topK setting.
+ */
+function installPerLorebookVectorThresholds() {
+    if (window.fetch.__stloPerLorebookThresholds) return;
+    const originalFetch = window.fetch.bind(window);
+    const wrappedFetch = async (input, init) => {
+        if (typeof input !== 'string' ||
+            !/^\/api\/vector\/query-multi(?:\?|$)/.test(input) ||
+            !init || typeof init.body !== 'string') {
+            return originalFetch(input, init);
         }
+
+        let request;
+        try {
+            request = JSON.parse(init.body);
+        } catch {
+            return originalFetch(input, init);
+        }
+
+        if (!Array.isArray(request.collectionIds) ||
+            request.collectionIds.length === 0 ||
+            !request.collectionIds.every(id => typeof id === 'string' && id.startsWith('world_'))) {
+            return originalFetch(input, init);
+        }
+
+        const worlds = Array.isArray(world_names) ? world_names : [];
+        const worldByCollection = new Map(
+            worlds.filter(name => typeof name === 'string')
+                .map(name => ['world_' + getStringHash(name), name])
+        );
+        const groups = new Map();
+        const globalThreshold = Number.isFinite(Number(request.threshold))
+            ? Number(request.threshold) : 0;
+        let hasOverride = false;
+
+        for (const id of request.collectionIds) {
+            const world = worldByCollection.get(id);
+            const loreSettings = world ? await getLorebookSettings(world) : null;
+            const cutoff = loreSettings?.vectorThreshold;
+            const overridden = typeof cutoff === 'number' &&
+                Number.isFinite(cutoff) && cutoff >= 0 && cutoff <= 1;
+            if (overridden) hasOverride = true;
+            const threshold = overridden ? cutoff : globalThreshold;
+            if (!groups.has(threshold)) groups.set(threshold, []);
+            groups.get(threshold).push(id);
+        }
+
+        // Keep the original Vector Storage behavior when no book has an override.
+        if (!hasOverride) return originalFetch(input, init);
+
+        const responses = await Promise.all(
+            Array.from(groups, async ([threshold, collectionIds]) => {
+                return originalFetch(input, {
+                    ...init,
+                    body: JSON.stringify({ ...request, collectionIds, threshold }),
+                });
+            })
+        );
+
+        // Propagate the actual server error rather than silently dropping memories.
+        const failed = responses.find(response => !response.ok);
+        if (failed) return failed;
+        const merged = {};
+        for (const response of responses) {
+            Object.assign(merged, await response.json());
+        }
+        return new Response(JSON.stringify(merged), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
     };
 
-    eventSource.on(event_types.WORLDINFO_UPDATED, handleWorldInfoLoaded);
-    eventListeners.push({ source: eventSource, event: event_types.WORLDINFO_UPDATED, handler: handleWorldInfoLoaded });
+    wrappedFetch.__stloPerLorebookThresholds = true;
+    window.fetch = wrappedFetch;
 }
 
 /**
@@ -507,7 +597,7 @@ function registerStloSlashCommand() {
 /**
  * Open the lorebook settings modal
  */
-async function openLorebookSettings() {
+async function openLorebookSettings(worldName = null) {
     // Use try-finally to ensure modal state is always reset
     try {
         // Atomic lock to prevent race conditions
@@ -519,7 +609,7 @@ async function openLorebookSettings() {
 
         // Settings opening
 
-        const currentLorebook = getCurrentLorebookName();
+        const currentLorebook = worldName || getCurrentLorebookName();
         if (!currentLorebook) {
             EXTENSION_STATE.modalOpen = false;
             toastr.info(
@@ -584,6 +674,14 @@ async function openLorebookSettings() {
                 ${createBudgetControls('lorebook', currentSettings)}
             </div>
 
+            <div class="world_entry_form_control MarginTop10">
+                <h4>벡터 유사도 임계값</h4>
+                <small>이 로어북의 벡터 검색에만 적용해. 비워두면 Vector Storage의 전역 임계값을 사용해 (0~1).</small>
+                <input type="number" id="${SELECTORS.LOREBOOK_VECTOR_THRESHOLD}" class="text_pole textarea_compact"
+                       min="0" max="1" step="0.01" placeholder="전역 설정 사용"
+                       value="${typeof currentSettings.vectorThreshold === 'number' ? currentSettings.vectorThreshold : ''}">
+            </div>
+
             <!-- Only When Speaking Toggle -->
             <div class="world_entry_form_control MarginTop10">
                 <label class="checkbox_label" for="lorebook-only-when-speaking">
@@ -633,6 +731,7 @@ async function openLorebookSettings() {
                 const orderAdjustmentGroupOnly = document.getElementById('lorebook-order-adjustment-group-only');
                 const onlyWhenSpeaking = document.getElementById('lorebook-only-when-speaking');
                 const randomTrimEl = document.getElementById(SELECTORS.LOREBOOK_RANDOM_TRIM);
+                const vectorThresholdInput = document.getElementById(SELECTORS.LOREBOOK_VECTOR_THRESHOLD);
 
                 if (prioritySelect && budgetModeSelect && budgetValueInput && orderAdjustmentEnabled && orderAdjustmentInput && orderAdjustmentGroupOnly && onlyWhenSpeaking) {
                     return {
@@ -644,6 +743,7 @@ async function openLorebookSettings() {
                         orderAdjustmentGroupOnly: orderAdjustmentGroupOnly.checked,
                         onlyWhenSpeaking: onlyWhenSpeaking.checked,
                         randomTrim: Boolean(randomTrimEl?.checked),
+                        vectorThreshold: vectorThresholdInput?.value ?? '',
                         timestamp: Date.now()
                     };
                 }
@@ -711,7 +811,19 @@ async function openLorebookSettings() {
                     validatedBudget = 0; // default mode
                 }
 
+                const rawThreshold = String(formState.vectorThreshold ?? '').trim();
+                let validatedThreshold = null;
+                if (rawThreshold !== '') {
+                    const parsedThreshold = Number(rawThreshold);
+                    if (!Number.isFinite(parsedThreshold) || parsedThreshold < 0 || parsedThreshold > 1) {
+                        toastr.error('벡터 임계값은 0부터 1까지 입력해줘.', 'Validation Error');
+                        return null;
+                    }
+                    validatedThreshold = parsedThreshold;
+                }
+
                 const validatedForm = {
+                    vectorThreshold: validatedThreshold,
                     priority: validatedPriority,
                     budgetMode: mode,
                     budget: validatedBudget,
@@ -1507,7 +1619,8 @@ async function init() {
 
             setupEventHandlers();
             await loadStloLocale();
-            addLorebookOrderingButton();
+            addLorebookBudgetMenuItem();
+            installPerLorebookVectorThresholds();
             registerStloSlashCommand();
             registerBudgetEnforcementHandlers();
             // Register per-loop trimmer only on newer branches
