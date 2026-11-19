@@ -260,33 +260,46 @@ function installStloModalStyles() {
     const style = document.createElement('style');
     style.id = 'stlo-modal-styles';
     style.textContent = `
-        .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 9px; width: 100%; min-width: 0; box-sizing: border-box; text-align: left; }
-        .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-width: 0; margin: 0; padding: 0 0 11px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
+        .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%; min-width: 0; box-sizing: border-box; text-align: left; }
+        .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-width: 0; margin: 0; padding: 0 0 10px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
         .stlo-modal-ui .stlo-section:last-child { padding-bottom: 0; border-bottom: none; }
-        .stlo-modal-ui h3, .stlo-modal-ui h4, .stlo-modal-ui h5 { margin: 0; text-align: left; line-height: 1.3; }
-        .stlo-modal-ui h3 { margin-bottom: 2px; }
-        .stlo-modal-ui small { display: block; margin: 0; text-align: left; line-height: 1.4; opacity: 0.85; }
+        .stlo-modal-ui h3, .stlo-modal-ui h4, .stlo-modal-ui h5 { margin: 0; line-height: 1.35; text-align: left; }
+        .stlo-modal-ui h3 { margin-bottom: 3px; }
+        .stlo-modal-ui small { display: block; margin: 0; line-height: 1.4; text-align: left; opacity: .85; }
         .stlo-modal-ui .stlo-section > select, .stlo-modal-ui .stlo-budget-options > select { width: min(100%, 320px) !important; max-width: 100%; min-width: 0; box-sizing: border-box; margin: 2px 0 0 !important; }
         .stlo-modal-ui .stlo-section > input[type="number"] { width: min(100%, 220px) !important; max-width: 100%; min-width: 0; box-sizing: border-box; margin: 2px 0 0 !important; }
-        .stlo-modal-ui .stlo-toggle-block { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; margin: 0; }
-        .stlo-modal-ui .stlo-checkrow { display: flex; align-items: center; justify-content: flex-start; gap: 5px; width: auto; max-width: 100%; margin: 0; line-height: 1.35; text-align: left; }
-        .stlo-modal-ui .stlo-checkrow input[type="checkbox"] { width: auto !important; max-width: none !important; flex: 0 0 auto; margin: 0; }
+        .stlo-modal-ui .stlo-field-heading, .stlo-modal-ui .stlo-option-line { display: flex; align-items: center; justify-content: flex-start; gap: 7px; width: 100%; min-width: 0; }
+        .stlo-modal-ui .stlo-option-line { gap: 6px; }
+        .stlo-modal-ui .stlo-toggle-block { display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; margin: 2px 0 0; }
+        .stlo-modal-ui .stlo-checkrow { display: inline-flex; align-items: center; justify-content: flex-start; gap: 7px; width: auto; max-width: 100%; min-width: 0; margin: 0; line-height: 1.35; text-align: left; }
+        .stlo-modal-ui .stlo-checkrow input[type="checkbox"] { width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; min-height: 16px !important; max-height: 16px !important; flex: 0 0 16px; aspect-ratio: 1; border-radius: 3px !important; box-sizing: border-box; margin: 0 !important; padding: 0 !important; }
         .stlo-modal-ui .checkbox_label > .checkmark { display: none; }
-        .stlo-modal-ui .stlo-toggle-block > small { margin: 0; line-height: 1.35; }
-        .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 0; padding-top: 3px; width: 100%; }
+        .stlo-modal-ui .stlo-info { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; margin: 0; padding: 0; }
+        .stlo-modal-ui .stlo-info > summary { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; box-sizing: border-box; border: 1px solid currentColor; border-radius: 50%; font-size: 12px; font-style: normal; font-weight: 700; line-height: 1; opacity: .75; list-style: none; cursor: pointer; user-select: none; }
+        .stlo-modal-ui .stlo-info > summary::-webkit-details-marker { display: none; }
+        .stlo-modal-ui .stlo-info > summary::marker { content: ""; }
+        .stlo-modal-ui .stlo-info > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+        .stlo-modal-ui .stlo-info[open] > summary { opacity: 1; }
+        .stlo-modal-ui .stlo-info-body { position: absolute; z-index: 10; top: calc(100% + 6px); left: 0; width: min(270px, calc(100vw - 90px)); max-width: none; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--SmartThemeBorderColor); border-radius: 7px; background: var(--SmartThemeBlurTintColor, #f8f3e9); color: var(--SmartThemeBodyColor, #333); box-shadow: 0 3px 12px rgba(0,0,0,.18); }
+        .stlo-modal-ui .stlo-info-body small + small { margin-top: 5px; }
+        .stlo-modal-ui .stlo-info-end .stlo-info-body { left: auto; right: 0; }
+        .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 3px 0 0; padding: 7px 0 0 12px; width: 100%; box-sizing: border-box; }
         .stlo-modal-ui .stlo-order-controls[hidden] { display: none !important; }
         .stlo-modal-ui .stlo-inline-number { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 7px; }
         .stlo-modal-ui .stlo-inline-number input[type="number"] { width: 110px !important; max-width: 100%; }
-        .stlo-modal-ui .stlo-budget-options { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; }
-        .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; }
+        .stlo-modal-ui .stlo-budget-options { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; }
+        .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; }
         .stlo-modal-ui .stlo-budget-value input[type="number"] { width: 130px !important; max-width: 100%; margin: 0 !important; }
-        .stlo-modal-ui .stlo-budget-note { margin-top: 1px; }
-        .stlo-modal-ui .stlo-advanced-drawer { width: 100%; }
+        .stlo-modal-ui .stlo-advanced-drawer { width: 100%; margin: 3px 0 0; }
+        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 9px 4px 0; }
+        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-toggle > b { min-width: 0; }
+        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-icon { flex: 0 0 auto; margin-left: auto !important; }
         .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-content { padding-top: 6px; }
-        .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 10px; }
+        .stlo-modal-ui .stlo-advanced-drawer .info-block { margin-bottom: 6px !important; }
+        .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 9px; }
         @media (max-width: 480px) {
-            .stlo-modal-ui { gap: 7px; }
-            .stlo-modal-ui .stlo-section { gap: 4px; padding-bottom: 9px; }
+            .stlo-modal-ui { gap: 6px; }
+            .stlo-modal-ui .stlo-section { gap: 4px; padding-bottom: 8px; }
         }
     `;
     document.head.appendChild(style);
@@ -761,8 +774,13 @@ async function openLorebookSettings(worldName = null) {
             <div class="stlo-modal-ui">
             <div class="world_entry_form_control stlo-section">
                 <h3 data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>
-                <h4 data-i18n="stlo.modal.priority.title">Lorebook Priority</h4>
-                <small data-i18n="stlo.modal.priority.help">Higher numbers (4-5) process first. Lower numbers (1-2) process last.</small>
+                <div class="stlo-field-heading">
+                    <h4 data-i18n="stlo.modal.priority.title">Lorebook Priority</h4>
+                    <details class="stlo-info">
+                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <div class="stlo-info-body"><small data-i18n="stlo.modal.priority.help">Higher numbers (4-5) process first. Lower numbers (1-2) process last.</small></div>
+                    </details>
+                </div>
 
                 <select id="${SELECTORS.LOREBOOK_PRIORITY_SELECT}" class="text_pole textarea_compact">
                     <option value="5" ${currentSettings.priority === 5 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.5">5 - Highest Priority (Processes First)</option>
@@ -771,34 +789,43 @@ async function openLorebookSettings(worldName = null) {
                     <option value="2" ${currentSettings.priority === 2 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.2">2 - Low Priority</option>
                     <option value="1" ${currentSettings.priority === 1 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.1">1 - Lowest Priority (Processes Last)</option>
                 </select>
-            </div>
-
-            <div class="world_entry_form_control stlo-section">
                 <div class="stlo-toggle-block">
-                    <label class="checkbox_label stlo-checkrow" for="${SELECTORS.PROTECT_ALWAYS_ON}">
+                    <div class="stlo-option-line">
+                        <label class="checkbox_label stlo-checkrow" for="${SELECTORS.PROTECT_ALWAYS_ON}">
                         <input type="checkbox" id="${SELECTORS.PROTECT_ALWAYS_ON}"
                                ${getProtectAlwaysOn() ? 'checked' : ''}>
                         <span class="checkmark"></span>
                         <span>상시 주입 우선 보호</span>
                     </label>
-                    <small>전체 로어북에 적용됩니다. 상시 항목을 키워드·벡터보다 먼저 처리합니다. 예산이 부족하면 상시 항목도 순서대로 제외됩니다.</small>
+                    <details class="stlo-info stlo-info-end">
+                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <div class="stlo-info-body"><small>모든 로어북에 적용됩니다. 상시 항목을 먼저 넣고, 예산이 부족하면 상시 항목도 순서대로 제외합니다.</small></div>
+                    </details>
+                    </div>
                 </div>
-            </div>
-
-            <div class="world_entry_form_control stlo-section">
                 <div class="stlo-toggle-block">
-                    <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-enabled">
+                    <div class="stlo-option-line">
+                        <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-enabled">
                         <input type="checkbox" id="lorebook-order-adjustment-enabled"
                                ${currentSettings.orderAdjustment !== 0 ? 'checked' : ''}>
                         <span class="checkmark"></span>
                         <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
                     </label>
-                    <small data-i18n="stlo.modal.order.help">Fine-tune processing order within this lorebook's priority level</small>
+                    <details class="stlo-info stlo-info-end">
+                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <div class="stlo-info-body"><small data-i18n="stlo.modal.order.help">Fine-tune processing order within this lorebook's priority level</small></div>
+                    </details>
+                    </div>
                 </div>
 
                 <div class="world_entry_form_control stlo-order-controls" id="lorebook-order-adjustment-container" ${currentSettings.orderAdjustment !== 0 ? '' : 'hidden'}>
-                    <h4 data-i18n="stlo.modal.order.title">Order Adjustment</h4>
-                    <small data-i18n="stlo.modal.order.explain">Higher values process first. Examples: +250 for slight boost, -500 for lower priority.</small>
+                    <div class="stlo-field-heading">
+                        <h4 data-i18n="stlo.modal.order.title">Order Adjustment</h4>
+                        <details class="stlo-info">
+                            <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                            <div class="stlo-info-body"><small data-i18n="stlo.modal.order.explain">Higher values process first. Examples: +250 for slight boost, -500 for lower priority.</small></div>
+                        </details>
+                    </div>
                     <div class="stlo-inline-number">
                         <input type="number" id="lorebook-order-adjustment" class="text_pole textarea_compact"
                                value="${currentSettings.orderAdjustment}" min="-10000" max="10000" step="1"
@@ -806,15 +833,18 @@ async function openLorebookSettings(worldName = null) {
                         <small style="color: #888;" data-i18n="stlo.modal.order.range">-10k to +10k</small>
                     </div>
 
-                    <div class="MarginTop10">
-                        <div class="stlo-toggle-block">
+                    <div class="stlo-toggle-block">
+                        <div class="stlo-option-line">
                             <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-group-only">
                                 <input type="checkbox" id="lorebook-order-adjustment-group-only"
                                        ${currentSettings.orderAdjustmentGroupOnly ? 'checked' : ''}>
                                 <span class="checkmark"></span>
                                 <span data-i18n="stlo.modal.order.groupOnly.label">Group Chats Only</span>
                             </label>
-                            <small data-i18n="stlo.modal.order.groupOnly.help">Only apply order adjustment during group chats (ignored in single character chats)</small>
+                            <details class="stlo-info stlo-info-end">
+                                <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                                <div class="stlo-info-body"><small data-i18n="stlo.modal.order.groupOnly.help">Only apply order adjustment during group chats (ignored in single character chats)</small></div>
+                            </details>
                         </div>
                     </div>
                 </div>
@@ -825,34 +855,42 @@ async function openLorebookSettings(worldName = null) {
             </div>
 
             <div class="world_entry_form_control stlo-section">
-                <h4>벡터 유사도 임계값</h4>
-                <small>이 로어북만 다른 기준으로 검색할 때 입력합니다. 비워두면 전역 설정을 사용합니다. (0~1)</small>
+                <div class="stlo-field-heading">
+                    <h4>벡터 유사도 임계값</h4>
+                    <details class="stlo-info">
+                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <div class="stlo-info-body"><small>0~1 사이의 값을 입력합니다. 비워두면 전역 설정을 사용합니다. 다른 값으로 검색할 때는 요청이 추가되어 비용과 시간이 늘 수 있습니다.</small></div>
+                    </details>
+                </div>
                 <input type="number" id="${SELECTORS.LOREBOOK_VECTOR_THRESHOLD}" class="text_pole textarea_compact"
                        min="0" max="1" step="0.01" placeholder="미입력시 전역 설정 사용"
                        value="${currentSettings.vectorThresholdEnabled === true
                            && typeof currentSettings.vectorThreshold === 'number'
                            ? currentSettings.vectorThreshold : ''}">
-                <small>다른 임계값을 쓰는 로어북이 함께 활성화되면 검색 요청이 추가되어 임베딩 비용과 처리 시간이 늘어날 수 있습니다.</small>
             </div>
 
-            <!-- Only When Speaking Toggle -->
-            <div class="world_entry_form_control stlo-section">
+            <!-- Group chat controls share one section, without dividers between toggles. -->
+            <div class="world_entry_form_control stlo-section stlo-group-section">
                 <div class="stlo-toggle-block">
-                    <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
+                    <div class="stlo-option-line">
+                        <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
                         <input type="checkbox" id="lorebook-only-when-speaking"
                                ${currentSettings.onlyWhenSpeaking ? 'checked' : ''}>
                         <span class="checkmark"></span>
                         <span data-i18n="stlo.modal.onlyWhenSpeaking.label">Group chats: Only activate for specific characters (requires character assignments below)</span>
                     </label>
-                    <small>
-                        <span data-i18n="stlo.modal.onlyWhenSpeaking.help.1">When enabled, this lorebook will only activate when characters assigned in Group Chat Overrides are speaking.</span>
-                        <strong data-i18n="stlo.modal.onlyWhenSpeaking.help.2">If this box is checked but no characters are assigned below, this lorebook WILL NOT ACTIVATE during group chats.</strong>
-                    </small>
+                    <details class="stlo-info stlo-info-end">
+                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <div class="stlo-info-body">
+                            <small data-i18n="stlo.modal.onlyWhenSpeaking.help.1">When enabled, this lorebook will only activate when characters assigned in Group Chat Overrides are speaking.</small>
+                            <small data-i18n="stlo.modal.onlyWhenSpeaking.help.2">If this box is checked but no characters are assigned below, this lorebook WILL NOT ACTIVATE during group chats.</small>
+                        </div>
+                    </details>
+                    </div>
                 </div>
-            </div>
 
             <!-- Group Chat Overrides -->
-            <div class="inline-drawer wide100p world_entry_form_control stlo-section stlo-advanced-drawer">
+            <div class="inline-drawer wide100p world_entry_form_control stlo-advanced-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
                     <b data-i18n="stlo.modal.groupOverrides.title">Group Chat Overrides</b>
                     <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
@@ -869,6 +907,7 @@ async function openLorebookSettings(worldName = null) {
                         <!-- Priority sections will be inserted here -->
                     </div>
                 </div>
+            </div>
             </div>
             </div>
         `;
@@ -1200,8 +1239,17 @@ function createBudgetControls(scope, currentSettings = {}) {
     const mode = currentSettings.budgetMode || 'default';
     const value = (typeof currentSettings.budget === 'number' ? currentSettings.budget : (currentSettings.budget || 0));
     return `
-        <h4 data-i18n="stlo.budget.title">Budget</h4>
-        <small data-i18n="stlo.budget.help">Control how much of the context or World Info budget this lorebook may use.</small>
+        <div class="stlo-field-heading">
+            <h4 data-i18n="stlo.budget.title">Budget</h4>
+            <details class="stlo-info">
+                <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                <div class="stlo-info-body">
+                    <small data-i18n="stlo.budget.help">Control how much of the context or World Info budget this lorebook may use.</small>
+                    <small data-i18n="stlo.budget.tip">Tip: default (0) lets ST decide; Fixed with 1 effectively chokes off this lorebook.</small>
+                    <small>재귀 검색을 쓰면, 최종 주입에서 빠진 로어도 다른 로어를 불러오는 데 영향을 줄 수 있습니다.</small>
+                </div>
+            </details>
+        </div>
         <div class="stlo-budget-options">
             <select id="${SELECTORS.LOREBOOK_BUDGET_MODE}" class="text_pole textarea_compact">
                 <option value="default" ${mode === 'default' ? 'selected' : ''} data-i18n="stlo.budget.mode.default">Use ST World Info Budget (default)</option>
@@ -1221,8 +1269,6 @@ function createBudgetControls(scope, currentSettings = {}) {
                     </label>
                 </div>
             </div>
-            <small class="stlo-budget-note" data-i18n="stlo.budget.tip">Tip: default (0) lets ST decide; Fixed with 1 effectively chokes off this lorebook.</small>
-            <small class="stlo-budget-note">재귀 검색 사용 시, 예산에서 제외된 로어가 다른 로어의 활성화에 영향을 줄 수 있습니다. 최종 주입에는 예산 제한이 적용됩니다.</small>
         </div>
     `;
 }
