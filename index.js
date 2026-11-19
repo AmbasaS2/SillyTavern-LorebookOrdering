@@ -66,7 +66,11 @@ const EXTENSION_STATE = {
     modalOpen: false,
     pendingAnimationFrame: null,
     currentSpeakingCharacter: null,  // Track current speaking character for group chat overrides
-    budgetHandlersRegistered: false
+    budgetHandlersRegistered: false,
+    // These settings were read once when the current World Info scan began.
+    scanWorldSettings: new Map(),
+    scanBudgetWorlds: new Set(),
+    scanHasExplicitBudgets: false
 };
 
 // Feature detection: WORLDINFO_SCAN_DONE exists only on newer ST branches
@@ -80,39 +84,6 @@ function stloDebug(...args) {
     }
 }
 // Utility functions
-
-// Simple debounce (leading=false, trailing=true)
-function debounce(fn, wait = 50) {
-    let t = null, lastArgs = null;
-    return function debounced(...args) {
-        lastArgs = args;
-        if (t) clearTimeout(t);
-        t = setTimeout(() => {
-            t = null;
-            fn.apply(this, lastArgs);
-        }, wait);
-    };
-}
-
-// Fire-and-forget background scheduler
-function scheduleBackground(fn) {
-    const run = () => {
-        try {
-            const ret = fn();
-            if (ret && typeof ret.then === 'function') {
-                ret.catch(e => console.warn('[STLO] scheduleBackground task error:', e));
-            }
-        } catch (e) {
-            console.warn('[STLO] scheduleBackground task sync error:', e);
-        }
-    };
-    try {
-        if (typeof requestIdleCallback === 'function') {
-            return requestIdleCallback(run, { timeout: 120 });
-        }
-    } catch {}
-    return setTimeout(run, 0);
-}
 
 // Token counts are cached by the exact entry object and content, not by UID
 // and length (which can collide across lorebooks or edited content).
@@ -643,13 +614,10 @@ async function setLorebookSettings(worldName, settings) {
             console.warn('STLO: Failed to update worldInfoCache after save:', e);
         }
 
-        // Reset budget-related state so new budgets apply on next generation
-        try {
-            EXTENSION_STATE.dropSet = null;
-            EXTENSION_STATE.dropEntries = [];
-        } catch (e) {
-            console.warn('STLO: Failed to reset budget state after save:', e);
-        }
+        // Discard any settings snapshot so the next scan uses the saved value.
+        EXTENSION_STATE.scanWorldSettings = new Map();
+        EXTENSION_STATE.scanBudgetWorlds = new Set();
+        EXTENSION_STATE.scanHasExplicitBudgets = false;
 
         // Notify UI/listeners that World Info has updated so panels can re-render
         try {
@@ -1686,6 +1654,21 @@ async function applyPriorityOrdering(eventData) {
             );
         }
 
+        // Reuse these small settings objects during subsequent scan passes.
+        // Avoid reading/cloning a lorebook's settings again for every loop.
+        EXTENSION_STATE.scanWorldSettings = settingsCache;
+        const budgetWorlds = new Set();
+        for (const [world, settings] of settingsCache) {
+            const configured = (mode, value) => mode && mode !== 'default' && Number(value) > 0;
+            if (configured(settings?.budgetMode, settings?.budget)
+                || Object.values(settings?.characterOverrides || {}).some(override =>
+                    configured(override?.budgetMode, override?.budget))) {
+                budgetWorlds.add(world);
+            }
+        }
+        EXTENSION_STATE.scanBudgetWorlds = budgetWorlds;
+        EXTENSION_STATE.scanHasExplicitBudgets = budgetWorlds.size > 0;
+
         const processedEntries = [];
         let skippedOnlyWhenSpeaking = 0;
 
@@ -1758,6 +1741,24 @@ async function applyPriorityOrdering(eventData) {
                     for (const entry of processedEntries) {
                         if (entry?.constant === true) entry.order += boost;
                     }
+                }
+            }
+        }
+
+        // Core SillyTavern gives active Sticky entries precedence over Order.
+        // Temporarily bypass its early budget check for eligible constants so
+        // Sticky cannot use their space first. The scan-done handler enforces
+        // the actual total WI budget and original per-book limits afterward.
+        // Only scan-local entry clones are touched, never saved lorebook data.
+        // Without any Sticky-configured entries, native Order already puts
+        // constants first. Avoid bypassing core budgeting unnecessarily.
+        const hasStickyCandidates = processedEntries.some(entry =>
+            entry?.disable !== true && Number(entry?.sticky) > 0);
+        if (HAS_WORLDINFO_SCAN_DONE && getProtectAlwaysOn() && hasStickyCandidates) {
+            for (const entry of processedEntries) {
+                if (entry?.constant === true && entry.disable !== true && entry.ignoreBudget !== true) {
+                    entry.__stloReservedConstant = true;
+                    entry.ignoreBudget = true;
                 }
             }
         }
@@ -1846,6 +1847,8 @@ async function init() {
             // Register per-loop trimmer only on newer branches
             if (HAS_WORLDINFO_SCAN_DONE) {
                 registerPerLoopBudgetTrimmer();
+            } else {
+                console.warn('[STLO] This SillyTavern version lacks WORLDINFO_SCAN_DONE. Per-book budget trimming is unavailable without unsafe prompt edits.');
             }
 
         } catch (error) {
@@ -1861,138 +1864,14 @@ init();
 
 // ================== STLO: Per-lorebook Budget Markers & Trimming ==================
 
-// Lazy-initialize extension state for budget enforcement
-if (!EXTENSION_STATE.dropSet) EXTENSION_STATE.dropSet = null;
-
 /**
- * WORLD_INFO_ACTIVATED handler: compute per-lorebook drop set (entry count budget).
- * Activated entries are structured; sorting by order desc mirrors final assembly.
- */
-async function onWorldInfoActivated(activatedEntries) {
-    try {
-        const byWorld = new Map();
-        for (const e of (activatedEntries || [])) {
-            if (!e?.world) continue;
-            if (!byWorld.has(e.world)) byWorld.set(e.world, []);
-            byWorld.get(e.world).push(e);
-        }
-
-        const dropSet = new Set();
-        const dropEntries = [];
-
-        // Compute total WI budget in tokens aligned with base ST config
-        const totalBudget = calculateTotalWIBudget();
-
-        for (const [world, list] of byWorld.entries()) {
-            // Load per-lorebook settings to determine mode/value
-            const settings = await getLorebookSettings(world);
-            const perBudget = await calculateLorebookBudget(settings, totalBudget);
-            if (!(perBudget > 0)) continue;
-
-            // Prioritize constants only when the global switch is enabled.
-            const protection = getProtectAlwaysOn();
-            let sorted;
-            if (protection) {
-                const always = list.filter(e => e?.constant === true)
-                    .sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
-                const optional = list.filter(e => e?.constant !== true);
-                if (settings.randomTrim) shuffleInPlace(optional);
-                else optional.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
-                sorted = [...always, ...optional];
-            } else {
-                sorted = list.slice();
-                if (settings.randomTrim) shuffleInPlace(sorted);
-                else sorted.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
-            }
-
-            let usedTokens = 0;
-
-            for (const e of sorted) {
-                const ignore = e?.ignoreBudget === true;
-                const tokens = getEntryTokenCountCached(e);
-
-                if (ignore) {
-                    // keep entry; do not consume budget
-                    continue;
-                }
-                if ((usedTokens + tokens) <= perBudget) {
-                    usedTokens += tokens;
-                } else {
-                    dropSet.add(`${world}:${e.uid}`);
-                    if (typeof e.content === 'string' && e.content.length) {
-                        dropEntries.push({ world: e.world, uid: e.uid, content: e.content });
-                        console.info('[STLO] Trimmed WI entry:', { world: e.world, uid: e.uid, comment: e?.comment ?? null, tokens });
-                    }
-                }
-            }
-        }
-
-        EXTENSION_STATE.dropSet = dropSet;
-        EXTENSION_STATE.dropEntries = dropEntries;
-
-        if (DEBUG_STLO) {
-            const totals = {};
-            for (const [w, l] of byWorld.entries()) totals[w] = l.length;
-            stloDebug('onWorldInfoActivated summary:', { totalsByWorld: totals, droppedCount: dropEntries.length });
-        }
-    } catch (e) {
-        console.warn('[STLO] onWorldInfoActivated error:', e);
-        EXTENSION_STATE.dropSet = null;
-        EXTENSION_STATE.dropEntries = [];
-    }
-}
-
-/**
- * CHAT_COMPLETION_PROMPT_READY handler: remove over-budget entry contents (no markers; Option A).
- */
-function onChatCompletionPromptReady(eventData) {
-    try {
-        const { chat, dryRun } = eventData || {};
-        if (dryRun) return;
-
-        const dropEntries = EXTENSION_STATE.dropEntries;
-        if (!Array.isArray(dropEntries) || dropEntries.length === 0 || !Array.isArray(chat)) return;
-
-        for (const msg of chat) {
-            if (!msg || msg.role !== 'system' || typeof msg.content !== 'string') continue;
-
-            let content = msg.content;
-            let changed = false;
-
-            // remove all occurrences of each over-budget entry.content
-            for (const e of dropEntries) {
-                const slice = e?.content;
-                if (typeof slice !== 'string' || !slice.length) continue;
-
-                let idx = content.indexOf(slice);
-                if (idx !== -1) {
-                    while (idx !== -1) {
-                        content = content.slice(0, idx) + content.slice(idx + slice.length);
-                        changed = true;
-                        idx = content.indexOf(slice);
-                    }
-                }
-            }
-
-            if (changed) {
-                // Tidy excessive blank lines after removals; do not trim leading whitespace
-                msg.content = content
-                    .replace(/\n{3,}/g, '\n\n')
-                    .replace(/[ \t]+\n/g, '\n');
-            }
-        }
-    } catch (e) {
-        console.warn('[STLO] onChatCompletionPromptReady error:', e);
-    }
-}
-
-/**
- * Reset per-generation state.
+ * Discard generation-only caches. Neither the final prompt nor other
+ * extensions' messages need to be edited to apply scan-time budget decisions.
  */
 function resetBudgetState() {
-    EXTENSION_STATE.dropSet = null;
-    EXTENSION_STATE.dropEntries = [];
-    // A new WeakMap drops old references without retaining entry objects.
+    EXTENSION_STATE.scanWorldSettings = new Map();
+    EXTENSION_STATE.scanBudgetWorlds = new Set();
+    EXTENSION_STATE.scanHasExplicitBudgets = false;
     TOKEN_COUNT_CACHE = new WeakMap();
 }
 
@@ -2064,135 +1943,152 @@ async function calculateLorebookBudget(settings, totalBudget) {
 }
 
 /**
- * Register handlers (kept separate from existing setupEventHandlers to minimize intrusion)
+ * Only generation lifecycle reset handlers are necessary here.
+ * The structural WorldInfo scan event owns per-lorebook trimming when present.
+ * On older core versions there is no safe structured opportunity to trim a
+ * selected entry; never rewrite arbitrary system prompt text by substring.
  */
 function registerBudgetEnforcementHandlers() {
     try {
         if (EXTENSION_STATE.budgetHandlersRegistered) return;
 
-        // Post-activation decision (drop set)
-        const activatedHandler = onWorldInfoActivated;
-        eventSource.on(event_types.WORLD_INFO_ACTIVATED, activatedHandler);
-        eventListeners.push({ source: eventSource, event: event_types.WORLD_INFO_ACTIVATED, handler: activatedHandler });
+        const resetGen = resetBudgetState;
+        eventSource.on(event_types.GENERATION_ENDED, resetGen);
+        eventListeners.push({ source: eventSource, event: event_types.GENERATION_ENDED, handler: resetGen });
 
-        // Post-combine surgery (strip/trim)
-        const promptReadyHandler = onChatCompletionPromptReady;
-        eventSource.on(event_types.CHAT_COMPLETION_PROMPT_READY, promptReadyHandler);
-        eventListeners.push({ source: eventSource, event: event_types.CHAT_COMPLETION_PROMPT_READY, handler: promptReadyHandler });
-
-        // Reset state when gen ends or chat changes
-        const resetGenHandler = resetBudgetState;
-        eventSource.on(event_types.GENERATION_ENDED, resetGenHandler);
-        eventListeners.push({ source: eventSource, event: event_types.GENERATION_ENDED, handler: resetGenHandler });
-
-        const chatChangedResetHandler = resetBudgetState;
-        eventSource.on(event_types.CHAT_CHANGED, chatChangedResetHandler);
-        eventListeners.push({ source: eventSource, event: event_types.CHAT_CHANGED, handler: chatChangedResetHandler });
+        const resetChat = resetBudgetState;
+        eventSource.on(event_types.CHAT_CHANGED, resetChat);
+        eventListeners.push({ source: eventSource, event: event_types.CHAT_CHANGED, handler: resetChat });
 
         EXTENSION_STATE.budgetHandlersRegistered = true;
-        console.debug('[STLO] Budget enforcement handlers registered');
     } catch (e) {
-        console.warn('[STLO] Failed to register budget enforcement handlers:', e);
+        console.warn('[STLO] Failed to register budget reset handlers:', e);
     }
 }
 
 /**
- * Register per-loop budget trimming on WORLDINFO_SCAN_DONE (newer ST branches).
- * Only trims lorebooks that have an explicit budget (> 0 resolved tokens).
+ * Trim only the structured activated-entry Map *before* SillyTavern builds the
+ * final prompt. Never perform substring replacement on generated prompt text:
+ * identical bodies can belong to different lore entries or unrelated prompts.
+ *
+ * This also reconciles total WI budget when constants are temporarily marked
+ * ignoreBudget to bypass the native Sticky-before-Order scan preference.
  */
 function registerPerLoopBudgetTrimmer() {
     try {
         const onScanDone = async (args) => {
             try {
-                // args.activated.entries: Map<string, WIEntry>
-                // args.activated.text: string
-                const entriesMap = args?.activated?.entries;
-                if (!entriesMap || typeof entriesMap.forEach !== 'function') return;
+                const entries = args?.activated?.entries;
+                if (!(entries instanceof Map) || entries.size === 0) return;
 
-                // Compute total WI budget once (used by percentage_budget mode)
-                const totalBudget = calculateTotalWIBudget();
+                const protect = getProtectAlwaysOn();
+                const settingsCache = EXTENSION_STATE.scanWorldSettings;
+                let reserved = false;
+                let hasUnknownWorld = false;
+                for (const entry of entries.values()) {
+                    if (protect && entry?.__stloReservedConstant === true) reserved = true;
+                    if (entry?.world && !settingsCache.has(entry.world)) hasUnknownWorld = true;
+                    if (reserved && hasUnknownWorld) break;
+                }
+                if (!reserved && !EXTENSION_STATE.scanHasExplicitBudgets && !hasUnknownWorld) {
+                    return; // Nothing to trim; no setting lookups, tokenization, or text rewrites.
+                }
 
-                // Group activated entries by lorebook (world)
+                const nativeBudget = Number(args?.budget?.current);
+                const totalBudget = Number.isFinite(nativeBudget) && nativeBudget > 0
+                    ? nativeBudget : calculateTotalWIBudget();
                 const byWorld = new Map();
-                entriesMap.forEach((entry) => {
-                    if (!entry?.world) return;
+                for (const [key, entry] of entries) {
+                    if (!entry?.world) continue;
                     if (!byWorld.has(entry.world)) byWorld.set(entry.world, []);
-                    byWorld.get(entry.world).push(entry);
-                });
+                    byWorld.get(entry.world).push({ key, entry });
+                }
 
-                // Cache settings per world for this loop
-                const settingsCache = new Map();
+                let dropped = 0;
+                const discard = ({ key, entry }) => {
+                    if (!entries.has(key)) return;
+                    entries.delete(key);
+                    entry.disable = true; // Keep a dropped entry out of recursion rescans.
+                    dropped++;
+                };
+                const orderDescending = (a, b) => (b.entry.order ?? 100) - (a.entry.order ?? 100);
+                const originallyIgnored = e =>
+                    e.ignoreBudget === true && e.__stloReservedConstant !== true;
 
-                // Work on a local copy of activated text; write back at the end
-                let text = String(args?.activated?.text ?? '');
-
-                for (const [world, list] of byWorld.entries()) {
-                    const settings = settingsCache.has(world)
-                        ? settingsCache.get(world)
-                        : await getLorebookSettings(world);
-                    settingsCache.set(world, settings || {});
-
-                    // Resolve per-lorebook budget in tokens for this world
-                    const perBudget = await calculateLorebookBudget(settings, totalBudget);
-
-                    // Only trim when an explicit budget is set (> 0). Default mode returns 0.
-                    if (!(perBudget > 0)) continue;
-
-                    // Honor global switch and keep constants first when enabled.
-                    const protection = getProtectAlwaysOn();
-                    let sorted;
-                    if (protection) {
-                        const always = list.filter(e => e?.constant === true)
-                            .sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
-                        const optional = list.filter(e => e?.constant !== true);
-                        if (settings.randomTrim) shuffleInPlace(optional);
-                        else optional.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
-                        sorted = [...always, ...optional];
-                    } else {
-                        sorted = list.slice();
-                        if (settings.randomTrim) shuffleInPlace(sorted);
-                        else sorted.sort((a, b) => (b.order ?? 100) - (a.order ?? 100));
-                    }
-
-                    let used = 0;
-                    const toDrop = [];
-                    for (const e of sorted) {
-                        if (e?.ignoreBudget === true) continue; // keep without consuming budget
-                        const tokens = getEntryTokenCountCached(e);
-                        if ((used + tokens) <= perBudget) {
-                            used += tokens;
-                        } else {
-                            toDrop.push(e);
+                // Preserve existing per-book modes, including character overrides
+                // and randomTrim, but consume budget from constants first if ON.
+                if (EXTENSION_STATE.scanHasExplicitBudgets || hasUnknownWorld) {
+                    for (const [world, list] of byWorld) {
+                        if (settingsCache.has(world) && !EXTENSION_STATE.scanBudgetWorlds.has(world)) {
+                            continue; // A default-budget book needs no trimming.
                         }
-                    }
+                        const settings = settingsCache.get(world) ?? await getLorebookSettings(world);
+                        const perBudget = await calculateLorebookBudget(settings, totalBudget);
+                        if (!(perBudget > 0)) continue;
 
-                    // Apply drops: remove from activated set and strip their content from text
-                    for (const e of toDrop) {
-                        // Mirror existing trim log used post-activation
-                        const tokens = getEntryTokenCountCached(e);
-                        console.info('[STLO] Trimmed WI entry:', { world: e.world, uid: e.uid, comment: e?.comment ?? null, tokens });
+                        let sorted;
+                        if (protect) {
+                            const always = list.filter(x => x.entry.constant === true).sort(orderDescending);
+                            const optional = list.filter(x => x.entry.constant !== true);
+                            if (settings.randomTrim) shuffleInPlace(optional);
+                            else optional.sort(orderDescending);
+                            sorted = [...always, ...optional];
+                        } else {
+                            sorted = list.slice();
+                            if (settings.randomTrim) shuffleInPlace(sorted);
+                            else sorted.sort(orderDescending);
+                        }
 
-                        entriesMap.delete(`${e.world}.${e.uid}`);
-                        // This entry is a scan-local clone. Keep it ineligible for later recursion passes.
-                        e.disable = true;
-                        const slice = typeof e.content === 'string' ? e.content : '';
-                        if (!slice) continue;
-
-                        // Remove all occurrences of the slice from the accumulated text
-                        let idx = text.indexOf(slice);
-                        while (idx !== -1) {
-                            text = text.slice(0, idx) + text.slice(idx + slice.length);
-                            idx = text.indexOf(slice);
+                        let used = 0;
+                        for (const item of sorted) {
+                            if (originallyIgnored(item.entry)) continue;
+                            const tokens = getEntryTokenCountCached(item.entry);
+                            if (used + tokens <= perBudget) used += tokens;
+                            else discard(item);
                         }
                     }
                 }
 
-                // Tidy excessive whitespace after removals
-                args.activated.text = text
-                    .replace(/\n{3,}/g, '\n\n')
-                    .replace(/[ \t]+\n/g, '\n');
-                // Note: We do not force-stop the loop here; accepts one-iteration lag for recursion buffer.
+                // Global budget reconciliation is needed only when this scan
+                // actually bypassed core budgeting to protect a constant entry.
+                if (reserved && totalBudget > 0) {
+                    const timed = args?.timedEffects;
+                    // Cache the native Sticky status once per active entry.
+                    // Calling isEffectActive inside sort() would repeatedly scan
+                    // the sticky-effect buffer for every comparison.
+                    const active = [...entries].map(([key, entry]) => {
+                        let sticky = 0;
+                        if (entry.constant !== true) {
+                            try { sticky = timed?.isEffectActive?.('sticky', entry) ? 1 : 0; }
+                            catch { /* Keep the original Order fallback. */ }
+                        }
+                        return { key, entry, sticky };
+                    });
+                    active.sort((a, b) => {
+                        if (a.entry.constant !== b.entry.constant) {
+                            return a.entry.constant === true ? -1 : 1;
+                        }
+                        if (a.entry.constant !== true) {
+                            const stickyDiff = b.sticky - a.sticky;
+                            if (stickyDiff) return stickyDiff;
+                        }
+                        return orderDescending(a, b);
+                    });
+                    let used = 0;
+                    for (const item of active) {
+                        if (originallyIgnored(item.entry)) continue;
+                        const tokens = getEntryTokenCountCached(item.entry);
+                        if (used + tokens <= totalBudget) used += tokens;
+                        else discard(item);
+                    }
+                }
 
+                // The core builds the final prompt from activated.entries.
+                // Its recursion buffer was already assembled before this hook,
+                // so editing activated.text would not undo a recursion trigger.
+                // Leave all text untouched rather than deleting a kept entry
+                // or unrelated system instruction that has matching content.
+                if (dropped) stloDebug('Trimmed WI entries structurally:', dropped);
             } catch (e) {
                 console.warn('[STLO] per-loop budget trimmer error:', e);
             }
@@ -2200,7 +2096,6 @@ function registerPerLoopBudgetTrimmer() {
 
         eventSource.on(event_types.WORLDINFO_SCAN_DONE, onScanDone);
         eventListeners.push({ source: eventSource, event: event_types.WORLDINFO_SCAN_DONE, handler: onScanDone });
-        console.debug('[STLO] Per-loop budget trimmer registered');
     } catch (e) {
         console.warn('[STLO] Failed to register per-loop budget trimmer:', e);
     }
