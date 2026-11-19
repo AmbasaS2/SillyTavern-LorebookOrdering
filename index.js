@@ -1,9 +1,9 @@
 import { event_types, eventSource } from '../../../events.js';
 import { getTokenCount } from '../../../tokenizers.js';
-import { getStringHash } from '../../../utils.js';
+import { getStringHash, getCharaFilename } from '../../../utils.js';
 import { getContext } from '../../../extensions.js';
-import { characters, getMaxContextSize } from '../../../../script.js';
-import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names } from '../../../world-info.js';
+import { characters, this_chid, getMaxContextSize } from '../../../../script.js';
+import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names } from '../../../world-info.js';
 import { POPUP_TYPE, Popup } from '../../../popup.js';
 import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../../../i18n.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
@@ -294,8 +294,40 @@ function installStloModalStyles() {
 }
 
 /**
- * Open the existing STLO editor from the extensions menu without requiring the
- * World Info tab to be open. The selected lorebook is passed directly to the editor.
+ * Use the same character lorebook links as the Lorebook Manager:
+ * the character's primary world and its additional character lorebooks.
+ * Global and chat lorebooks are not included in the default filter.
+ * No active character means all lorebooks are available.
+ */
+function getCurrentCharacterLinkedLorebooks() {
+    if (this_chid === undefined || this_chid === null) return null;
+    const character = characters?.[this_chid];
+    if (!character) return null;
+
+    const books = new Set();
+    const primary = character.data?.extensions?.world;
+    if (typeof primary === 'string' && primary.trim()) books.add(primary);
+
+    let fileName = '';
+    try {
+        fileName = getCharaFilename(this_chid);
+    } catch (error) {
+        console.warn('[STLO] Could not resolve character filename for linked lorebooks:', error);
+    }
+
+    const charLore = Array.isArray(world_info?.charLore)
+        ? world_info.charLore.find(item => item?.name === fileName)
+        : null;
+    for (const name of Array.isArray(charLore?.extraBooks) ? charLore.extraBooks : []) {
+        if (typeof name === 'string' && name.trim()) books.add(name);
+    }
+    return books;
+}
+
+/**
+ * Open the STLO editor from the extensions menu. During a character chat,
+ * show attached character lorebooks first; the checkbox reveals all books.
+ * This filter is display-only and never changes lorebook connections.
  */
 async function openLorebookBudgetFromMenu() {
     const available = (Array.isArray(world_names) ? world_names : [])
@@ -305,23 +337,59 @@ async function openLorebookBudgetFromMenu() {
         return;
     }
 
+    const linked = getCurrentCharacterLinkedLorebooks();
+    const current = getCurrentLorebookName();
     const form = document.createElement('div');
     form.className = 'world_entry_form_control';
     const label = document.createElement('label');
     label.htmlFor = 'stlo_menu_lorebook_select';
     label.textContent = '로어북 선택';
+
     const select = document.createElement('select');
     select.id = 'stlo_menu_lorebook_select';
     select.className = 'text_pole textarea_compact';
-    for (const name of available) {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        select.appendChild(option);
-    }
-    const current = getCurrentLorebookName();
-    if (current && available.includes(current)) select.value = current;
-    form.append(label, select);
+
+    const allLabel = document.createElement('label');
+    allLabel.className = 'checkbox_label';
+    allLabel.style.marginTop = '10px';
+    const showAll = document.createElement('input');
+    showAll.type = 'checkbox';
+    showAll.id = 'stlo_menu_show_all_lorebooks';
+    showAll.checked = linked === null;
+    showAll.disabled = linked === null;
+    const checkmark = document.createElement('span');
+    checkmark.className = 'checkmark';
+    const allText = document.createElement('span');
+    allText.textContent = '모든 로어북 보기';
+    allLabel.append(showAll, checkmark, allText);
+
+    const updateOptions = () => {
+        const names = showAll.checked || linked === null
+            ? available
+            : available.filter(name => linked.has(name));
+        const previous = select.value;
+        select.replaceChildren();
+        if (names.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = '연결된 로어북이 없습니다';
+            option.disabled = true;
+            select.appendChild(option);
+            select.value = '';
+            return;
+        }
+        for (const name of names) {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            select.appendChild(option);
+        }
+        select.value = names.includes(previous) ? previous
+            : (current && names.includes(current) ? current : names[0]);
+    };
+    showAll.addEventListener('change', updateOptions);
+    updateOptions();
+    form.append(label, select, allLabel);
 
     const selected = await new Promise(resolve => {
         const popup = new Popup(form, POPUP_TYPE.CONFIRM, '', {
