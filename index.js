@@ -275,7 +275,7 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-checkrow input[type="checkbox"] { width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; min-height: 16px !important; max-height: 16px !important; flex: 0 0 16px; aspect-ratio: 1; border-radius: 3px !important; box-sizing: border-box; margin: 0 !important; padding: 0 !important; }
         .stlo-modal-ui .checkbox_label > .checkmark { display: none; }
         .stlo-modal-ui .stlo-info { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; margin: 0; padding: 0; }
-        .stlo-modal-ui .stlo-info > summary { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; box-sizing: border-box; border: 0; border-radius: 50%; font-size: 0; line-height: 1; opacity: .8; list-style: none; cursor: pointer; user-select: none; }
+        .stlo-modal-ui .stlo-info > summary { display: inline-flex; align-items: center; justify-content: flex-start; width: 22px; height: 22px; box-sizing: border-box; border: 0; border-radius: 50%; font-size: 0; line-height: 1; opacity: .8; list-style: none; cursor: pointer; user-select: none; }
         .stlo-modal-ui .stlo-info > summary::before { content: "i"; display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; border: 1px solid currentColor; border-radius: 50%; box-sizing: border-box; font-size: 9px; font-style: normal; font-weight: 700; line-height: 1; }
         .stlo-modal-ui .stlo-info > summary::-webkit-details-marker { display: none; }
         .stlo-modal-ui .stlo-info > summary::marker { content: ""; }
