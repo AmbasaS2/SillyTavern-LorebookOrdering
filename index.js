@@ -275,14 +275,17 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-checkrow input[type="checkbox"] { width: 16px !important; height: 16px !important; min-width: 16px !important; max-width: 16px !important; min-height: 16px !important; max-height: 16px !important; flex: 0 0 16px; aspect-ratio: 1; border-radius: 3px !important; box-sizing: border-box; margin: 0 !important; padding: 0 !important; }
         .stlo-modal-ui .checkbox_label > .checkmark { display: none; }
         .stlo-modal-ui .stlo-info { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; margin: 0; padding: 0; }
-        .stlo-modal-ui .stlo-info > summary { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; box-sizing: border-box; border: 1px solid currentColor; border-radius: 50%; font-size: 12px; font-style: normal; font-weight: 700; line-height: 1; opacity: .75; list-style: none; cursor: pointer; user-select: none; }
+        .stlo-modal-ui .stlo-info > summary { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; box-sizing: border-box; border: 0; border-radius: 50%; font-size: 0; line-height: 1; opacity: .8; list-style: none; cursor: pointer; user-select: none; }
+        .stlo-modal-ui .stlo-info > summary::before { content: "i"; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border: 1px solid currentColor; border-radius: 50%; box-sizing: border-box; font-size: 10px; font-style: normal; font-weight: 700; line-height: 1; }
         .stlo-modal-ui .stlo-info > summary::-webkit-details-marker { display: none; }
         .stlo-modal-ui .stlo-info > summary::marker { content: ""; }
         .stlo-modal-ui .stlo-info > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
         .stlo-modal-ui .stlo-info[open] > summary { opacity: 1; }
-        .stlo-modal-ui .stlo-info-body { position: absolute; z-index: 10; top: calc(100% + 6px); left: 0; width: min(270px, calc(100vw - 90px)); max-width: none; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--SmartThemeBorderColor); border-radius: 7px; background: var(--SmartThemeBlurTintColor, #f8f3e9); color: var(--SmartThemeBodyColor, #333); box-shadow: 0 3px 12px rgba(0,0,0,.18); }
-        .stlo-modal-ui .stlo-info-body small + small { margin-top: 5px; }
-        .stlo-modal-ui .stlo-info-end .stlo-info-body { left: auto; right: 0; }
+        .stlo-modal-ui .stlo-info-body { display: none; }
+        .stlo-info-popup { position: fixed; z-index: 2147483000; width: min(270px, calc(100vw - 24px)); max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--SmartThemeBorderColor); border-radius: 7px; background: var(--SmartThemeBlurTintColor, #f8f3e9); color: var(--SmartThemeBodyColor, #333); box-shadow: 0 3px 12px rgba(0,0,0,.18); text-align: left; }
+        .stlo-info-popup[hidden] { display: none !important; }
+        .stlo-info-popup small { display: block; margin: 0; line-height: 1.45; color: inherit; }
+        .stlo-info-popup small + small { margin-top: 6px; }
         .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 3px 0 0; padding: 7px 0 0 12px; width: 100%; box-sizing: border-box; }
         .stlo-modal-ui .stlo-order-controls[hidden] { display: none !important; }
         .stlo-modal-ui .stlo-inline-number { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 7px; }
@@ -291,9 +294,9 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; }
         .stlo-modal-ui .stlo-budget-value input[type="number"] { width: 130px !important; max-width: 100%; margin: 0 !important; }
         .stlo-modal-ui .stlo-advanced-drawer { width: 100%; margin: 3px 0 0; }
-        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 9px 4px 0; }
+        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-toggle { display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; width: max-content; max-width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 2px 4px 0; }
         .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-toggle > b { min-width: 0; }
-        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-icon { flex: 0 0 auto; margin-left: auto !important; }
+        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-icon { flex: 0 0 auto; margin-left: 0 !important; }
         .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-content { padding-top: 6px; }
         .stlo-modal-ui .stlo-advanced-drawer .info-block { margin-bottom: 6px !important; }
         .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 9px; }
@@ -777,7 +780,7 @@ async function openLorebookSettings(worldName = null) {
                 <div class="stlo-field-heading">
                     <h4 data-i18n="stlo.modal.priority.title">Lorebook Priority</h4>
                     <details class="stlo-info">
-                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <summary aria-label="설명 보기">i</summary>
                         <div class="stlo-info-body"><small data-i18n="stlo.modal.priority.help">Higher numbers (4-5) process first. Lower numbers (1-2) process last.</small></div>
                     </details>
                 </div>
@@ -798,7 +801,7 @@ async function openLorebookSettings(worldName = null) {
                         <span>상시 주입 우선 보호</span>
                     </label>
                     <details class="stlo-info stlo-info-end">
-                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <summary aria-label="설명 보기">i</summary>
                         <div class="stlo-info-body"><small>모든 로어북에 적용됩니다. 상시 항목을 먼저 넣고, 예산이 부족하면 상시 항목도 순서대로 제외합니다.</small></div>
                     </details>
                     </div>
@@ -812,7 +815,7 @@ async function openLorebookSettings(worldName = null) {
                         <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
                     </label>
                     <details class="stlo-info stlo-info-end">
-                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <summary aria-label="설명 보기">i</summary>
                         <div class="stlo-info-body"><small data-i18n="stlo.modal.order.help">Fine-tune processing order within this lorebook's priority level</small></div>
                     </details>
                     </div>
@@ -822,7 +825,7 @@ async function openLorebookSettings(worldName = null) {
                     <div class="stlo-field-heading">
                         <h4 data-i18n="stlo.modal.order.title">Order Adjustment</h4>
                         <details class="stlo-info">
-                            <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                            <summary aria-label="설명 보기">i</summary>
                             <div class="stlo-info-body"><small data-i18n="stlo.modal.order.explain">Higher values process first. Examples: +250 for slight boost, -500 for lower priority.</small></div>
                         </details>
                     </div>
@@ -842,7 +845,7 @@ async function openLorebookSettings(worldName = null) {
                                 <span data-i18n="stlo.modal.order.groupOnly.label">Group Chats Only</span>
                             </label>
                             <details class="stlo-info stlo-info-end">
-                                <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                                <summary aria-label="설명 보기">i</summary>
                                 <div class="stlo-info-body"><small data-i18n="stlo.modal.order.groupOnly.help">Only apply order adjustment during group chats (ignored in single character chats)</small></div>
                             </details>
                         </div>
@@ -858,7 +861,7 @@ async function openLorebookSettings(worldName = null) {
                 <div class="stlo-field-heading">
                     <h4>벡터 유사도 임계값</h4>
                     <details class="stlo-info">
-                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <summary aria-label="설명 보기">i</summary>
                         <div class="stlo-info-body"><small>0~1 사이의 값을 입력합니다. 비워두면 전역 설정을 사용합니다. 다른 값으로 검색할 때는 요청이 추가되어 비용과 시간이 늘 수 있습니다.</small></div>
                     </details>
                 </div>
@@ -880,7 +883,7 @@ async function openLorebookSettings(worldName = null) {
                         <span data-i18n="stlo.modal.onlyWhenSpeaking.label">Group chats: Only activate for specific characters (requires character assignments below)</span>
                     </label>
                     <details class="stlo-info stlo-info-end">
-                        <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                        <summary aria-label="설명 보기">i</summary>
                         <div class="stlo-info-body">
                             <small data-i18n="stlo.modal.onlyWhenSpeaking.help.1">When enabled, this lorebook will only activate when characters assigned in Group Chat Overrides are speaking.</small>
                             <small data-i18n="stlo.modal.onlyWhenSpeaking.help.2">If this box is checked but no characters are assigned below, this lorebook WILL NOT ACTIVATE during group chats.</small>
@@ -1038,9 +1041,10 @@ async function openLorebookSettings(worldName = null) {
 
             // Function to clean up modal event listeners
             const cleanupModalListeners = () => {
-                modalEventListeners.forEach(({ element, event, handler }, index) => {
+                document.getElementById('stlo-info-popup')?.remove();
+                modalEventListeners.forEach(({ element, event, handler, capture }, index) => {
                     try {
-                        element.removeEventListener(event, handler);
+                        element.removeEventListener(event, handler, Boolean(capture));
                     } catch (error) {
                         console.error(`Error removing modal event listener ${index}:`, error);
                     }
@@ -1126,11 +1130,106 @@ async function openLorebookSettings(worldName = null) {
 }
 
 /**
+ * Show only one short help popup at a time. Place it directly inside the
+ * native popup <dialog>, outside its clipped/scrollable content. A body-level
+ * overlay would render *behind* a modal dialog in the browser's top layer.
+ * Placement is clamped to the viewport, including narrow mobile screens.
+ */
+function setupStloInfoPopups(modalEventListeners) {
+    const modal = document.querySelector('.stlo-modal-ui');
+    if (!modal) return;
+
+    document.getElementById('stlo-info-popup')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'stlo-info-popup';
+    overlay.className = 'stlo-info-popup';
+    overlay.hidden = true;
+    overlay.setAttribute('role', 'tooltip');
+    const popupLayer = modal.closest('dialog') || document.body;
+    popupLayer.appendChild(overlay);
+
+    let current = null;
+    const hide = () => {
+        if (current) {
+            current.open = false;
+            current.querySelector('summary')?.removeAttribute('aria-describedby');
+            current = null;
+        }
+        overlay.hidden = true;
+        overlay.replaceChildren();
+    };
+    const show = (details, summary) => {
+        const content = details.querySelector('.stlo-info-body');
+        if (!content) return;
+        overlay.replaceChildren(...Array.from(content.childNodes, node => node.cloneNode(true)));
+        overlay.hidden = false;
+        overlay.style.visibility = 'hidden';
+
+        const bounds = summary.getBoundingClientRect();
+        const viewWidth = document.documentElement.clientWidth || window.innerWidth;
+        const viewHeight = window.innerHeight;
+        const margin = 12;
+        const width = Math.min(270, Math.max(1, viewWidth - 2 * margin));
+        overlay.style.width = width + 'px';
+        const height = overlay.getBoundingClientRect().height;
+        const left = Math.max(margin, Math.min(bounds.left, viewWidth - margin - width));
+        let top = bounds.bottom + 6;
+        if (top + height > viewHeight - margin) {
+            top = bounds.top - height - 6;
+        }
+        if (top < margin) top = margin;
+        overlay.style.left = left + 'px';
+        overlay.style.top = top + 'px';
+        overlay.style.visibility = 'visible';
+
+        details.open = true;
+        summary.setAttribute('aria-describedby', overlay.id);
+        current = details;
+    };
+    const onClick = event => {
+        if (overlay.contains(event.target)) return;
+        const summary = event.target.closest?.('summary');
+        const details = summary?.parentElement;
+        if (!details?.classList.contains('stlo-info') || !modal.contains(details)) {
+            hide();
+            return;
+        }
+        event.preventDefault(); // Native <details> would leave a clipped in-modal popup.
+        if (details === current) {
+            hide();
+        } else {
+            hide();
+            show(details, summary);
+        }
+    };
+    const onKeyDown = event => {
+        if (current && event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            hide();
+        }
+    };
+    // Close on scroll/resize rather than leaving a tooltip over unrelated UI.
+    document.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+    modalEventListeners.push(
+        { element: document, event: 'click', handler: onClick },
+        { element: document, event: 'keydown', handler: onKeyDown },
+        { element: document, event: 'scroll', handler: hide, capture: true },
+        { element: window, event: 'resize', handler: hide },
+    );
+}
+
+/**
  * Set up interactive behavior for the modal
  * @param {Array} modalEventListeners - Array to track event listeners for cleanup
  * @param {Object} currentSettings - Current lorebook settings
  */
 function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
+    setupStloInfoPopups(modalEventListeners);
+
     // Set up order adjustment behavior for main settings
     const orderAdjustmentEnabled = document.getElementById('lorebook-order-adjustment-enabled');
     const orderAdjustmentContainer = document.getElementById('lorebook-order-adjustment-container');
@@ -1242,7 +1341,7 @@ function createBudgetControls(scope, currentSettings = {}) {
         <div class="stlo-field-heading">
             <h4 data-i18n="stlo.budget.title">Budget</h4>
             <details class="stlo-info">
-                <summary aria-label="설명 보기" title="설명 보기">i</summary>
+                <summary aria-label="설명 보기">i</summary>
                 <div class="stlo-info-body">
                     <small data-i18n="stlo.budget.help">Control how much of the context or World Info budget this lorebook may use.</small>
                     <small data-i18n="stlo.budget.tip">Tip: default (0) lets ST decide; Fixed with 1 effectively chokes off this lorebook.</small>
