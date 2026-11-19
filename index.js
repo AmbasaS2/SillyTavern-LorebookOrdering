@@ -265,6 +265,34 @@ function setupEventHandlers() {
 }
 
 
+
+/** Format only the STLO dialog; other SillyTavern panels are unaffected. */
+function installStloModalStyles() {
+    if (document.getElementById('stlo-modal-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'stlo-modal-styles';
+    style.textContent = `
+        .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 16px; width: 100%; text-align: left; }
+        .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin: 0; padding: 0 0 16px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
+        .stlo-modal-ui .stlo-section:last-child { padding-bottom: 0; border-bottom: none; }
+        .stlo-modal-ui h3, .stlo-modal-ui h4, .stlo-modal-ui h5 { margin: 0; text-align: left; line-height: 1.4; }
+        .stlo-modal-ui small { display: block; margin: 0; text-align: left; line-height: 1.5; opacity: 0.85; }
+        .stlo-modal-ui .stlo-section > select, .stlo-modal-ui .stlo-budget-options > select, .stlo-modal-ui .stlo-section > input { width: 100%; max-width: 100%; box-sizing: border-box; }
+        .stlo-modal-ui .stlo-checkrow { display: flex; align-items: center; gap: 8px; margin: 0; text-align: left; }
+        .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-top: 6px; }
+        .stlo-modal-ui .stlo-order-controls[hidden] { display: none !important; }
+        .stlo-modal-ui .stlo-inline-number { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 10px; }
+        .stlo-modal-ui .stlo-inline-number input { width: 110px; max-width: 100%; }
+        .stlo-modal-ui .stlo-budget-options { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+        .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; }
+        .stlo-modal-ui .stlo-budget-value input { width: 150px; max-width: 100%; }
+        .stlo-modal-ui .stlo-advanced-drawer { width: 100%; }
+        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-content { padding-top: 10px; }
+        .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 16px; }
+    `;
+    document.head.appendChild(style);
+}
+
 /**
  * Open the existing STLO editor from the extensions menu without requiring the
  * World Info tab to be open. The selected lorebook is passed directly to the editor.
@@ -321,7 +349,7 @@ function addLorebookBudgetMenuItem() {
     const icon = document.createElement('div');
     icon.className = 'fa-solid fa-book extensionsMenuExtensionButton';
     const label = document.createElement('span');
-    label.textContent = '로어북 예산';
+    label.textContent = '로어북 예산 관리';
     item.append(icon, label);
     item.addEventListener('click', openLorebookBudgetFromMenu);
     container.appendChild(item);
@@ -625,7 +653,8 @@ async function openLorebookSettings(worldName = null) {
 
         // Create modal HTML - single vertical scrolling content
         const modalHtml = `
-            <div class="world_entry_form_control MarginBot5 alignCenteritems">
+            <div class="stlo-modal-ui">
+            <div class="world_entry_form_control stlo-section">
                 <h3 class="marginBot10" data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>
                 <h4 data-i18n="stlo.modal.priority.title">Lorebook Priority</h4>
                 <small data-i18n="stlo.modal.priority.help">Higher numbers (4-5) process first. Lower numbers (1-2) process last.</small>
@@ -639,8 +668,8 @@ async function openLorebookSettings(worldName = null) {
                 </select>
             </div>
 
-            <div class="world_entry_form_control MarginTop10">
-                <label class="checkbox_label" for="lorebook-order-adjustment-enabled">
+            <div class="world_entry_form_control stlo-section">
+                <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-enabled">
                     <input type="checkbox" id="lorebook-order-adjustment-enabled"
                            ${currentSettings.orderAdjustment !== 0 ? 'checked' : ''}>
                     <span class="checkmark"></span>
@@ -648,10 +677,10 @@ async function openLorebookSettings(worldName = null) {
                 </label>
                 <small data-i18n="stlo.modal.order.help">Fine-tune processing order within this lorebook's priority level</small>
 
-                <div class="world_entry_form_control MarginTop10${currentSettings.orderAdjustment !== 0 ? '' : ' hidden'}" id="lorebook-order-adjustment-container">
+                <div class="world_entry_form_control stlo-order-controls" id="lorebook-order-adjustment-container" ${currentSettings.orderAdjustment !== 0 ? '' : 'hidden'}>
                     <h4 data-i18n="stlo.modal.order.title">Order Adjustment</h4>
                     <small data-i18n="stlo.modal.order.explain">Higher values process first. Examples: +250 for slight boost, -500 for lower priority.</small>
-                    <div class="flexNoWrap flexGap5 justifyCenter">
+                    <div class="stlo-inline-number">
                         <input type="number" id="lorebook-order-adjustment" class="text_pole textarea_compact"
                                value="${currentSettings.orderAdjustment}" min="-10000" max="10000" step="1"
                                placeholder="0" style="width: 100px;">
@@ -670,21 +699,21 @@ async function openLorebookSettings(worldName = null) {
                 </div>
             </div>
 
-            <div class="world_entry_form_control MarginBot5">
+            <div class="world_entry_form_control stlo-section">
                 ${createBudgetControls('lorebook', currentSettings)}
             </div>
 
-            <div class="world_entry_form_control MarginTop10">
+            <div class="world_entry_form_control stlo-section">
                 <h4>벡터 유사도 임계값</h4>
-                <small>이 로어북의 벡터 검색에만 적용해. 비워두면 Vector Storage의 전역 임계값을 사용해 (0~1).</small>
+                <small>값이 높을수록 관련성이 높은 기억만 불러옵니다. 비워 두면 Vector Storage의 전역 임계값을 사용합니다. (0~1)</small>
                 <input type="number" id="${SELECTORS.LOREBOOK_VECTOR_THRESHOLD}" class="text_pole textarea_compact"
                        min="0" max="1" step="0.01" placeholder="전역 설정 사용"
                        value="${typeof currentSettings.vectorThreshold === 'number' ? currentSettings.vectorThreshold : ''}">
             </div>
 
             <!-- Only When Speaking Toggle -->
-            <div class="world_entry_form_control MarginTop10">
-                <label class="checkbox_label" for="lorebook-only-when-speaking">
+            <div class="world_entry_form_control stlo-section">
+                <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
                     <input type="checkbox" id="lorebook-only-when-speaking"
                            ${currentSettings.onlyWhenSpeaking ? 'checked' : ''}>
                     <span class="checkmark"></span>
@@ -697,7 +726,7 @@ async function openLorebookSettings(worldName = null) {
             </div>
 
             <!-- Group Chat Overrides -->
-            <div class="inline-drawer wide100p world_entry_form_control MarginTop10 MarginBot10">
+            <div class="inline-drawer wide100p world_entry_form_control stlo-section stlo-advanced-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
                     <b data-i18n="stlo.modal.groupOverrides.title">Group Chat Overrides</b>
                     <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
@@ -714,6 +743,7 @@ async function openLorebookSettings(worldName = null) {
                         <!-- Priority sections will be inserted here -->
                     </div>
                 </div>
+            </div>
             </div>
         `;
 
@@ -816,7 +846,7 @@ async function openLorebookSettings(worldName = null) {
                 if (rawThreshold !== '') {
                     const parsedThreshold = Number(rawThreshold);
                     if (!Number.isFinite(parsedThreshold) || parsedThreshold < 0 || parsedThreshold > 1) {
-                        toastr.error('벡터 임계값은 0부터 1까지 입력해줘.', 'Validation Error');
+                        toastr.error('벡터 임계값은 0부터 1까지 입력해 주세요.', 'Validation Error');
                         return null;
                     }
                     validatedThreshold = parsedThreshold;
@@ -938,12 +968,12 @@ function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
     if (orderAdjustmentEnabled && orderAdjustmentContainer && orderAdjustmentInput) {
         const orderAdjustmentChangeHandler = () => {
             if (orderAdjustmentEnabled.checked) {
-                orderAdjustmentContainer.classList.remove('hidden');
+                orderAdjustmentContainer.hidden = false;
                 if (orderAdjustmentInput.value === '' || orderAdjustmentInput.value === '0') {
                     orderAdjustmentInput.value = '0';
                 }
             } else {
-                orderAdjustmentContainer.classList.add('hidden');
+                orderAdjustmentContainer.hidden = true;
                 orderAdjustmentInput.value = '0';
             }
         };
@@ -1040,18 +1070,18 @@ function createBudgetControls(scope, currentSettings = {}) {
     return `
         <h4 data-i18n="stlo.budget.title">Budget</h4>
         <small data-i18n="stlo.budget.help">Control how much of the context or World Info budget this lorebook may use.</small>
-        <div class="flexNoWrap flexGap5 justifyCenter">
+        <div class="stlo-budget-options">
             <select id="${SELECTORS.LOREBOOK_BUDGET_MODE}" class="text_pole textarea_compact">
                 <option value="default" ${mode === 'default' ? 'selected' : ''} data-i18n="stlo.budget.mode.default">Use ST World Info Budget (default)</option>
                 <option value="percentage_budget" ${mode === 'percentage_budget' ? 'selected' : ''} data-i18n="stlo.budget.mode.percentBudget">% of World Info budget</option>
                 <option value="percentage_context" ${mode === 'percentage_context' ? 'selected' : ''} data-i18n="stlo.budget.mode.percentContext">% of Max Context</option>
                 <option value="fixed" ${mode === 'fixed' ? 'selected' : ''} data-i18n="stlo.budget.mode.fixed">Fixed tokens</option>
             </select>
-            <div id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}" class="flexNoWrap flexGap5 justifyCenter" style="${mode === 'default' ? 'display:none;' : ''}">
+            <div id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}" class="stlo-budget-value" style="${mode === 'default' ? 'display:none;' : ''}">
                 <input type="number" id="${SELECTORS.LOREBOOK_BUDGET_VALUE}" class="text_pole textarea_compact"
                        value="${value || 0}" placeholder="0" style="width: 120px;">
                 <small id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint"></small>
-                <label class="checkbox_label" for="${SELECTORS.LOREBOOK_RANDOM_TRIM}" style="margin-left: 10px;">
+                <label class="checkbox_label stlo-checkrow" for="${SELECTORS.LOREBOOK_RANDOM_TRIM}">
                     <input type="checkbox" id="${SELECTORS.LOREBOOK_RANDOM_TRIM}" ${currentSettings.randomTrim ? 'checked' : ''}>
                     <span class="checkmark"></span>
                     <span>${translate('Random trim (drop random entries when over budget)', 'stlo.budget.randomTrim')}</span>
@@ -1167,7 +1197,7 @@ function generateAdvancedContent() {
                 <div class="override-order-adjustment-container" data-priority="${priority.level}"
                      style="display: none;">
                     <h5 data-i18n="stlo.modal.order.title">Order Adjustment</h5>
-                    <div class="flexNoWrap flexGap5 justifyCenter">
+                    <div class="stlo-inline-number">
                         <input type="number" class="text_pole textarea_compact override-order-adjustment"
                                data-priority="${priority.level}" min="-10000" max="10000" step="1"
                                value="0" placeholder="0" style="width: 100px;">
@@ -1620,6 +1650,7 @@ async function init() {
             setupEventHandlers();
             await loadStloLocale();
             addLorebookBudgetMenuItem();
+            installStloModalStyles();
             installPerLorebookVectorThresholds();
             registerStloSlashCommand();
             registerBudgetEnforcementHandlers();
