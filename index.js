@@ -272,23 +272,34 @@ function installStloModalStyles() {
     const style = document.createElement('style');
     style.id = 'stlo-modal-styles';
     style.textContent = `
-        .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 16px; width: 100%; text-align: left; }
-        .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; margin: 0; padding: 0 0 16px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
+        .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 9px; width: 100%; min-width: 0; box-sizing: border-box; text-align: left; }
+        .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-width: 0; margin: 0; padding: 0 0 11px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
         .stlo-modal-ui .stlo-section:last-child { padding-bottom: 0; border-bottom: none; }
-        .stlo-modal-ui h3, .stlo-modal-ui h4, .stlo-modal-ui h5 { margin: 0; text-align: left; line-height: 1.4; }
-        .stlo-modal-ui small { display: block; margin: 0; text-align: left; line-height: 1.5; opacity: 0.85; }
-        .stlo-modal-ui .stlo-section > select, .stlo-modal-ui .stlo-budget-options > select, .stlo-modal-ui .stlo-section > input { width: 100%; max-width: 100%; box-sizing: border-box; }
-        .stlo-modal-ui .stlo-checkrow { display: flex; align-items: center; gap: 8px; margin: 0; text-align: left; }
-        .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding-top: 6px; }
+        .stlo-modal-ui h3, .stlo-modal-ui h4, .stlo-modal-ui h5 { margin: 0; text-align: left; line-height: 1.3; }
+        .stlo-modal-ui h3 { margin-bottom: 2px; }
+        .stlo-modal-ui small { display: block; margin: 0; text-align: left; line-height: 1.4; opacity: 0.85; }
+        .stlo-modal-ui .stlo-section > select, .stlo-modal-ui .stlo-budget-options > select { width: min(100%, 320px) !important; max-width: 100%; min-width: 0; box-sizing: border-box; margin: 2px 0 0 !important; }
+        .stlo-modal-ui .stlo-section > input[type="number"] { width: min(100%, 220px) !important; max-width: 100%; min-width: 0; box-sizing: border-box; margin: 2px 0 0 !important; }
+        .stlo-modal-ui .stlo-toggle-block { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; margin: 0; }
+        .stlo-modal-ui .stlo-checkrow { display: flex; align-items: center; justify-content: flex-start; gap: 5px; width: auto; max-width: 100%; margin: 0; line-height: 1.35; text-align: left; }
+        .stlo-modal-ui .stlo-checkrow input[type="checkbox"] { width: auto !important; max-width: none !important; flex: 0 0 auto; margin: 0; }
+        .stlo-modal-ui .checkbox_label > .checkmark { display: none; }
+        .stlo-modal-ui .stlo-toggle-block > small { margin: 0; line-height: 1.35; }
+        .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 0; padding-top: 3px; width: 100%; }
         .stlo-modal-ui .stlo-order-controls[hidden] { display: none !important; }
-        .stlo-modal-ui .stlo-inline-number { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 10px; }
-        .stlo-modal-ui .stlo-inline-number input { width: 110px; max-width: 100%; }
-        .stlo-modal-ui .stlo-budget-options { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
-        .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; }
-        .stlo-modal-ui .stlo-budget-value input[type="number"] { width: 150px; max-width: 100%; }
+        .stlo-modal-ui .stlo-inline-number { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 7px; }
+        .stlo-modal-ui .stlo-inline-number input[type="number"] { width: 110px !important; max-width: 100%; }
+        .stlo-modal-ui .stlo-budget-options { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; }
+        .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; }
+        .stlo-modal-ui .stlo-budget-value input[type="number"] { width: 130px !important; max-width: 100%; margin: 0 !important; }
+        .stlo-modal-ui .stlo-budget-note { margin-top: 1px; }
         .stlo-modal-ui .stlo-advanced-drawer { width: 100%; }
-        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-content { padding-top: 10px; }
-        .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 16px; }
+        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-content { padding-top: 6px; }
+        .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 10px; }
+        @media (max-width: 480px) {
+            .stlo-modal-ui { gap: 7px; }
+            .stlo-modal-ui .stlo-section { gap: 4px; padding-bottom: 9px; }
+        }
     `;
     document.head.appendChild(style);
 }
@@ -723,7 +734,7 @@ async function openLorebookSettings(worldName = null) {
         const modalHtml = `
             <div class="stlo-modal-ui">
             <div class="world_entry_form_control stlo-section">
-                <h3 class="marginBot10" data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>
+                <h3 data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>
                 <h4 data-i18n="stlo.modal.priority.title">Lorebook Priority</h4>
                 <small data-i18n="stlo.modal.priority.help">Higher numbers (4-5) process first. Lower numbers (1-2) process last.</small>
 
@@ -737,13 +748,15 @@ async function openLorebookSettings(worldName = null) {
             </div>
 
             <div class="world_entry_form_control stlo-section">
-                <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-enabled">
-                    <input type="checkbox" id="lorebook-order-adjustment-enabled"
-                           ${currentSettings.orderAdjustment !== 0 ? 'checked' : ''}>
-                    <span class="checkmark"></span>
-                    <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
-                </label>
-                <small data-i18n="stlo.modal.order.help">Fine-tune processing order within this lorebook's priority level</small>
+                <div class="stlo-toggle-block">
+                    <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-enabled">
+                        <input type="checkbox" id="lorebook-order-adjustment-enabled"
+                               ${currentSettings.orderAdjustment !== 0 ? 'checked' : ''}>
+                        <span class="checkmark"></span>
+                        <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
+                    </label>
+                    <small data-i18n="stlo.modal.order.help">Fine-tune processing order within this lorebook's priority level</small>
+                </div>
 
                 <div class="world_entry_form_control stlo-order-controls" id="lorebook-order-adjustment-container" ${currentSettings.orderAdjustment !== 0 ? '' : 'hidden'}>
                     <h4 data-i18n="stlo.modal.order.title">Order Adjustment</h4>
@@ -756,13 +769,15 @@ async function openLorebookSettings(worldName = null) {
                     </div>
 
                     <div class="MarginTop10">
-                        <label class="checkbox_label" for="lorebook-order-adjustment-group-only">
-                            <input type="checkbox" id="lorebook-order-adjustment-group-only"
-                                   ${currentSettings.orderAdjustmentGroupOnly ? 'checked' : ''}>
-                            <span class="checkmark"></span>
-                            <span data-i18n="stlo.modal.order.groupOnly.label">Group Chats Only</span>
-                        </label>
-                        <small data-i18n="stlo.modal.order.groupOnly.help">Only apply order adjustment during group chats (ignored in single character chats)</small>
+                        <div class="stlo-toggle-block">
+                            <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-group-only">
+                                <input type="checkbox" id="lorebook-order-adjustment-group-only"
+                                       ${currentSettings.orderAdjustmentGroupOnly ? 'checked' : ''}>
+                                <span class="checkmark"></span>
+                                <span data-i18n="stlo.modal.order.groupOnly.label">Group Chats Only</span>
+                            </label>
+                            <small data-i18n="stlo.modal.order.groupOnly.help">Only apply order adjustment during group chats (ignored in single character chats)</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -781,16 +796,18 @@ async function openLorebookSettings(worldName = null) {
 
             <!-- Only When Speaking Toggle -->
             <div class="world_entry_form_control stlo-section">
-                <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
-                    <input type="checkbox" id="lorebook-only-when-speaking"
-                           ${currentSettings.onlyWhenSpeaking ? 'checked' : ''}>
-                    <span class="checkmark"></span>
-                    <span data-i18n="stlo.modal.onlyWhenSpeaking.label">Group chats: Only activate for specific characters (requires character assignments below)</span>
-                </label>
-                <small>
-                    <span data-i18n="stlo.modal.onlyWhenSpeaking.help.1">When enabled, this lorebook will only activate when characters assigned in Group Chat Overrides are speaking.</span>
-                    <strong data-i18n="stlo.modal.onlyWhenSpeaking.help.2">If this box is checked but no characters are assigned below, this lorebook WILL NOT ACTIVATE during group chats.</strong>
-                </small>
+                <div class="stlo-toggle-block">
+                    <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
+                        <input type="checkbox" id="lorebook-only-when-speaking"
+                               ${currentSettings.onlyWhenSpeaking ? 'checked' : ''}>
+                        <span class="checkmark"></span>
+                        <span data-i18n="stlo.modal.onlyWhenSpeaking.label">Group chats: Only activate for specific characters (requires character assignments below)</span>
+                    </label>
+                    <small>
+                        <span data-i18n="stlo.modal.onlyWhenSpeaking.help.1">When enabled, this lorebook will only activate when characters assigned in Group Chat Overrides are speaking.</span>
+                        <strong data-i18n="stlo.modal.onlyWhenSpeaking.help.2">If this box is checked but no characters are assigned below, this lorebook WILL NOT ACTIVATE during group chats.</strong>
+                    </small>
+                </div>
             </div>
 
             <!-- Group Chat Overrides -->
@@ -1149,13 +1166,15 @@ function createBudgetControls(scope, currentSettings = {}) {
                 <input type="number" id="${SELECTORS.LOREBOOK_BUDGET_VALUE}" class="text_pole textarea_compact"
                        value="${value || 0}" placeholder="0" style="width: 120px;">
                 <small id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint"></small>
-                <label class="checkbox_label stlo-checkrow" for="${SELECTORS.LOREBOOK_RANDOM_TRIM}">
-                    <input type="checkbox" id="${SELECTORS.LOREBOOK_RANDOM_TRIM}" ${currentSettings.randomTrim ? 'checked' : ''}>
-                    <span class="checkmark"></span>
-                    <span>${translate('Random trim (drop random entries when over budget)', 'stlo.budget.randomTrim')}</span>
-                </label>
+                <div class="stlo-toggle-block">
+                    <label class="checkbox_label stlo-checkrow" for="${SELECTORS.LOREBOOK_RANDOM_TRIM}">
+                        <input type="checkbox" id="${SELECTORS.LOREBOOK_RANDOM_TRIM}" ${currentSettings.randomTrim ? 'checked' : ''}>
+                        <span class="checkmark"></span>
+                        <span>${translate('Random trim (drop random entries when over budget)', 'stlo.budget.randomTrim')}</span>
+                    </label>
+                </div>
             </div>
-            <small data-i18n="stlo.budget.tip">Tip: default (0) lets ST decide; Fixed with 1 effectively chokes off this lorebook.</small>
+            <small class="stlo-budget-note" data-i18n="stlo.budget.tip">Tip: default (0) lets ST decide; Fixed with 1 effectively chokes off this lorebook.</small>
         </div>
     `;
 }
