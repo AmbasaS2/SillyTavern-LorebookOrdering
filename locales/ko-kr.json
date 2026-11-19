@@ -40,7 +40,7 @@
   "stlo.modal.priority.option.2": "2 - 낮은 우선순위",
   "stlo.modal.priority.option.1": "1 - 가장 나중에 처리",
   "stlo.modal.order.enableLabel": "세부 순서 조정 사용",
-  "stlo.modal.order.help": "같은 우선순위의 로어북들 사이에서 처리 순서를 더 자세히 조정합니다. 보통은 꺼 두셔도 됩니다.",
+  "stlo.modal.order.help": "같은 우선순위의 로어북들 사이에서 처리 순서를 더 자세히 조정합니다.",
   "stlo.modal.order.title": "세부 순서 조정값",
   "stlo.modal.order.explain": "0이면 변경하지 않습니다. 양수(예: +250)는 더 먼저, 음수(예: -500)는 더 나중에 처리합니다.",
   "stlo.modal.order.range": "-10,000 ~ +10,000",
