@@ -2,7 +2,7 @@
 
 **A SillyTavern extension for managing lorebook priorities, per-lorebook token limits, and optional per-lorebook vector similarity thresholds.**
 
-This is an independent fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), based on upstream v2.2.4. The original extension provides the core priority, budget, order adjustment, random trimming, and group-chat features. This fork retains those features and adds options for a particular lorebook-management workflow. Many thanks to aikohanasaki for the original design and implementation.
+This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), based on upstream v2.2.4. The original extension provides the core priority, budget, order adjustment, random trimming, and group-chat features. This fork retains those features and adds options for a particular lorebook-management workflow. Many thanks to aikohanasaki for the original design and implementation.
 
 [English](#-installation-and-first-steps) · [한국어](#-stlo-포크--로어북-예산-관리) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
