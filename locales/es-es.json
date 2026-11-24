@@ -5,6 +5,7 @@
   "stlo.jev.nano": "Suscripción NanoGPT",
   "stlo.jev.direct": "Clave oficial de Jev de TypeSafe",
   "stlo.jev.help": "Jev cuenta primero las entradas siempre activas y respeta los límites por libro. Usa la clave de la conexión elegida guardada en Scene Reader. Si falla, se usa la recuperación habitual.",
+  "stlo.jev.inputHelp": "Jev evalúa en una sola solicitud los candidatos de todos los libros de lore activos en este chat con Jev habilitado. Cuantos más candidatos, más tokens de entrada. El presupuesto solo limita el lore incluido en la respuesta.",
   "stlo.button.configure": "Configurar prioridad y presupuesto de STLO",
   "stlo.warn.title": "⚠️ Precaución",
   "stlo.warn.body": "Tu estrategia de inserción de información mundial no está configurada como «Ordenado uniformemente». STLO requiere la estrategia «Ordenado uniformemente» para funcionar correctamente. ¿Qué te gustaría hacer?",

@@ -5,6 +5,7 @@
   "stlo.jev.nano": "NanoGPT-Abonnement",
   "stlo.jev.direct": "Offizieller TypeSafe-Jev-Schlüssel",
   "stlo.jev.help": "Jev berücksichtigt zuerst daueraktive Einträge und beachtet Buchlimits. Es nutzt den passenden in Scene Reader gespeicherten Schlüssel. Bei einem Verbindungsfehler gilt der normale Abruf.",
+  "stlo.jev.inputHelp": "Jev bewertet die Kandidaten aus allen dafür aktivierten Lorebüchern im aktuellen Chat in einer Anfrage. Mehr Kandidaten benötigen mehr Eingabetokens. Das Abrufbudget begrenzt nur die Textmenge für die Antwort.",
   "stlo.button.configure": "STLO-Priorität & Budget konfigurieren",
   "stlo.warn.title": "⚠️ Achtung",
   "stlo.warn.body": "Ihre Einfügestrategie für Welteninfos ist nicht auf „Gleichmäßig sortiert“ eingestellt. STLO benötigt die Strategie „Gleichmäßig sortiert“, um korrekt zu funktionieren. Was möchten Sie tun?",

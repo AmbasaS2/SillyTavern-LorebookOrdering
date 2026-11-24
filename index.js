@@ -54,6 +54,22 @@ function setProtectAlwaysOn(value) {
 // Cleanup tracking
 let eventListeners = [];
 let jevGeneration = null;
+let nativeVectorPasses = 0;
+let guardedVectorInterceptor = null;
+
+function guardNativeVectorInterceptor() {
+    const interceptor = globalThis.vectors_rearrangeChat;
+    if (typeof interceptor !== 'function' || interceptor === guardedVectorInterceptor) return;
+    guardedVectorInterceptor = async function (...args) {
+        nativeVectorPasses++;
+        try {
+            return await interceptor.apply(this, args);
+        } finally {
+            nativeVectorPasses--;
+        }
+    };
+    globalThis.vectors_rearrangeChat = guardedVectorInterceptor;
+}
 
 function stopJevGeneration() {
     jevGeneration?.controller.abort();
@@ -65,6 +81,7 @@ function startJevGeneration(type, _options, dryRun) {
     const chatId = getCurrentChatId();
     if (!dryRun && chatId && ['normal', 'continue', 'regenerate', 'swipe'].includes(type)) {
         jevGeneration = { chatId, controller: new AbortController() };
+        if (HAS_WORLDINFO_SCAN_DONE && extension_settings.vectors?.enabled_world_info) guardNativeVectorInterceptor();
     }
 }
 
@@ -590,7 +607,9 @@ async function handleWorldInfoEntriesLoaded(eventData) {
 
         // Delegate consolidation, sorting, and budget to dedicated functions
         await applyPriorityOrdering(eventData);
-        if (HAS_WORLDINFO_SCAN_DONE) await applyJevSelection(eventData.globalLore);
+        // Vector Storage uses this same event to synchronize persistent hashes.
+        // Shape only the actual reply scan; keep the vector pass's full book.
+        if (HAS_WORLDINFO_SCAN_DONE && nativeVectorPasses === 0) await applyJevSelection(eventData.globalLore);
         // In newer branches (with WORLDINFO_SCAN_DONE), we trim per-loop and skip pre-scan entirely.
         if (!HAS_WORLDINFO_SCAN_DONE) {
             await enforceBudgetPreScan(eventData);
@@ -856,6 +875,7 @@ async function openLorebookSettings(worldName = null) {
                     </select>
                 </label>
                 <small data-i18n="stlo.jev.help">Jev counts always-on entries from enabled books first. Book limits still apply. It uses the selected key saved in Scene Reader. If the connection fails, standard World Info recall is used.</small>
+                <small data-i18n="stlo.jev.inputHelp">Every Jev request sends all eligible entries from all active lorebooks with Jev enabled in this chat. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.</small>
             </div>
             <div class="world_entry_form_control stlo-section">
                 <h3 data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>

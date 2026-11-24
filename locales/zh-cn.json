@@ -5,6 +5,7 @@
   "stlo.jev.nano": "NanoGPT 订阅",
   "stlo.jev.direct": "TypeSafe 官方 Jev 密钥",
   "stlo.jev.help": "优先计入常驻条目，同时应用每本书的预算。使用 Scene Reader 中为所选连接保存的密钥。连接失败时使用常规调用方式。",
+  "stlo.jev.inputHelp": "Jev 会在一次请求中评估当前聊天里所有已启用 Jev 的活跃世界书中的候选条目。候选越多，输入 token 越多。注入预算仅限制用于回复的世界书文本量。",
   "stlo.button.configure": "配置 STLO 优先级与预算",
   "stlo.warn.title": "⚠️ 注意",
   "stlo.warn.body": "您的世界信息插入策略未设置为“均匀排序”。STLO 需要“均匀排序”策略才能正常工作。您想要如何处理？",
