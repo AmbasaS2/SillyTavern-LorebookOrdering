@@ -1,8 +1,8 @@
 # 📚 ST Lorebook Ordering (STLO) — Ambasa Fork
 
-**A SillyTavern extension for managing lorebook priorities, per-lorebook token limits, and optional per-lorebook vector similarity thresholds.**
+**Scene-aware lore recall with Jev, plus lorebook priorities, token budgets, always-on protection, and optional per-lorebook vector thresholds for SillyTavern.**
 
-This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), based on upstream v2.2.4. The original extension provides the core priority, budget, order adjustment, random trimming, and group-chat features. This fork retains those features and adds options for a particular lorebook-management workflow. Many thanks to aikohanasaki for the original design and implementation.
+This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), based on upstream v2.2.4. The original extension provides the core priority, budget, order adjustment, random trimming, and group-chat features. This fork retains those features and adds Jev-based lore selection, always-on protection, and book-specific vector settings. Many thanks to aikohanasaki for the original design and implementation.
 
 [English](#-installation-and-first-steps) · [한국어](#-stlo-포크--로어북-예산-관리) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
@@ -23,18 +23,66 @@ The diagrams in this README are illustrated guides based on the fork's settings,
    https://github.com/AmbasaS2/SillyTavern-LorebookOrdering
    ```
 
-3. Install and reload SillyTavern. Use a recent SillyTavern version with the `WORLDINFO_SCAN_DONE` event (e.g. the 1.18 series) for per-lorebook budget trimming.
-4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, choose a lorebook, configure the settings, and click **Save settings**.
+3. Install and reload SillyTavern. Use a recent SillyTavern version with the `WORLDINFO_SCAN_DONE` event (e.g. the 1.18 series) for Jev and per-lorebook budget trimming.
+4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, choose a lorebook, configure its budget and priority, optionally enable Jev, and click **Save settings**.
 
 ## 🧭 How to Use
 
 <p align="center">
-  <a href="assets/readme/mobile/stlo-workflow-guide-mobile.svg"><img src="assets/readme/mobile/stlo-workflow-guide-mobile.svg" alt="STLO workflow: select a lorebook, set priority and budget, optionally set vector threshold, save / 설정 흐름" width="860" /></a>
+  <a href="assets/readme/mobile/stlo-workflow-guide-mobile.svg"><img src="assets/readme/mobile/stlo-workflow-guide-mobile.svg" alt="STLO workflow: select a lorebook, set priority and budget, optionally use Jev or vector recall, save / 설정 흐름" width="860" /></a>
 </p>
 
 The menu shows the current character's primary and additional linked lorebooks first. Enable **모든 로어북 보기 (Show all lorebooks)** to choose any available book. When no current character can be identified, the full list is shown. The filter only changes the selection list; it does not connect, disconnect, or activate any lorebooks.
 
 The original slash command is retained: `/stlo My Lorebook` selects the named book in the World Info editor and opens its STLO settings. The name is case-insensitive.
+
+## ✨ Jev Recall — scene-aware lore selection
+
+<p align="center">
+  <a href="assets/readme/mobile/stlo-jev-guide-mobile.svg"><img src="assets/readme/mobile/stlo-jev-guide-mobile.svg" alt="Jev recall: current scene, relevant lore selection, token budgets, usual RP reply / 제브가 장면에 필요한 로어를 선택하는 과정" width="860" /></a>
+</p>
+
+Jev recall is the main new retrieval feature of this fork. Instead of relying solely on keyword matches or embedding similarity, STLO asks [TypeSafe Jev 1.14](https://nano-gpt.com/models/decisions/typesafe/jev-1.14) to decide which eligible lore entries would actually help with the current roleplay scene. For example, an old promise, a shared joke, an unresolved disagreement, or a character-specific habit may be relevant even if the latest message does not repeat the same words.
+
+Jev is a decision model, not the model that writes the RP response. STLO sends a single structured decision request per eligible generation through NanoGPT, ranks the accepted entries by their inclusion probabilities, and passes the entries that fit the budgets to SillyTavern. Your usual RP model still generates the reply. The extension does not create new memories, rewrite lore, or require an additional vector index or server plugin.
+
+### Setup
+
+1. In NanoGPT, create or use an API key for your subscription. Set the key's **Billing → Subscription only** to prevent spending your account balance.
+2. In SillyTavern, save a **Chat Completion → Custom (OpenAI-compatible)** connection profile using the base URL `https://nano-gpt.com/api/subscription/v1` and that key. The profile must have a saved credential bound to this endpoint. The ordinary NanoGPT endpoint or a native NanoGPT connection profile is not selectable for Jev in this implementation.
+3. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)** and choose a lorebook. Enable **Use Jev to select entries in chats with this character**. Select your saved **NanoGPT connection profile**, set **Total Jev budget (tokens)**, and save.
+4. Continue your RP normally. The extension requests `typesafe/jev-1.14` automatically; it does not replace your main API or require you to change the profile's saved chat model to Jev.
+
+In a one-to-one character chat, the switch applies to the character and covers eligible entries from all lorebooks active in that chat, not just the book whose settings you opened. Other characters can have different settings. When there is no single current character (including group chat), the dialog instead exposes **Use Jev for this lorebook**; this applies to that book. The total Jev budget and selected connection profile are shared extension settings. Jev is optional and defaults to off for new configurations.
+
+### What Jev sees and selects
+
+- Up to six recent non-system chat messages (up to 1,400 characters per message), and each eligible entry's book name, title, keywords, and a bounded excerpt of its content (up to approximately 960 characters, with beginning and ending excerpts for long entries).
+- One include/skip decision per eligible entry; the original full content of selected entries is used for injection, not the excerpt sent for assessment.
+- Ordinary eligible non-constant entries in scope, whether keyword-based or marked for vector retrieval. Disabled entries are not candidates. Always-on entries are handled normally and counted first for budgeting; special entries such as outlets, managed side prompts, explicit activation decorators, sticky/cooldown/delay/recursion-only entries, character filters and trigger-restricted entries retain their native handling.
+- Only active lorebooks are considered. Saved lore and activation settings are not rewritten. No automatic memory creation or summarization is performed.
+
+### Three budget limits
+
+| Limit | What it controls |
+|---|---|
+| SillyTavern World Info budget | The shared World Info ceiling for the prompt. |
+| STLO per-lorebook budget | The maximum each book may contribute. |
+| Total Jev budget (default 10,000 tokens) | The shared recall ceiling across Jev-managed books, counting their always-on entries first. |
+
+These limits are not added together or reserved allocations. For instance, a memory book capped at 3,000 tokens with 2,000 tokens of always-on entries has at most 1,000 tokens left for additional Jev picks, even if the total Jev budget is 10,000. Jev selects relevant entries in score order within the remaining limits; the original insertion positions/order are retained. Ordinary native entries and explicitly budget-exempt entries retain their applicable handling; always-on entries themselves are not guaranteed to fit every budget.
+
+### Jev or native vector retrieval
+
+One generation uses one recall path. When Jev is enabled for that generation, STLO skips SillyTavern's native vector retrieval, including chat and Data Bank/file vector injections. It does not delete vector data or change the user's saved Vector Storage settings. When Jev is disabled, ordinary World Info and configured native vector retrieval remain available, including this fork's per-book vector thresholds.
+
+If Jev is unavailable (for example, missing profile, invalid response, provider error, or timeout), STLO leaves the native World Info rules in place. The generation can continue with ordinary keyword and always-on activation; it does not issue a second vector recall request as a fallback. No extra Jev calls are made for repeated scans in the same generation. Dry-run prompt previews do not invoke Jev.
+
+### Input size, subscription usage, and privacy
+
+**The Jev token budget is an injection limit, not an API input-token limit.** Every eligible entry in the active scope is assessed in one request. Large collections therefore increase the request size even when only a few entries are ultimately injected. The NanoGPT endpoint currently documents a 64K request limit and a 32K per-question limit for this model; an oversized request or exhausted allowance can fail and fall back to ordinary World Info.
+
+The request sends the recent chat excerpts and candidate lore excerpts to NanoGPT for processing by Jev. Enable it only when you are comfortable sending that content. There is an additional API request and possible latency on eligible RP generations; subscription coverage and allowance depend on the provider and account. Check your [NanoGPT subscription and billing settings](https://nano-gpt.com/support) rather than assuming unlimited or free usage.
 
 ## ⚙️ Priority and Order
 
@@ -72,7 +120,7 @@ All lorebooks share SillyTavern's global World Info budget. A per-book budget is
 
 For example, 25% of an 8,000-token World Info budget equals a 2,000-token per-book ceiling. A book may use less, and other books do not receive guaranteed reservations.
 
-**Random trim** is an upstream feature. Instead of always considering entries in order, it shuffles the selection when applying a per-book cap. With Protect Always-On enabled, constants retain their order and only non-constant entries are shuffled.
+**Random trim** is an upstream feature. Instead of always considering entries in order, it shuffles the selection when applying a per-book cap. With Protect Always-On enabled, constants retain their order and only ordinary non-constant entries are shuffled. Jev-selected entries are considered in their relevance order after ordinary native entries in per-book trimming.
 
 The fork trims structured activated entries before the final prompt is assembled instead of deleting matching strings from prompt text. With recursive scanning, an entry excluded from the final prompt may already have triggered another entry; trimming does not undo all earlier activation effects.
 
@@ -82,7 +130,7 @@ The fork trims structured activated entries before the final prompt is assembled
   <a href="assets/readme/mobile/stlo-vector-guide-mobile.svg"><img src="assets/readme/mobile/stlo-vector-guide-mobile.svg" alt="Optional vector similarity thresholds, query groups, one global result cap and token budget distinction / 벡터 검색 조건과 예산 구분" width="860" /></a>
 </p>
 
-This option applies to World Info vector retrieval; it does not replace SillyTavern's Vector Storage configuration or enable vectorization for you.
+When Jev is not used, this option applies to native World Info vector retrieval; it does not replace SillyTavern's Vector Storage configuration or enable vectorization for you.
 
 - **Blank:** use the existing global vector similarity threshold.
 - **0–1:** explicitly override the similarity threshold for this lorebook. A higher threshold generally requires a closer match; the appropriate value depends on the embedding model and content.
@@ -106,6 +154,7 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 
 | Feature | Original STLO v2.2.4 | Ambasa fork |
 |---|---|---|
+| Jev scene-aware recall | Not included | Optional decision-model recall with shared and per-book budgets |
 | Priority, order, budget modes, random trim | Included | Retained |
 | Group-chat overrides and `/stlo` | Included | Retained |
 | Settings access | World Info editor button | Extensions-menu picker; character-linked filter and show-all |
@@ -114,23 +163,23 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 | Settings layout | Upstream interface | Compact layout, expandable controls, clickable help |
 | Budget enforcement | Upstream implementation | Structured scan-time trimming and scan-local settings/token reuse |
 
-[Compare the fork's code changes](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/compare/c593986c315c60292f8f4b888d1fdda65517ba6c...17fa72b739f833c40d8398982c26ff19b5a1b5af) (upstream base to the documented fork code, excluding later documentation commits).
+[Compare the fork's code changes](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/compare/c593986c315c60292f8f4b888d1fdda65517ba6c...3ca62a5f98168cad03a6080104cb9f3a45345958) (upstream base to the documented fork code, excluding later documentation commits).
 
 ## 📌 Compatibility and Data
 
-- Per-lorebook trimming requires `WORLDINFO_SCAN_DONE`. The fork does not perform final-prompt substring trimming as a fallback on older SillyTavern versions. The original pre-scan total-budget fallback remains.
+- Jev and per-lorebook trimming require `WORLDINFO_SCAN_DONE`. The fork does not perform final-prompt substring trimming as a fallback on older SillyTavern versions. The original pre-scan total-budget fallback remains.
 - STLO 2.x no longer requires the older “evenly” insertion strategy check; the inherited older README and guides may describe earlier behavior. This fork does not enforce that check.
-- Book settings are stored in the lorebook's existing `stlo` data; Protect Always-On is stored in extension settings. Settings are applied with the Save button. If a previously configured book unexpectedly opens with default values, load it in the World Info editor first and reopen the settings before saving.
+- Book settings are stored in the lorebook's existing `stlo` data; Protect Always-On, character-specific Jev switches, the shared Jev budget and connection profile ID are stored in extension settings. Settings are applied with the Save button. If a previously configured book unexpectedly opens with default values, load it in the World Info editor first and reopen the settings before saving.
 - Do not enable upstream and this fork simultaneously. Back up your lorebook files before switching. To return to upstream, disable/remove this fork and enable only upstream.
-- The diagrams and instructions describe the code at [17fa72b7](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/17fa72b739f833c40d8398982c26ff19b5a1b5af), based on upstream manifest version 2.2.4. They are not a claim of compatibility testing on every SillyTavern version, browser, or extension combination.
+- The diagrams and instructions describe the code at [3ca62a5f](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/3ca62a5f98168cad03a6080104cb9f3a45345958), based on upstream manifest version 2.2.4. They are not a claim of compatibility testing on every SillyTavern version, browser, or extension combination.
 
 ---
 
 # 📚 STLO 포크 · 로어북 예산 관리
 
-**로어북별 우선순위와 토큰 예산을 설정하고, 필요에 따라 로어북마다 벡터 유사도 임계값을 다르게 지정하는 실리태번 확장입니다.**
+**제브(Jev)로 현재 RP에 필요한 로어를 골라 주입하고, 로어북별 우선순위와 토큰 예산까지 관리하는 실리태번 확장입니다.**
 
-[aikohanasaki님의 ST Lorebook Ordering](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering) v2.2.4를 기반으로 만든 포크입니다. 원본에서 제공하는 우선순위, 예산, 세부 순서, 랜덤 트리밍, 그룹 채팅 기능을 그대로 사용하며, 특정 로어북 주입 방식에 맞춘 설정을 추가했습니다.
+[aikohanasaki님의 ST Lorebook Ordering](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering) v2.2.4를 기반으로 만든 포크입니다. 원본에서 제공하는 우선순위, 예산, 세부 순서, 랜덤 트리밍, 그룹 채팅 기능을 그대로 사용하며, 제브를 이용한 로어 선택, 상시 주입 우선 보호, 책별 벡터 설정을 추가했습니다. 원작자님께 감사드립니다.
 
 [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [원본 STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
@@ -151,8 +200,8 @@ Enable **Only activate for specific characters** to limit the book to turns by a
    https://github.com/AmbasaS2/SillyTavern-LorebookOrdering
    ```
 
-3. 설치 후 새로고침합니다. 로어북별 예산 트리밍은 `WORLDINFO_SCAN_DONE`을 지원하는 최근 버전(예: 1.18 계열)을 권장합니다.
-4. **확장 메뉴 → 로어북 예산 관리**에서 책을 선택한 뒤 설정을 저장합니다.
+3. 설치 후 새로고침합니다. 제브 및 로어북별 예산 트리밍은 `WORLDINFO_SCAN_DONE`을 지원하는 최근 버전(예: 1.18 계열)을 권장합니다.
+4. **확장 메뉴 → 로어북 예산 관리**에서 책을 선택하고 예산·우선순위 및 필요한 경우 제브를 설정한 뒤 저장합니다.
 
 ## 🧭 사용 흐름
 
@@ -163,6 +212,54 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 현재 캐릭터의 기본·추가 연결 로어북을 먼저 보여 줍니다. **모든 로어북 보기**에 체크하면 다른 책도 선택할 수 있습니다. 현재 캐릭터를 특정할 수 없으면 전체 목록을 보여 줍니다. 목록을 필터링해도 실제 로어북 연결이나 활성화 여부는 바뀌지 않습니다.
 
 원본의 `/stlo 로어북 이름` 명령어도 남아 있습니다. 월드 정보 편집기에서 해당 로어북을 선택하고 설정창을 엽니다.
+
+## ✨ 제브(Jev) — 지금 장면에 필요한 로어를 골라 주입
+
+<p align="center">
+  <a href="assets/readme/mobile/stlo-jev-guide-mobile.svg"><img src="assets/readme/mobile/stlo-jev-guide-mobile.svg" alt="Jev recall: current scene, relevant lore selection, token budgets, usual RP reply / 제브가 장면에 필요한 로어를 선택하는 과정" width="860" /></a>
+</p>
+
+포크의 핵심 추가 기능입니다. 키워드가 일치하거나 벡터 유사도가 높은 로어를 찾는 것에 그치지 않고, [TypeSafe Jev 1.14](https://nano-gpt.com/models/decisions/typesafe/jev-1.14)가 현재 RP에 실제로 도움이 될 로어인지 항목별로 판정합니다. 예전의 약속이나 둘만의 농담, 풀리지 않은 갈등, 캐릭터의 습관처럼 같은 단어가 나오지 않아도 지금 장면에 필요한 기억을 선택할 수 있도록 했습니다.
+
+제브는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모델입니다. STLO는 나노GPT를 통해 한 번의 요청으로 대상 로어의 주입 여부를 판정받고, 선택된 항목을 판정 점수순으로 예산에 맞게 추려 실리태번에 전달합니다. 실제 RP 답변은 평소 사용하던 모델이 생성합니다. 별도의 서버 플러그인이나 벡터 인덱스가 필요하지 않으며, 새 기억을 만들거나 기존 로어를 요약·수정하는 기능이 아닙니다.
+
+### 사용 설정
+
+1. 나노GPT에서 구독용 API 키를 준비합니다. 잔액 결제를 막으려면 해당 키의 **Billing → Subscription only**를 설정하세요.
+2. 실리태번 API 연결에서 **Chat Completion → Custom (OpenAI-compatible)**을 선택하고 주소를 `https://nano-gpt.com/api/subscription/v1`로 지정합니다. 해당 주소에 키가 저장된 연결 프로필을 만듭니다. 일반 나노GPT API 주소나 실리태번의 NanoGPT 전용 연결 방식은 현재 제브 프로필 선택 대상이 아닙니다.
+3. **확장 메뉴 → 로어북 예산 관리**에서 책 하나를 열고 **이 캐릭터와의 채팅은 제브로 항목 선택**을 켭니다. **나노GPT 연결 프로필**과 **제브 총예산 (토큰)**을 지정한 뒤 설정을 저장합니다.
+4. 평소처럼 RP를 이어갑니다. STLO가 판정용 모델 `typesafe/jev-1.14`를 자동 지정하므로 메인 RP API나 저장한 프로필의 일반 채팅 모델을 제브로 바꿀 필요가 없습니다.
+
+1:1 채팅에서는 현재 캐릭터별로 켜고 끌 수 있습니다. 어느 책에서 설정창을 열었든 그 캐릭터의 현재 채팅에 연결·활성화된 모든 로어북의 판정 대상 항목에 적용됩니다. 선택한 책 한 권에만 적용되는 것이 아닙니다. 단일 캐릭터를 특정할 수 없는 상황(그룹 채팅 포함)에서는 **이 로어북에서 제브로 항목 선택**으로 책별 설정을 사용합니다. 제브 총예산과 연결 프로필은 확장 공통 설정입니다. 새 설정에서는 기본적으로 꺼져 있습니다.
+
+### 판정 대상과 주입
+
+- 최근 시스템 메시지를 제외한 최대 6개 메시지(각 최대 1,400자)와 활성 로어북의 대상 항목별 책 이름·제목·키워드·본문 발췌(최대 약 960자, 긴 글은 앞뒤 부분)를 한 요청으로 전달합니다.
+- 제브는 항목마다 넣을지 말지 판정합니다. 선택된 항목은 발췌가 아닌 원래 전체 본문을 주입 대상으로 삼습니다.
+- 초록불과 벡터 표시가 된 일반 항목 모두 판정할 수 있습니다. 비활성 항목은 제외합니다. 상시 주입, Outlet, 관리형 사이드 프롬프트, 활성화 데코레이터, Sticky·쿨다운·지연·재귀 전용·캐릭터 필터·트리거 제한 항목 등 별도 규칙이 있는 항목은 기존 처리를 유지합니다.
+- 저장된 로어북을 수정하거나, 활성화되지 않은 모든 로어북을 임의로 검색하거나, 기억을 자동 생성하지 않습니다.
+
+### 예산은 세 가지를 함께 적용합니다
+
+| 설정 | 역할 |
+|---|---|
+| 실리태번 전체 월드 정보 예산 | 모든 로어북이 공유하는 전체 상한 |
+| STLO 로어북별 예산 | 각 책의 최대 사용량 |
+| 제브 총예산 (기본 10,000토큰) | 제브 적용 책들의 공통 상한. 그 책들의 상시 항목부터 계산 |
+
+예를 들어 메모리북 개별 예산이 3,000토큰이고 파란불 기억이 2,000토큰이라면, 제브 총예산을 10,000으로 설정해도 그 책에서 제브가 추가 선택할 수 있는 기억은 최대 1,000토큰입니다. 제브가 선택한 항목은 판정 점수가 높은 순서대로 예산에 맞춰 넣고, 원래의 프롬프트 삽입 위치와 순서 설정은 유지합니다. 일반 항목과 예산 무시 항목의 기존 처리도 유지되며 상시 항목 역시 예산에 따라 빠질 수 있습니다.
+
+### 제브와 기존 벡터 검색은 동시에 실행하지 않습니다
+
+제브를 사용하는 답변에서는 로어북뿐 아니라 기존 채팅·데이터뱅크/파일 벡터 검색도 건너뜁니다. 저장된 벡터 데이터나 설정을 지우는 것은 아닙니다. 제브를 끈 답변에서는 기존 키워드·벡터 검색과 로어북별 벡터 임계값 기능을 사용합니다.
+
+연결 프로필 누락, API 오류, 응답 형식 오류, 제한 시간 초과 등으로 제브를 사용하지 못하면 기본 월드 정보 규칙에 맡깁니다. 기존 키워드·상시 주입으로 진행하며, 같은 답변에 벡터 검색을 추가로 요청하는 방식은 아닙니다. 한 번의 답변 생성 중 판정 요청을 반복하지 않고, 프롬프트 미리보기용 dry-run에서도 제브를 호출하지 않습니다.
+
+### 제브 API 비용과 입력량
+
+**제브 총예산은 RP 답변에 주입되는 토큰 한도입니다. 제브에 보내는 입력 토큰 한도가 아닙니다.** 현재 범위의 판정 대상 항목을 한 요청으로 보내므로 로어북이 클수록 입력 토큰이 늘어납니다. 나노GPT 모델 안내 기준 요청 전체 64K, 질문별 32K 제한이 있으므로 너무 큰 요청은 실패할 수 있습니다.
+
+제브를 켜면 최근 대화와 로어 발췌가 외부 API인 나노GPT를 통해 제브 모델에 전달됩니다. 이 점을 고려해서 사용하세요. 별도의 판정 API 요청으로 시간이 추가될 수 있으며, 구독 포함 여부와 사용량 한도는 [나노GPT 구독·결제 정책](https://nano-gpt.com/support)을 확인하세요. 구독이라고 무조건 무제한·무료인 것은 아닙니다.
 
 ## ⚙️ 우선순위와 순서
 
@@ -198,7 +295,7 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 
 예를 들어 전체 월드 정보 예산이 8,000토큰이고 어떤 책을 25%로 설정했다면, 그 책은 최대 2,000토큰을 사용할 수 있습니다. 실제 주입량은 더 적을 수 있습니다.
 
-**예산 초과 시 항목을 무작위로 제외**는 원본 STLO의 랜덤 트리밍 기능입니다. 상시 주입 우선 보호를 켜면 상시 항목은 기존 순서를 유지하고 나머지 항목을 섞습니다.
+**예산 초과 시 항목을 무작위로 제외**는 원본 STLO의 랜덤 트리밍 기능입니다. 상시 주입 우선 보호를 켜면 상시 항목은 기존 순서를 유지하고 일반 항목을 섞습니다. 책별 예산 트리밍에서는 제브가 고른 항목을 일반 항목 뒤에서 판정 점수순으로 고려합니다.
 
 포크에서는 최종 프롬프트에서 일치하는 문자열을 찾아 제거하는 대신 활성화 항목 구조에서 직접 제외합니다. 재귀 검색을 사용하면 최종 주입에서 제외된 로어도 앞선 검색 과정에서 다른 로어를 활성화했을 수 있습니다.
 
@@ -208,7 +305,7 @@ Enable **Only activate for specific characters** to limit the book to turns by a
   <a href="assets/readme/mobile/stlo-vector-guide-mobile.svg"><img src="assets/readme/mobile/stlo-vector-guide-mobile.svg" alt="개별 벡터 임계값, 전역 결과 한도, 토큰 예산과 검색 조건의 차이" width="860" /></a>
 </p>
 
-벡터화된 로어북을 검색할 때 사용할 유사도 기준입니다. 실리태번의 벡터 저장소 설정 자체를 대체하거나 로어북을 자동으로 벡터화하지 않습니다.
+제브를 사용하지 않을 때 기존 벡터화된 로어북을 검색하는 유사도 기준입니다. 실리태번의 벡터 저장소 설정 자체를 대체하거나 로어북을 자동으로 벡터화하지 않습니다.
 
 - 미입력: 전역 벡터 유사도 임계값을 사용합니다.
 - 0~1 입력: 해당 로어북의 검색 임계값을 지정합니다. 일반적으로 높을수록 관련성이 높은 후보만 남습니다.
@@ -232,6 +329,7 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 
 | 기능 | 원본 STLO v2.2.4 | 포크 |
 |---|---|---|
+| 제브 로어 선택 | 미포함 | 현재 장면에 필요한 로어 판정 및 예산 내 주입 |
 | 우선순위·세부 순서·예산·랜덤 트리밍 | 지원 | 유지 |
 | 그룹 채팅 설정, /stlo | 지원 | 유지 |
 | 설정 접근 | 월드 정보 편집기 버튼 | 확장 메뉴, 현재 캐릭터 연결 책 필터 |
@@ -240,15 +338,15 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 | 설정 UI | 기존 구성 | 좁은 화면에 맞춘 구성, 클릭형 도움말 |
 | 예산 트리밍 | 기존 구현 | 활성화 항목 구조에서 제외, 스캔 내 설정·토큰 계산 재사용 |
 
-[원본 기반 코드와 포크 코드 비교](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/compare/c593986c315c60292f8f4b888d1fdda65517ba6c...17fa72b739f833c40d8398982c26ff19b5a1b5af)
+[원본 기반 코드와 포크 코드 비교](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/compare/c593986c315c60292f8f4b888d1fdda65517ba6c...3ca62a5f98168cad03a6080104cb9f3a45345958)
 
 ## 📌 호환성 및 저장
 
-- 로어북별 예산 트리밍에는 `WORLDINFO_SCAN_DONE`이 필요합니다. 해당 이벤트가 없는 버전에서는 최종 프롬프트 문자열 제거를 대체 수단으로 사용하지 않습니다. 기존 사전 스캔 전체 예산 제한 경로는 남아 있습니다.
+- 제브와 로어북별 예산 트리밍에는 `WORLDINFO_SCAN_DONE`이 필요합니다. 해당 이벤트가 없는 버전에서는 최종 프롬프트 문자열 제거를 대체 수단으로 사용하지 않습니다. 기존 사전 스캔 전체 예산 제한 경로는 남아 있습니다.
 - STLO 2.x부터 이전 버전의 '균등 정렬' 강제 확인은 제거되었습니다. 기존 가이드에는 이전 버전의 동작이 설명되어 있을 수 있습니다.
-- 로어북별 설정은 기존 로어북의 `stlo` 데이터에 저장하고, 상시 주입 우선 보호는 확장 설정에 저장합니다. 설정 저장 버튼을 눌러 변경 사항을 반영합니다. 전에 설정한 책이 기본값으로 열린다면 바로 저장하지 말고 월드 정보 편집기에서 책을 불러온 후 다시 확인하세요.
+- 로어북별 설정은 기존 로어북의 `stlo` 데이터에 저장하고, 상시 주입 우선 보호, 캐릭터별 제브 사용 여부, 제브 총예산과 연결 프로필 ID는 확장 설정에 저장합니다. 설정 저장 버튼을 눌러 변경 사항을 반영합니다. 전에 설정한 책이 기본값으로 열린다면 바로 저장하지 말고 월드 정보 편집기에서 책을 불러온 후 다시 확인하세요.
 - 원본과 포크를 동시에 활성화하지 마세요. 전환 전 로어북 파일을 백업하세요.
-- 문서는 원본 manifest v2.2.4를 기반으로 한 [17fa72b7](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/17fa72b739f833c40d8398982c26ff19b5a1b5af) 코드를 기준으로 작성했습니다. 모든 기기와 확장 조합의 호환성을 검증했다는 의미는 아닙니다.
+- 문서는 원본 manifest v2.2.4를 기반으로 한 [3ca62a5f](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/3ca62a5f98168cad03a6080104cb9f3a45345958) 코드를 기준으로 작성했습니다. 모든 기기와 확장 조합의 호환성을 검증했다는 의미는 아닙니다.
 
 ---
 
@@ -258,6 +356,7 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 - **SillyTavern-MemoryBooks:** [STMB](https://github.com/aikohanasaki/SillyTavern-MemoryBooks) and the original [STMB + STLO guides](guides/).
 - **Original documentation:** [upstream README](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), [translated readmes](readmes/), [guides](guides/), [original changelog](CHANGELOG.md). These document the upstream extension and may not reflect this fork's new controls.
 - **Fork modifications and documentation:** AmbasaS2.
+- **Decision model:** [TypeSafe Jev 1.14 via NanoGPT](https://nano-gpt.com/models/decisions/typesafe/jev-1.14).
 - **License:** [GNU Affero General Public License v3.0](LICENSE). Original author attribution, license, and upstream history are retained.
 
 Thank you to the original STLO creator and contributors for making this work possible.
