@@ -4,7 +4,7 @@
   "stlo.jev.provider": "Jev接続",
   "stlo.jev.nano": "NanoGPTサブスクリプション",
   "stlo.jev.direct": "TypeSafe Jev公式APIキー",
-  "stlo.jev.help": "常時有効な項目を先に数え、本ごとの上限を適用します。Scene Readerに保存された選択先のキーを使用します。接続に失敗した場合は通常の呼び出し方式を使います。",
+  "stlo.jev.help": "常時有効な項目を先に数え、本ごとの上限を適用します。Scene Readerに保存された選択先のキーを使用します。このチャットで Jev を有効にすると、返信時のベクトル検索を省略します。Jev の接続に失敗した場合はキーワード検索を使います。",
   "stlo.jev.inputHelp": "このチャットで有効なロアブックのうち、Jev をオンにしたすべての本の候補を一度に判定します。候補が多いほど入力トークンが増えます。予算で制限されるのは返信に使うロアの量だけです。",
   "stlo.button.configure": "STLOの優先度と予算を設定",
   "stlo.warn.title": "⚠️ 注意",

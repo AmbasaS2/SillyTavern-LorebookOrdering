@@ -4,7 +4,7 @@
   "stlo.jev.provider": "Conexión de Jev",
   "stlo.jev.nano": "Suscripción NanoGPT",
   "stlo.jev.direct": "Clave oficial de Jev de TypeSafe",
-  "stlo.jev.help": "Jev cuenta primero las entradas siempre activas y respeta los límites por libro. Usa la clave de la conexión elegida guardada en Scene Reader. Si falla, se usa la recuperación habitual.",
+  "stlo.jev.help": "Jev cuenta primero las entradas siempre activas y respeta los límites por libro. Usa la clave de la conexión elegida guardada en Scene Reader. Con Jev activado en este chat, las respuestas omiten la búsqueda vectorial. Si Jev falla, se usa la búsqueda por palabras clave.",
   "stlo.jev.inputHelp": "Jev evalúa en una sola solicitud los candidatos de todos los libros de lore activos en este chat con Jev habilitado. Cuantos más candidatos, más tokens de entrada. El presupuesto solo limita el lore incluido en la respuesta.",
   "stlo.button.configure": "Configurar prioridad y presupuesto de STLO",
   "stlo.warn.title": "⚠️ Precaución",

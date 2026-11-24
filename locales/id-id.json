@@ -4,7 +4,7 @@
   "stlo.jev.provider": "Koneksi Jev",
   "stlo.jev.nano": "Langganan NanoGPT",
   "stlo.jev.direct": "Kunci resmi TypeSafe Jev",
-  "stlo.jev.help": "Jev menghitung entri yang selalu aktif lebih dahulu dan mengikuti batas buku. Kunci untuk koneksi yang dipilih diambil dari Scene Reader. Jika gagal, metode biasa digunakan.",
+  "stlo.jev.help": "Jev menghitung entri yang selalu aktif lebih dahulu dan mengikuti batas buku. Kunci untuk koneksi yang dipilih diambil dari Scene Reader. Saat Jev aktif di obrolan ini, balasan melewati pencarian vektor. Jika Jev gagal, pencarian kata kunci digunakan.",
   "stlo.jev.inputHelp": "Jev menilai kandidat dari semua buku lore aktif di obrolan ini yang mengaktifkan Jev dalam satu permintaan. Semakin banyak kandidat, semakin banyak token masukan. Anggaran hanya membatasi jumlah lore yang disertakan dalam balasan.",
   "stlo.button.configure": "Konfigurasi Prioritas & Anggaran STLO",
   "stlo.warn.title": "⚠️ Perhatian",

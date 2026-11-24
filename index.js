@@ -3,7 +3,8 @@ import { getTokenCount, getTokenCountAsync } from '../../../tokenizers.js';
 import { getStringHash, getCharaFilename } from '../../../utils.js';
 import { extension_settings, getContext } from '../../../extensions.js';
 import { characters, this_chid, getCurrentChatId, getMaxContextSize, getRequestHeaders, saveSettingsDebounced } from '../../../../script.js';
-import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names } from '../../../world-info.js';
+import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names, selected_world_info, METADATA_KEY } from '../../../world-info.js';
+import { power_user } from '../../../power-user.js';
 import { POPUP_TYPE, Popup } from '../../../popup.js';
 import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../../../i18n.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
@@ -57,10 +58,58 @@ let jevGeneration = null;
 let nativeVectorPasses = 0;
 let guardedVectorInterceptor = null;
 
+function getCachedLorebook(world) {
+    // Read cached metadata without cloning the entries in StructuredCloneMap.get().
+    return worldInfoCache instanceof Map ? Map.prototype.get.call(worldInfoCache, world) : worldInfoCache.get(world);
+}
+
+async function hasActiveJevLorebook(context) {
+    const worlds = new Set([
+        ...selected_world_info,
+        ...(getCurrentCharacterLinkedLorebooks() ?? []),
+        context.chatMetadata?.[METADATA_KEY],
+        power_user.persona_description_lorebook,
+    ]);
+    const uncached = [];
+    for (const world of worlds) {
+        if (!world) continue;
+        if (worldInfoCache.has(world)) {
+            if (getCachedLorebook(world)?.[EXTENSION_NAME]?.jevRecall === true) return true;
+        } else if (world_names.includes(world)) {
+            uncached.push(world);
+        }
+    }
+    // On a cold cache, reuse the normal World Info loader so the scan can read
+    // those same cached books without a second set of requests.
+    const books = await Promise.allSettled(uncached.map(world => loadWorldInfo(world)));
+    return books.some(book => book.status === 'fulfilled' && book.value?.[EXTENSION_NAME]?.jevRecall === true);
+}
+
+function hasEnabledVectorRecall() {
+    const vectors = extension_settings.vectors;
+    return vectors?.enabled_world_info || vectors?.enabled_chats || vectors?.enabled_files;
+}
+
 function guardNativeVectorInterceptor() {
     const interceptor = globalThis.vectors_rearrangeChat;
     if (typeof interceptor !== 'function' || interceptor === guardedVectorInterceptor) return;
     guardedVectorInterceptor = async function (...args) {
+        const run = jevGeneration;
+        if (run && run.chatId === getCurrentChatId() && hasEnabledVectorRecall()) {
+            const context = getContext();
+            const useJev = await hasActiveJevLorebook(context);
+            if (run !== jevGeneration || run.chatId !== getCurrentChatId()) return;
+            // Pick one recall path for the whole generation. A book that fails
+            // to load here may become available later during the reply scan.
+            run.vectorRecall = !useJev;
+            if (useJev) {
+                // Normally cleared by the native interceptor, including after
+                // a previous reply used chat or Data Bank vector recall.
+                delete context.extensionPrompts?.['3_vectors'];
+                delete context.extensionPrompts?.['4_vectors_data_bank'];
+                return;
+            }
+        }
         nativeVectorPasses++;
         try {
             return await interceptor.apply(this, args);
@@ -81,7 +130,7 @@ function startJevGeneration(type, _options, dryRun) {
     const chatId = getCurrentChatId();
     if (!dryRun && chatId && ['normal', 'continue', 'regenerate', 'swipe'].includes(type)) {
         jevGeneration = { chatId, controller: new AbortController() };
-        if (HAS_WORLDINFO_SCAN_DONE && extension_settings.vectors?.enabled_world_info) guardNativeVectorInterceptor();
+        if (HAS_WORLDINFO_SCAN_DONE && hasEnabledVectorRecall()) guardNativeVectorInterceptor();
     }
 }
 
@@ -621,7 +670,7 @@ async function handleWorldInfoEntriesLoaded(eventData) {
 
 async function applyJevSelection(entries) {
     const run = jevGeneration;
-    if (!run || run.chatId !== getCurrentChatId()) return;
+    if (!run || run.vectorRecall || run.chatId !== getCurrentChatId()) return;
     run.selection = null;
     const settings = EXTENSION_STATE.scanWorldSettings;
     const worlds = new Set([...settings].filter(([, book]) => book.jevRecall === true).map(([world]) => world));
@@ -664,11 +713,7 @@ async function getLorebookSettings(worldName) {
     try {
         // Cache-first: avoid backend fetches that may be gated by permissions/visibility
         if (worldInfoCache.has(worldName)) {
-            // StructuredCloneMap.get() clones the whole lorebook. Read the
-            // underlying Map value without mutating it; only copy STLO settings.
-            const worldData = worldInfoCache instanceof Map
-                ? Map.prototype.get.call(worldInfoCache, worldName)
-                : worldInfoCache.get(worldName);
+            const worldData = getCachedLorebook(worldName);
             const extensionData = worldData && typeof worldData === 'object' ? worldData[EXTENSION_NAME] : null;
             return { ...DEFAULT_LOREBOOK_SETTINGS, ...(extensionData ? structuredClone(extensionData) : {}) };
         }
@@ -874,7 +919,7 @@ async function openLorebookSettings(worldName = null) {
                             data-i18n="stlo.jev.direct">TypeSafe Jev API key</option>
                     </select>
                 </label>
-                <small data-i18n="stlo.jev.help">Jev counts always-on entries from enabled books first. Book limits still apply. It uses the selected key saved in Scene Reader. If the connection fails, standard World Info recall is used.</small>
+                <small data-i18n="stlo.jev.help">Jev counts always-on entries first, respects book limits, and uses the selected key from Scene Reader. When Jev is enabled in this chat, replies skip vector search. If Jev fails, keyword search is used.</small>
                 <small data-i18n="stlo.jev.inputHelp">Every Jev request sends all eligible entries from all active lorebooks with Jev enabled in this chat. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.</small>
             </div>
             <div class="world_entry_form_control stlo-section">

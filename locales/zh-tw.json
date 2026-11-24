@@ -4,7 +4,7 @@
   "stlo.jev.provider": "Jev 連線",
   "stlo.jev.nano": "NanoGPT 訂閱",
   "stlo.jev.direct": "TypeSafe 官方 Jev 金鑰",
-  "stlo.jev.help": "優先計入常駐條目，並套用各書的預算。使用 Scene Reader 中為所選連線儲存的金鑰。連線失敗時使用一般呼叫方式。",
+  "stlo.jev.help": "優先計入常駐條目，並套用各書的預算。使用 Scene Reader 中為所選連線儲存的金鑰。在此聊天中啟用 Jev 後，產生回覆時會略過向量搜尋。Jev 連線失敗時使用關鍵字搜尋。",
   "stlo.jev.inputHelp": "Jev 會在一次請求中評估目前聊天裡所有已啟用 Jev 的作用中世界書的候選項目。候選項目越多，輸入 token 越多。注入預算只限制用於回覆的世界書文字量。",
   "stlo.button.configure": "設定 STLO 優先權與預算",
   "stlo.warn.title": "⚠️ 注意",

@@ -4,7 +4,7 @@
   "stlo.jev.provider": "Jev connection",
   "stlo.jev.nano": "NanoGPT subscription",
   "stlo.jev.direct": "TypeSafe Jev API key",
-  "stlo.jev.help": "Jev counts always-on entries from enabled books first. Book limits still apply. It uses the selected key saved in Scene Reader. If the connection fails, standard World Info recall is used.",
+  "stlo.jev.help": "Jev counts always-on entries from enabled books first. Book limits still apply. It uses the selected key saved in Scene Reader. When Jev is enabled in this chat, replies skip vector search. If Jev fails, keyword search is used.",
   "stlo.jev.inputHelp": "Every Jev request sends all eligible entries from all active lorebooks with Jev enabled in this chat. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.",
   "stlo.button.configure": "Configure STLO Priority & Budget",
 
