@@ -73,6 +73,25 @@ test('Jev reserves all applicable constants and fits books in model score order'
     assert.equal(normalizeJevBudget('12500'), 12500);
 });
 
+test('Jev admission follows scores in the available slots without altering native or saved insertion order', () => {
+    const worlds = new Set(['Memory']);
+    const lower = lore('Memory', 1, 'Lower score', { order: 40 });
+    const higher = lore('Memory', 2, 'Higher score', { order: 10 });
+    const native = lore('Other', 1, 'Native', { order: 30 });
+    const pinned = lore('Memory', 3, 'Always on', { order: 50, constant: true });
+    const entries = [pinned, lower, native, higher, lower];
+    const scores = new Map([[jevEntryKey(higher), 0], [jevEntryKey(lower), 1]]);
+    applyJevRecall(entries, worlds, scores);
+    assert.deepEqual(entries, [
+        pinned,
+        { ...higher, order: 40, __stloJevInsertionOrder: 10, content: '@@activate\nHigher score', vectorized: false },
+        native,
+        { ...lower, order: 10, __stloJevInsertionOrder: 40, content: '@@activate\nLower score', vectorized: false },
+    ]);
+    assert.equal(higher.order, 10);
+    assert.equal(lower.order, 40);
+});
+
 test('Every eligible entry reaches the chosen Jev connection in one request', async () => {
     const worlds = new Set(['Memory', 'NPC']);
     const big = Array.from({length:72}, (_, i) => lore('Memory', i, '등불 '.repeat(240)));

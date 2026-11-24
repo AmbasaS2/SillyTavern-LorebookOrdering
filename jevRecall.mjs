@@ -117,7 +117,15 @@ export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoB
 }
 
 export function applyJevRecall(entries, worlds, accepted) {
-    const written = new Set();
+    const sources = new Map();
+    if (accepted.size) {
+        for (const entry of entries) {
+            const key = jevEntryKey(entry);
+            if (accepted.has(key) && !sources.has(key) && isJevCandidate(entry, worlds)) sources.set(key, entry);
+        }
+    }
+    const ranked = [...accepted.keys()].map(key => sources.get(key)).filter(Boolean);
+    let next = 0;
     let write = 0;
     for (const entry of entries) {
         if (!isJevCandidate(entry, worlds)) {
@@ -125,11 +133,19 @@ export function applyJevRecall(entries, worlds, accepted) {
             continue;
         }
         const key = jevEntryKey(entry);
-        if (accepted.has(key) && !written.has(key)) {
+        if (sources.has(key)) {
+            const chosen = ranked[next++];
             // World Info parses this on the scan-local copy. Keep the original
             // constant flag so STLO can still budget genuine always-on entries first.
-            entries[write++] = { ...entry, content: '@@activate\n' + entry.content, vectorized: false };
-            written.add(key);
+            const copy = { ...chosen, content: '@@activate\n' + chosen.content, vectorized: false };
+            if (chosen.order !== entry.order) {
+                // Reuse the available Jev slots for native admission in score
+                // order; restore the entry's insertion order after that scan.
+                copy.__stloJevInsertionOrder = chosen.order;
+                copy.order = entry.order;
+            }
+            entries[write++] = copy;
+            sources.delete(key);
         }
     }
     entries.length = write;

@@ -2223,9 +2223,12 @@ function registerPerLoopBudgetTrimmer() {
                 let reserved = false;
                 let hasUnknownWorld = false;
                 for (const entry of entries.values()) {
+                    if (entry && Object.hasOwn(entry, '__stloJevInsertionOrder')) {
+                        entry.order = entry.__stloJevInsertionOrder;
+                        delete entry.__stloJevInsertionOrder;
+                    }
                     if (protect && entry?.__stloReservedConstant === true) reserved = true;
                     if (entry?.world && !settingsCache.has(entry.world)) hasUnknownWorld = true;
-                    if (reserved && hasUnknownWorld) break;
                 }
                 if (!reserved && !EXTENSION_STATE.scanHasExplicitBudgets && !hasUnknownWorld && !jev?.accepted.size) {
                     return; // Nothing to trim; no setting lookups, tokenization, or text rewrites.
@@ -2257,8 +2260,8 @@ function registerPerLoopBudgetTrimmer() {
                 const originallyIgnored = e =>
                     e.ignoreBudget === true && e.__stloReservedConstant !== true;
 
-                // Preserve existing per-book modes, including character overrides
-                // and randomTrim, but consume budget from constants first if ON.
+                // Preserve ordinary per-book ordering. Spend the remaining
+                // budget on Jev picks in relevance order.
                 if (EXTENSION_STATE.scanHasExplicitBudgets || hasUnknownWorld) {
                     for (const [world, list] of byWorld) {
                         if (settingsCache.has(world) && !EXTENSION_STATE.scanBudgetWorlds.has(world)) {
@@ -2268,18 +2271,25 @@ function registerPerLoopBudgetTrimmer() {
                         const perBudget = await calculateLorebookBudget(settings, totalBudget);
                         if (!(perBudget > 0)) continue;
 
+                        const native = [];
+                        const selected = [];
+                        for (const item of list) {
+                            const target = jev?.accepted.has(jevEntryKey(item.entry)) ? selected : native;
+                            target.push(item);
+                        }
                         let sorted;
                         if (protect) {
-                            const always = list.filter(x => x.entry.constant === true).sort(orderDescending);
-                            const optional = list.filter(x => x.entry.constant !== true);
+                            const always = native.filter(x => x.entry.constant === true).sort(orderDescending);
+                            const optional = native.filter(x => x.entry.constant !== true);
                             if (settings.randomTrim) shuffleInPlace(optional);
-                            else optional.sort(recallOrder);
+                            else optional.sort(orderDescending);
                             sorted = [...always, ...optional];
                         } else {
-                            sorted = list.slice();
+                            sorted = native;
                             if (settings.randomTrim) shuffleInPlace(sorted);
                             else sorted.sort(orderDescending);
                         }
+                        sorted.push(...selected.sort(recallOrder));
 
                         let used = 0;
                         for (const item of sorted) {
