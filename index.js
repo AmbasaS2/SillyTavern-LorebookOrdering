@@ -1,5 +1,5 @@
 import { event_types, eventSource } from '../../../events.js';
-import { getTokenCount, getTokenCountAsync } from '../../../tokenizers.js';
+import { getTokenCountAsync } from '../../../tokenizers.js';
 import { getStringHash, getCharaFilename } from '../../../utils.js';
 import { extension_settings, getContext } from '../../../extensions.js';
 import { characters, this_chid, getCurrentChatId, getMaxContextSize, getRequestHeaders, saveSettingsDebounced } from '../../../../script.js';
@@ -183,18 +183,18 @@ function stloDebug(...args) {
 // and length (which can collide across lorebooks or edited content).
 let TOKEN_COUNT_CACHE = new WeakMap();
 function getEntryTokenCountCached(entry) {
-    try {
-        if (!entry || typeof entry !== 'object') return 0;
-        const content = typeof entry.content === 'string' ? entry.content : '';
-        const cached = TOKEN_COUNT_CACHE.get(entry);
-        if (cached && cached.content === content) return cached.tokens;
+    if (!entry || typeof entry !== 'object') return 0;
+    const content = typeof entry.content === 'string' ? entry.content : '';
+    const cached = TOKEN_COUNT_CACHE.get(entry);
+    if (cached?.content === content) return cached.tokens;
 
-        const tokens = Number(getTokenCount(content)) || 0;
-        TOKEN_COUNT_CACHE.set(entry, { content, tokens });
-        return tokens;
-    } catch {
+    const cache = TOKEN_COUNT_CACHE;
+    const tokens = getTokenCountAsync(content).then(value => Number(value) || 0).catch(() => {
+        if (cache.get(entry)?.tokens === tokens) cache.delete(entry);
         return 0;
-    }
+    });
+    cache.set(entry, { content, tokens });
+    return tokens;
 }
 ﻿// Utility functions
 
@@ -2154,7 +2154,7 @@ async function enforceBudgetPreScan(eventData) {
         for (const e of ordered) {
             if (!e) continue;
             if (e.ignoreBudget === true) continue; // keep without consuming budget
-            const tokens = getEntryTokenCountCached(e);
+            const tokens = await getEntryTokenCountCached(e);
             if ((used + tokens) <= totalBudget) {
                 used += tokens;
             } else {
@@ -2397,7 +2397,7 @@ function registerPerLoopBudgetTrimmer() {
                         let used = 0;
                         for (const item of sorted) {
                             if (originallyIgnored(item.entry)) continue;
-                            const tokens = getEntryTokenCountCached(item.entry);
+                            const tokens = await getEntryTokenCountCached(item.entry);
                             if (used + tokens <= perBudget) used += tokens;
                             else discard(item);
                         }
@@ -2432,7 +2432,7 @@ function registerPerLoopBudgetTrimmer() {
                     let used = 0;
                     for (const item of active) {
                         if (originallyIgnored(item.entry)) continue;
-                        const tokens = getEntryTokenCountCached(item.entry);
+                        const tokens = await getEntryTokenCountCached(item.entry);
                         if (used + tokens <= totalBudget) used += tokens;
                         else discard(item);
                     }
@@ -2443,11 +2443,11 @@ function registerPerLoopBudgetTrimmer() {
                     const selected = [];
                     for (const [key, entry] of entries) {
                         if (!jev.worlds.has(entry.world) || entry.outletName || Number(entry.position) === 7) continue;
-                        if (entry.constant === true) used += getEntryTokenCountCached(entry);
+                        if (entry.constant === true) used += await getEntryTokenCountCached(entry);
                         else if (jev.accepted.has(jevEntryKey(entry))) selected.push({ key, entry });
                     }
                     for (const item of selected.sort(recallOrder)) {
-                        const tokens = getEntryTokenCountCached(item.entry);
+                        const tokens = await getEntryTokenCountCached(item.entry);
                         if (used + tokens <= jev.budget) used += tokens;
                         else discard(item);
                     }

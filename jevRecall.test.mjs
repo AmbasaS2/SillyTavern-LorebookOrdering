@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
 
 const lore = (world, uid, text, flags = {}) => ({
@@ -15,6 +17,32 @@ const profile = {
 };
 const connection = getNanoJevConnection(profile);
 const response = data => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(data) } }] }) });
+
+test('budget token counts share an async request and retry a failed count', async () => {
+    const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
+    const start = source.indexOf('let TOKEN_COUNT_CACHE = new WeakMap();');
+    const end = source.indexOf('\n}', source.indexOf('function getEntryTokenCountCached', start)) + 2;
+    assert.ok(start >= 0 && end > start);
+    const requests = [];
+    const count = runInNewContext(source.slice(start, end) + '\ngetEntryTokenCountCached', {
+        getTokenCountAsync: text => new Promise((resolve, reject) => requests.push({text, resolve, reject})),
+    });
+    const entry = { content: 'first' };
+    const initial = count(entry);
+    assert.equal(count(entry), initial);
+    assert.equal(requests.length, 1);
+    entry.content = 'edited';
+    const edited = count(entry);
+    requests[0].reject(Error('tokenizer unavailable'));
+    assert.equal(await initial, 0);
+    assert.equal(count(entry), edited);
+    requests[1].reject(Error('tokenizer unavailable'));
+    assert.equal(await edited, 0);
+    const retry = count(entry);
+    assert.equal(requests[2].text, 'edited');
+    requests[2].resolve(11);
+    assert.equal(await retry, 11);
+});
 
 test('Only profiles with bound NanoGPT subscription keys are selectable', () => {
     assert.equal(connection.id, profile.id);
