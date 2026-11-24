@@ -10,7 +10,7 @@ import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../.
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { applyJevRecall, fitJevRecall, jevEntryKey, normalizeJevBudget, normalizeJevProvider, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
 
 const EXTENSION_NAME = 'stlo';
 const SELECTORS = {
@@ -689,15 +689,18 @@ async function applyJevSelection(entries) {
     if (!worlds.size) return;
     const prepared = prepareJevRecall(entries, worlds, getContext().chat ?? []);
     if (!prepared) return;
-    const provider = normalizeJevProvider(extension_settings[EXTENSION_NAME]?.jevProvider);
-    const signature = provider + JSON.stringify(prepared.body);
+    const profileId = extension_settings[EXTENSION_NAME]?.jevProfileId;
+    const profile = extension_settings.connectionManager?.profiles?.find(candidate => candidate?.id === profileId);
+    const connection = getNanoJevConnection(profile);
+    if (!connection) return;
+    const signature = JSON.stringify([connection.id, connection.customAuth, prepared.body]);
     // A new scan in this generation can reuse an identical selection.
     // If the input changed, leave that scan to the native World Info rules.
     if (run.pending && signature !== run.signature) return;
     if (!run.pending) {
         run.signature = signature;
         const signal = AbortSignal.any([run.controller.signal, AbortSignal.timeout(12000)]);
-        run.pending = requestJevRecall(prepared, getRequestHeaders(), signal, undefined, provider).catch(error => {
+        run.pending = requestJevRecall(prepared, connection, getRequestHeaders(), signal).catch(error => {
             if (!run.controller.signal.aborted) console.warn('[STLO] Jev fell back to World Info:', error);
             return null;
         });
@@ -1025,15 +1028,14 @@ async function openLorebookSettings(worldName = null) {
                     <input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1"
                         value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}" style="width: 100px;">
                 </label>
-                <label class="stlo-inline-number" for="stlo-jev-provider">
-                    <span data-i18n="stlo.jev.provider">Jev connection</span>
-                    <select id="stlo-jev-provider" class="text_pole textarea_compact">
-                        <option value="nanogpt" data-i18n="stlo.jev.nano">NanoGPT subscription</option>
-                        <option value="typesafe" ${normalizeJevProvider(extension_settings[EXTENSION_NAME]?.jevProvider) === 'typesafe' ? 'selected' : ''}
-                            data-i18n="stlo.jev.direct">TypeSafe Jev API key</option>
+                <label class="stlo-inline-number" for="stlo-jev-profile">
+                    <span data-i18n="stlo.jev.profile">NanoGPT connection profile</span>
+                    <select id="stlo-jev-profile" class="text_pole textarea_compact">
+                        <option value="" data-i18n="stlo.jev.chooseProfile">Select a profile</option>
                     </select>
                 </label>
-                <small data-i18n="stlo.jev.help">Jev counts always-on entries first, respects book limits, and uses the selected key from Scene Reader. When Jev is enabled in this chat, replies skip vector search. If Jev fails, keyword search is used.</small>
+                <small data-i18n="stlo.jev.keyHelp">Only NanoGPT connection keys are supported. Use a key with Billing set to Subscription only to block balance charges.</small>
+                <small data-i18n="stlo.jev.help">Jev counts always-on entries first and respects book limits. Replies skip vector search when Jev is enabled. Keyword search is used if Jev is unavailable.</small>
                 <small data-i18n="${characterAvatar ? 'stlo.jev.inputHelpForCharacter' : 'stlo.jev.inputHelp'}">Every Jev request sends all eligible entries from the active lorebooks using Jev. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.</small>
             </div>
             <!-- Group chat controls share one section, without dividers between toggles. -->
@@ -1097,7 +1099,7 @@ async function openLorebookSettings(worldName = null) {
                 const protectAlwaysOnInput = document.getElementById(SELECTORS.PROTECT_ALWAYS_ON);
                 const jevRecall = document.getElementById('stlo-jev-recall');
                 const jevBudget = document.getElementById('stlo-jev-budget');
-                const jevProvider = document.getElementById('stlo-jev-provider');
+                const jevProfile = document.getElementById('stlo-jev-profile');
 
                 if (prioritySelect && budgetModeSelect && budgetValueInput && orderAdjustmentEnabled && orderAdjustmentInput && orderAdjustmentGroupOnly && onlyWhenSpeaking) {
                     return {
@@ -1113,7 +1115,7 @@ async function openLorebookSettings(worldName = null) {
                         protectAlwaysOn: Boolean(protectAlwaysOnInput?.checked),
                         jevRecall: jevRecall?.checked === true,
                         jevBudget: normalizeJevBudget(jevBudget?.value),
-                        jevProvider: normalizeJevProvider(jevProvider?.value),
+                        jevProfileId: jevProfile?.value ?? '',
                         timestamp: Date.now()
                     };
                 }
@@ -1199,7 +1201,7 @@ async function openLorebookSettings(worldName = null) {
                     protectAlwaysOn: formState.protectAlwaysOn,
                     jevRecall: formState.jevRecall,
                     jevBudget: formState.jevBudget,
-                    jevProvider: formState.jevProvider,
+                    jevProfileId: formState.jevProfileId,
                     vectorThreshold: validatedThreshold,
                     vectorThresholdEnabled: rawThreshold !== '',
                     priority: validatedPriority,
@@ -1282,14 +1284,14 @@ async function openLorebookSettings(worldName = null) {
         // Save the settings if we got them
         if (result) {
             try {
-                const { protectAlwaysOn, jevRecall, jevBudget, jevProvider, ...lorebookSettings } = result;
+                const { protectAlwaysOn, jevRecall, jevBudget, jevProfileId, ...lorebookSettings } = result;
                 if (!characterAvatar) lorebookSettings.jevRecall = jevRecall;
                 const saved = await setLorebookSettings(currentLorebook, lorebookSettings);
 
                 if (saved) {
                     extension_settings[EXTENSION_NAME] ??= {};
                     extension_settings[EXTENSION_NAME].jevBudget = jevBudget;
-                    extension_settings[EXTENSION_NAME].jevProvider = jevProvider;
+                    extension_settings[EXTENSION_NAME].jevProfileId = jevProfileId;
                     if (characterAvatar && jevRecall !== initialJevRecall) {
                         extension_settings[EXTENSION_NAME].jevByCharacter = {
                             ...extension_settings[EXTENSION_NAME].jevByCharacter,
@@ -1415,6 +1417,15 @@ function setupStloInfoPopups(modalEventListeners) {
  */
 function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
     setupStloInfoPopups(modalEventListeners);
+    const jevProfile = document.getElementById('stlo-jev-profile');
+    if (jevProfile) {
+        for (const profile of extension_settings.connectionManager?.profiles ?? []) {
+            const connection = getNanoJevConnection(profile);
+            if (connection) jevProfile.add(new Option(connection.name || connection.id, connection.id));
+        }
+        jevProfile.value = extension_settings[EXTENSION_NAME]?.jevProfileId || '';
+        if (jevProfile.selectedIndex < 0) jevProfile.selectedIndex = 0;
+    }
 
     // Set up order adjustment behavior for main settings
     const orderAdjustmentEnabled = document.getElementById('lorebook-order-adjustment-enabled');

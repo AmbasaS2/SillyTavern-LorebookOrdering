@@ -1,12 +1,37 @@
 export const DEFAULT_JEV_BUDGET = 10000;
+const NANO_JEV_ENDPOINT = 'https://nano-gpt.com/api/subscription/v1';
 
 export function normalizeJevBudget(value) {
     const tokens = Number(value);
     return Number.isSafeInteger(tokens) && tokens > 0 ? tokens : DEFAULT_JEV_BUDGET;
 }
 
-export function normalizeJevProvider(value) {
-    return value === 'typesafe' ? 'typesafe' : 'nanogpt';
+export function getNanoJevConnection(profile) {
+    if (profile?.api !== 'custom' || typeof profile.id !== 'string' || !profile.id) return null;
+    const snapshot = profile['custom-connection'] ?? {
+        version: 1,
+        settings: { custom_url: profile['api-url'] },
+        auth: { mode: 'bearer', required: false },
+        credential: { mode: 'legacy-custom', id: profile['secret-id'] },
+    };
+    const credential = snapshot?.credential;
+    const auth = snapshot?.auth;
+    if (snapshot?.version !== 1 ||
+        typeof credential?.id !== 'string' || !credential.id ||
+        String(snapshot.settings?.custom_url ?? '').replace(/\/+$/, '') !== NANO_JEV_ENDPOINT) return null;
+    if (credential.mode === 'reference') {
+        if (!['api_key_custom', 'api_key_nanogpt'].includes(credential.key) ||
+            String(credential.endpoint ?? '').replace(/\/+$/, '') !== NANO_JEV_ENDPOINT) return null;
+    } else if (credential.mode !== 'legacy-custom') {
+        return null;
+    }
+    if (auth?.mode !== 'bearer' && !(auth?.mode === 'header' && String(auth.name).toLowerCase() === 'x-api-key')) return null;
+    return {
+        id: profile.id,
+        name: profile.name,
+        endpoint: NANO_JEV_ENDPOINT,
+        customAuth: { version: 1, auth, credential },
+    };
 }
 
 export const jevEntryKey = entry => JSON.stringify([entry.world, entry.uid]);
@@ -52,13 +77,32 @@ export function prepareJevRecall(entries, worlds, messages) {
     return { candidates, body: { model: 'typesafe/jev-1.14', state: { current, assessment: instructions, lore }, questions } };
 }
 
-export async function requestJevRecall(prepared, headers, signal, fetchImpl = fetch, provider = 'nanogpt') {
-    const direct = normalizeJevProvider(provider) === 'typesafe';
-    const route = direct ? '/api/plugins/scene-reader-jev/systemone' : '/api/plugins/scene-reader-jev/nanogpt/systemone';
-    const body = direct ? { ...prepared.body, model: 'jev-1.14.0' } : prepared.body;
-    const response = await fetchImpl(route, { method: 'POST', headers, body: JSON.stringify(body), signal });
+export async function requestJevRecall(prepared, connection, headers, signal, fetchImpl = fetch) {
+    if (!connection) throw Error('Select a NanoGPT subscription connection profile.');
+    const { model, state, questions } = prepared.body;
+    const body = {
+        chat_completion_source: 'custom',
+        custom_url: connection.endpoint,
+        custom_auth: connection.customAuth,
+        secret_id: connection.customAuth.credential.id,
+        model,
+        messages: [{ role: 'user', content: JSON.stringify(state) }],
+        stream: false,
+        custom_include_headers: JSON.stringify({ Accept: 'application/json' }),
+        custom_include_body: JSON.stringify({ response_format: { type: 'questions', questions } }),
+    };
+    const response = await fetchImpl('/api/backends/chat-completions/generate',
+        { method: 'POST', headers, body: JSON.stringify(body), signal });
     if (!response.ok) throw Error('Jev is unavailable (' + response.status + ').');
-    const { answers } = await response.json();
+    const data = await response.json();
+    if (data?.error) throw Error('NanoGPT did not complete the Jev request.');
+    let decoded;
+    try {
+        decoded = JSON.parse(data?.choices?.[0]?.message?.content);
+    } catch {
+        throw Error('NanoGPT did not return readable Jev decisions.');
+    }
+    const answers = decoded?.answers ?? decoded;
     const selected = [];
     for (const [id, key] of prepared.candidates) {
         const result = answers?.[id];

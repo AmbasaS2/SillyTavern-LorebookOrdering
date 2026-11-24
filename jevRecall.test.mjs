@@ -1,9 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyJevRecall, fitJevRecall, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
 
 const lore = (world, uid, text, flags = {}) => ({
     world, uid, comment: world+' '+uid, key: ['lantern'], content: text, vectorized: true, constant: false, ...flags,
+});
+const endpoint = 'https://nano-gpt.com/api/subscription/v1';
+const profile = {
+    id: 'nano-profile', name: 'NanoGPT subscription', api: 'custom',
+    'custom-connection': {
+        version: 1, settings: { custom_url: endpoint, custom_model: 'google/gemma-4-31b-it' },
+        credential: { mode: 'legacy-custom', id: 'vault-entry' }, auth: { mode: 'bearer', required: false },
+    },
+};
+const connection = getNanoJevConnection(profile);
+const response = data => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(data) } }] }) });
+
+test('Only profiles with bound NanoGPT subscription keys are selectable', () => {
+    assert.equal(connection.id, profile.id);
+    const snapshot = profile['custom-connection'];
+    const withSnapshot = value => getNanoJevConnection({ ...profile, 'custom-connection': value });
+    assert.equal(withSnapshot({ ...snapshot, settings: { custom_url: 'https://nano-gpt.com/api/v1' } }), null);
+    assert.equal(withSnapshot({ ...snapshot, settings: { custom_url: endpoint + '?paid=true' } }), null);
+    assert.equal(withSnapshot({ ...snapshot, credential: { mode:'legacy-custom', id: null } }), null);
+    const legacy = { id: 'legacy', api: 'custom', 'api-url': endpoint, 'secret-id': 'legacy-vault-entry' };
+    assert.equal(getNanoJevConnection(legacy).customAuth.credential.id, 'legacy-vault-entry');
+    assert.equal(getNanoJevConnection({ ...legacy, 'custom-connection': { version: 1, excluded: true } }), null);
+    const reference = { mode: 'reference', key: 'api_key_nanogpt', id: 'nano-vault-entry', endpoint };
+    assert.equal(withSnapshot({ ...snapshot, credential: reference }).customAuth.credential.id, 'nano-vault-entry');
+    assert.equal(getNanoJevConnection({ id: 'native-nano-profile', api: 'nanogpt', 'secret-id': 'nano-vault-entry' }), null);
+    assert.equal(withSnapshot({ ...snapshot, credential: { ...reference, key: 'api_key_openai' } }), null);
+    assert.equal(withSnapshot({ ...snapshot, credential: { ...reference, endpoint: 'https://example.test/api/v1' } }), null);
 });
 
 test('Jev selects ordinary entries from all enabled books and preserves special and native entries', async () => {
@@ -34,10 +61,10 @@ test('Jev selects ordinary entries from all enabled books and preserves special 
     const answers = Object.fromEntries([...prepared.candidates].map(([id, key]) => [
         id, { choice: key === jevEntryKey(rejected) ? 'skip' : 'include', confidence: 0.8 },
     ]));
-    const ranked = await requestJevRecall(prepared, {}, undefined, async (route, request) => {
-        assert.equal(route, '/api/plugins/scene-reader-jev/nanogpt/systemone');
+    const ranked = await requestJevRecall(prepared, connection, {}, undefined, async (route, request) => {
+        assert.equal(route, '/api/backends/chat-completions/generate');
         assert.equal(JSON.parse(request.body).model, 'typesafe/jev-1.14');
-        return { ok: true, json: async () => ({ answers }) };
+        return response({ answers });
     });
     const accepted = await fitJevRecall(entries, worlds, ranked, {
         budget: 10000, worldInfoBudget: 20000, bookBudgets: new Map(), countTokens: async text => text.length,
@@ -100,20 +127,29 @@ test('Every eligible entry reaches the chosen Jev connection in one request', as
     assert.equal(prepared.candidates.size, 73);
     const seen = new Set();
     let requests = 0;
-    const selected = await requestJevRecall(prepared, {}, undefined, async (route, request) => {
+    const selected = await requestJevRecall(prepared, connection, {}, undefined, async (route, request) => {
         requests++;
-        assert.equal(route, '/api/plugins/scene-reader-jev/systemone');
+        assert.equal(route, '/api/backends/chat-completions/generate');
         const body = JSON.parse(request.body);
-        assert.equal(body.model, 'jev-1.14.0');
-        assert.ok(new TextEncoder().encode(JSON.stringify(body.state)).length > 30000);
-        assert.equal(Object.keys(body.questions).length, 73);
-        const answers = Object.fromEntries(Object.keys(body.questions).map(id => {
+        const state = JSON.parse(body.messages[0].content);
+        const format = JSON.parse(body.custom_include_body).response_format;
+        assert.equal(body.model, 'typesafe/jev-1.14');
+        assert.equal(body.chat_completion_source, 'custom');
+        assert.equal(body.custom_url, endpoint);
+        assert.equal(body.secret_id, 'vault-entry');
+        assert.deepEqual(body.custom_auth, connection.customAuth);
+        assert.equal(body.stream, false);
+        assert.deepEqual(JSON.parse(body.custom_include_headers), { Accept: 'application/json' });
+        assert.equal(format.type, 'questions');
+        assert.ok(new TextEncoder().encode(body.messages[0].content).length > 30000);
+        assert.equal(Object.keys(format.questions).length, 73);
+        const answers = Object.fromEntries(Object.keys(format.questions).map(id => {
             assert.equal(seen.has(id), false);
             seen.add(id);
-            return [id, { choice:body.state.lore[id].book === 'NPC' ? 'include' : 'skip' }];
+            return [id, { choice:state.lore[id].book === 'NPC' ? 'include' : 'skip' }];
         }));
-        return { ok:true, json:async()=>({answers}) };
-    }, 'typesafe');
+        return response(answers);
+    });
     assert.equal(requests, 1);
     assert.equal(seen.size, 73);
     assert.deepEqual(selected, [jevEntryKey(npc)]);
@@ -122,19 +158,23 @@ test('Every eligible entry reaches the chosen Jev connection in one request', as
 test('A missing decision or unavailable provider fails without substituting incomplete results', async () => {
     const entries = [lore('NPC', 1, 'A secret'), lore('NPC', 2, 'A fact')];
     const request = prepareJevRecall(entries, new Set(['NPC']), [{ mes: 'Secrets' }]);
-    await assert.rejects(requestJevRecall(request, {}, undefined, async () => ({
+    await assert.rejects(requestJevRecall(request, null, {}, undefined, async () => {
+        assert.fail('An unselected profile must not call any endpoint');
+    }), /profile/);
+    await assert.rejects(requestJevRecall(request, connection, {}, undefined, async () => ({
         ok: false, status: 404,
     })), /unavailable/);
     let calls = 0;
-    await assert.rejects(requestJevRecall(request, {}, undefined, async () => {
+    await assert.rejects(requestJevRecall(request, connection, {}, undefined, async () => {
         calls++;
         return { ok: false, status: 413 };
     }), /413/);
     assert.equal(calls, 1);
-    await assert.rejects(requestJevRecall(request, {}, undefined, async () => ({
-        ok: true, json: async () => ({ answers: { e1: { choice: 'skip' } } }),
-    })), /every candidate/);
-    assert.deepEqual(await requestJevRecall(request, {}, undefined, async () => ({
-        ok: true, json: async () => ({ answers: { e1: { choice: 'skip' }, e2: { choice: 'skip' } } }),
-    })), []);
+    await assert.rejects(requestJevRecall(request, connection, {}, undefined, async () => ({
+        ok: true, json: async () => ({ error: { message: 'quota' } }),
+    })), /did not complete/);
+    await assert.rejects(requestJevRecall(request, connection, {}, undefined, async () =>
+        response({ answers: { e1: { choice: 'skip' } } })), /every candidate/);
+    assert.deepEqual(await requestJevRecall(request, connection, {}, undefined, async () =>
+        response({ answers: { e1: { choice: 'skip' }, e2: { choice: 'skip' } } })), []);
 });
