@@ -23,6 +23,14 @@ test('Jev selects ordinary entries from all enabled books and preserves special 
     const prepared = prepareJevRecall(entries, worlds, [{ name: 'User', mes: 'Lantern?' }]);
     assert.deepEqual(new Set(Object.values(prepared.body.state.lore).map(entry => entry.book)), worlds);
     assert.equal(prepared.candidates.size, 9);
+    assert.match(prepared.body.state.assessment, /established voice.*scene a natural way to move forward/);
+    for (const [id, question] of Object.entries(prepared.body.questions)) {
+        assert.deepEqual(question, {
+            type: 'choice',
+            instructions: id,
+            criteria: { include: null, skip: null },
+        });
+    }
     const answers = Object.fromEntries([...prepared.candidates].map(([id, key]) => [
         id, { choice: key === jevEntryKey(rejected) ? 'skip' : 'include', confidence: 0.8 },
     ]));
