@@ -1,4 +1,7 @@
 {
+  "stlo.jev.enable": "Utiliser Jev pour ce livre de lore",
+  "stlo.jev.budget": "Budget total Jev (jetons)",
+  "stlo.jev.help": "Jev compte d’abord les entrées toujours actives des livres activés pour Jev. Les limites par livre s’appliquent. Si la connexion à l’abonnement NanoGPT de Scene Reader échoue, le rappel habituel est utilisé.",
   "stlo.button.configure": "Configurer la priorité et le budget STLO",
   "stlo.warn.title": "⚠️ Attention",
   "stlo.warn.body": "Votre stratégie d'insertion des informations sur le monde n'est pas réglée sur « Trié uniformément ». STLO nécessite la stratégie « Trié uniformément » pour fonctionner correctement. Que souhaitez-vous faire ?",

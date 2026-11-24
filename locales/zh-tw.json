@@ -1,4 +1,7 @@
 {
+  "stlo.jev.enable": "對此世界書使用 Jev",
+  "stlo.jev.budget": "Jev 總預算（權杖）",
+  "stlo.jev.help": "先計入啟用 Jev 的世界書中的常駐條目。各書的預算仍然有效。無法連線至 Scene Reader 的 NanoGPT 訂閱時，使用一般呼叫方式。",
   "stlo.button.configure": "設定 STLO 優先權與預算",
   "stlo.warn.title": "⚠️ 注意",
   "stlo.warn.body": "您的世界資訊插入策略未設定為「均勻排序」。STLO 需要「均勻排序」策略才能正常運作。您想要如何處理？",
