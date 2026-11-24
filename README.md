@@ -6,6 +6,15 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 
 [English](#-installation-and-first-steps) · [한국어](#-stlo-포크--로어북-예산-관리) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
+## Who is this for?
+
+- Long-running roleplays where old promises and events are hard to recall, but irrelevant lore often appears.
+- Players with several lorebooks (character details, worldbuilding, memories) who want to control their relative priority and token usage.
+- Players who keep recent memories or essential settings always on and want to protect them from being crowded out.
+- Vector users who want different similarity thresholds for different books.
+
+Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection.
+
 ## 📸 Settings Preview
 
 <p align="center">
@@ -35,6 +44,31 @@ The diagrams in this README are illustrated guides based on the fork's settings,
 The menu shows the current character's primary and additional linked lorebooks first. Enable **모든 로어북 보기 (Show all lorebooks)** to choose any available book. When no current character can be identified, the full list is shown. The filter only changes the selection list; it does not connect, disconnect, or activate any lorebooks.
 
 The original slash command is retained: `/stlo My Lorebook` selects the named book in the World Info editor and opens its STLO settings. The name is case-insensitive.
+
+### What can I configure?
+
+The book settings dialog is arranged in this order. You do not need to change every option.
+
+| Control | When to use it |
+|---|---|
+| Lorebook priority (1–5) | Give important books first consideration. Normal is 3. |
+| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Global setting, on by default; budgets still apply. |
+| Order adjustment | Fine-tune ordering only when ordinary priority levels are not enough. |
+| Per-book budget | Set a maximum contribution for this book. Fixed tokens are an easy starting point. |
+| Random trim | Vary which already-active ordinary entries fit if the same ones always win. |
+| Vector similarity threshold (벡터 유사도 임계값) | For native vector retrieval without Jev, use a book-specific threshold or leave blank for the global setting. |
+| Use Jev to select entries in chats with this character | Let Jev judge relevant lore in a one-to-one character chat; in group chats the switch is book-specific. |
+| Total Jev budget / NanoGPT connection profile | Configure these only when using Jev. Both are shared extension settings. |
+| Group chat overrides | Change priority or activation by speaking character. Ignore for one-to-one RP. |
+
+### My everyday workflow
+
+For an illustrative 8,000-token World Info budget, give the character settings priority 5, worldbuilding 4, and Memory priority 3 with a fixed cap of 2,000 tokens. Keep always-on protection enabled if you want recent memories considered first. These are examples, not reserved allocations.
+
+- **Keep ordinary keywords/vector recall:** leave Jev off; optionally adjust per-book vector thresholds.
+- **Try scene-aware recall:** prepare the NanoGPT subscription connection profile below, enable Jev, set its total budget and save. Do not adjust vector thresholds for Jev.
+
+Save once and continue roleplaying as usual. If a book uses too many tokens, reduce its cap; if essential always-on entries are missing, check that the book's cap and overall World Info budget can fit them. A budget controls how much can enter the prompt, not how much lore is guaranteed to enter.
 
 ## ✨ Jev Recall — scene-aware lore selection
 
@@ -183,6 +217,15 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 
 [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [원본 STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
+## 이런 분들께 추천합니다!
+
+- 장기 롤플 중 예전에 했던 약속이나 중요한 사건은 잘 안 불려 오고 관계없는 로어만 들어가는 분
+- 캐릭터 설정·세계관·메모리북 등 여러 책의 토큰 사용량과 우선순위를 따로 관리하고 싶은 분
+- 최근 기억이나 중요한 파란불 설정을 검색된 다른 로어보다 먼저 넣고 싶은 분
+- 기존 벡터 검색을 유지하되 로어북마다 검색 기준을 다르게 설정하고 싶은 분
+
+제브는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관리만 사용해도 됩니다.
+
 ## 📸 설정 화면
 
 <p align="center">
@@ -212,6 +255,31 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 현재 캐릭터의 기본·추가 연결 로어북을 먼저 보여 줍니다. **모든 로어북 보기**에 체크하면 다른 책도 선택할 수 있습니다. 현재 캐릭터를 특정할 수 없으면 전체 목록을 보여 줍니다. 목록을 필터링해도 실제 로어북 연결이나 활성화 여부는 바뀌지 않습니다.
 
 원본의 `/stlo 로어북 이름` 명령어도 남아 있습니다. 월드 정보 편집기에서 해당 로어북을 선택하고 설정창을 엽니다.
+
+### 로어북 예산 관리 설정창에서 할 수 있는 것
+
+실제 설정창의 위에서 아래 순서입니다. 모든 기능을 사용할 필요는 없습니다.
+
+| 설정 | 언제, 어떻게 쓰나요? |
+|---|---|
+| 로어북 우선순위 (1–5) | 중요한 책을 먼저 처리하고 싶을 때 높입니다. 기본 3. |
+| 상시 주입 우선 보호 | 파란불 항목부터 예산을 쓰고 싶을 때 켭니다. 모든 책에 공통 적용, 기본 켜짐. |
+| 세부 순서 조정 | 같은 우선순위 내에서 좀 더 세밀하게 순서를 바꾸고 싶을 때만 사용합니다. |
+| 예산 | 해당 책의 최대 주입량을 제한합니다. 처음에는 직접 토큰 수 지정을 추천합니다. |
+| 예산 초과 시 항목을 무작위로 제외 | 이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다. |
+| 벡터 유사도 임계값 | 제브를 쓰지 않고 기존 벡터 검색을 사용할 때 책별로 검색 기준을 달리합니다. 비우면 전역값. |
+| 이 캐릭터와의 채팅은 제브로 항목 선택 | 현재 장면에 필요한 로어를 제브가 고르게 합니다. 1:1은 캐릭터별, 그룹 등은 책별 설정입니다. |
+| 제브 총예산 / 나노GPT 연결 프로필 | 제브를 사용할 때만 설정합니다. 두 값은 공통 설정입니다. |
+| 그룹 채팅 설정 | 말하는 캐릭터에 따라 우선순위와 활성 여부를 다르게 합니다. 1:1만 하면 건드릴 필요 없습니다. |
+
+### 평소에는 이렇게 씁니다
+
+전체 월드 정보 예산이 8,000토큰이라면 예를 들어 캐릭터 설정은 우선순위 5, 세계관은 4, 메모리북은 3으로 두고 메모리북에 최대 2,000토큰을 지정할 수 있습니다. 파란불 기억을 먼저 넣고 싶다면 상시 주입 우선 보호를 켜 두세요. 이 숫자는 예시이며 예약된 배분량은 아닙니다.
+
+- **기존 키워드·벡터로 사용:** 제브를 끄고 필요할 때만 책별 벡터 임계값을 조절하세요.
+- **제브로 사용:** 아래 나노GPT 연결 프로필을 준비하고 제브 체크와 총예산을 설정하세요. 이때 기존 벡터 임계값은 조절할 필요 없습니다.
+
+설정을 저장한 뒤에는 평소처럼 롤플하면 됩니다. 메모리북이 토큰을 너무 많이 먹으면 개별 예산을 줄이고, 중요한 파란불 기억이 빠지면 개별 예산과 전체 월드 정보 예산이 충분한지 먼저 확인하세요.
 
 ## ✨ 제브(Jev) — 지금 장면에 필요한 로어를 골라 주입
 
