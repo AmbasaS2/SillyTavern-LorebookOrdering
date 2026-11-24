@@ -139,4 +139,5 @@ export function applyJevRecall(entries, worlds, accepted) {
         }
     }
     entries.length = write;
+    return written;
 }
