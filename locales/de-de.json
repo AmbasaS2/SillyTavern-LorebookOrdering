@@ -1,7 +1,10 @@
 {
   "stlo.jev.enable": "Jev für dieses Lorebuch verwenden",
   "stlo.jev.budget": "Jev-Gesamtbudget (Tokens)",
-  "stlo.jev.help": "Jev berücksichtigt zuerst die daueraktiven Einträge der für Jev aktivierten Lorebücher. Buchlimits gelten weiterhin. Bei einem Verbindungsfehler zum NanoGPT-Abo von Scene Reader greift der normale Abruf.",
+  "stlo.jev.provider": "Jev-Verbindung",
+  "stlo.jev.nano": "NanoGPT-Abonnement",
+  "stlo.jev.direct": "Offizieller TypeSafe-Jev-Schlüssel",
+  "stlo.jev.help": "Jev berücksichtigt zuerst daueraktive Einträge und beachtet Buchlimits. Es nutzt den passenden in Scene Reader gespeicherten Schlüssel. Bei einem Verbindungsfehler gilt der normale Abruf.",
   "stlo.button.configure": "STLO-Priorität & Budget konfigurieren",
   "stlo.warn.title": "⚠️ Achtung",
   "stlo.warn.body": "Ihre Einfügestrategie für Welteninfos ist nicht auf „Gleichmäßig sortiert“ eingestellt. STLO benötigt die Strategie „Gleichmäßig sortiert“, um korrekt zu funktionieren. Was möchten Sie tun?",

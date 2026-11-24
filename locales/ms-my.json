@@ -1,7 +1,10 @@
 {
   "stlo.jev.enable": "Gunakan Jev untuk buku lore ini",
   "stlo.jev.budget": "Jumlah bajet Jev (token)",
-  "stlo.jev.help": "Jev mengira entri sentiasa aktif daripada buku yang menggunakan Jev terlebih dahulu. Had setiap buku masih digunakan. Jika sambungan langganan NanoGPT Scene Reader gagal, kaedah biasa digunakan.",
+  "stlo.jev.provider": "Sambungan Jev",
+  "stlo.jev.nano": "Langganan NanoGPT",
+  "stlo.jev.direct": "Kunci rasmi TypeSafe Jev",
+  "stlo.jev.help": "Jev mengira entri sentiasa aktif dahulu dan mematuhi had buku. Jev menggunakan kunci sambungan yang disimpan dalam Scene Reader. Jika sambungan gagal, kaedah biasa digunakan.",
   "stlo.button.configure": "Konfigurasikan Keutamaan & Belanjawan STLO",
   "stlo.warn.title": "⚠️ Awas",
   "stlo.warn.body": "Strategi Sisipan Maklumat Dunia anda tidak ditetapkan kepada \"Disusun Sama Rata\". STLO memerlukan strategi \"Disusun Sama Rata\" untuk berfungsi dengan betul. Apa yang anda mahu lakukan?",

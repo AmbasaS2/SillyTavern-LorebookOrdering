@@ -57,10 +57,39 @@ test('Jev reserves all applicable constants and fits books in model score order'
     const selection = await fitJevRecall(entries, worlds, ranked, limits);
     assert.deepEqual([...selection.keys()], [small, npc].map(jevEntryKey));
     assert.equal((await fitJevRecall(entries, worlds, ranked, { ...limits, budget: 4 })).size, 0);
+    assert.deepEqual([...await fitJevRecall(entries, worlds, ranked, { ...limits, bookBudgets: new Map([['Core', 7]]) })],
+        [[jevEntryKey(npc), 0]]);
     assert.deepEqual([...await fitJevRecall(entries, worlds, ranked, { ...limits, worldInfoBudget: 14 })],
         [[jevEntryKey(small), 0]]);
     assert.equal(normalizeJevBudget(), 10000);
     assert.equal(normalizeJevBudget('12500'), 12500);
+});
+
+test('Every eligible entry reaches Jev, in size-bounded requests and through the chosen connection', async () => {
+    const worlds = new Set(['Memory', 'NPC']);
+    const big = Array.from({length:72}, (_, i) => lore('Memory', i, '등불 '.repeat(240)));
+    const npc = lore('NPC', 72, 'A rare promise');
+    const prepared = prepareJevRecall([...big, npc], worlds, [{ mes: 'A lantern appears.' }]);
+    assert.equal(prepared.candidates.size, 73);
+    const seen = new Set();
+    let requests = 0;
+    const selected = await requestJevRecall(prepared, {}, undefined, async (route, request) => {
+        requests++;
+        assert.equal(route, '/api/plugins/scene-reader-jev/systemone');
+        const body = JSON.parse(request.body);
+        assert.equal(body.model, 'jev-1.14.0');
+        assert.ok(new TextEncoder().encode(JSON.stringify(body.state)).length < 30000);
+        assert.ok(new TextEncoder().encode(request.body).length < 62000);
+        const answers = Object.fromEntries(Object.keys(body.questions).map(id => {
+            assert.equal(seen.has(id), false);
+            seen.add(id);
+            return [id, { choice:body.state.lore[id].book === 'NPC' ? 'include' : 'skip' }];
+        }));
+        return { ok:true, json:async()=>({answers}) };
+    }, 'typesafe');
+    assert.ok(requests > 1);
+    assert.equal(seen.size, 73);
+    assert.deepEqual(selected, [jevEntryKey(npc)]);
 });
 
 test('A missing decision or unavailable provider fails without substituting incomplete results', async () => {

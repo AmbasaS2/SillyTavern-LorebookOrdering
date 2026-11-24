@@ -1,7 +1,10 @@
 {
   "stlo.jev.enable": "Use Jev for this lorebook",
   "stlo.jev.budget": "Total Jev budget (tokens)",
-  "stlo.jev.help": "Jev uses enabled lorebooks in this chat and counts their always-on entries first. Book limits still apply. Jev uses the Scene Reader NanoGPT subscription. If it cannot connect, standard World Info recall is used.",
+  "stlo.jev.provider": "Jev connection",
+  "stlo.jev.nano": "NanoGPT subscription",
+  "stlo.jev.direct": "TypeSafe Jev API key",
+  "stlo.jev.help": "Jev counts always-on entries from enabled books first. Book limits still apply. It uses the selected key saved in Scene Reader. If the connection fails, standard World Info recall is used.",
   "stlo.button.configure": "Configure STLO Priority & Budget",
 
   "stlo.warn.title": "⚠️ Caution",

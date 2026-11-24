@@ -1,7 +1,10 @@
 {
   "stlo.jev.enable": "Usar Jev en este libro de lore",
   "stlo.jev.budget": "Presupuesto total de Jev (tokens)",
-  "stlo.jev.help": "Jev cuenta primero las entradas siempre activas de los libros habilitados para Jev. Se mantienen los límites por libro. Si falla la conexión a la suscripción NanoGPT de Scene Reader, se usa la recuperación habitual.",
+  "stlo.jev.provider": "Conexión de Jev",
+  "stlo.jev.nano": "Suscripción NanoGPT",
+  "stlo.jev.direct": "Clave oficial de Jev de TypeSafe",
+  "stlo.jev.help": "Jev cuenta primero las entradas siempre activas y respeta los límites por libro. Usa la clave de la conexión elegida guardada en Scene Reader. Si falla, se usa la recuperación habitual.",
   "stlo.button.configure": "Configurar prioridad y presupuesto de STLO",
   "stlo.warn.title": "⚠️ Precaución",
   "stlo.warn.body": "Tu estrategia de inserción de información mundial no está configurada como «Ordenado uniformemente». STLO requiere la estrategia «Ordenado uniformemente» para funcionar correctamente. ¿Qué te gustaría hacer?",

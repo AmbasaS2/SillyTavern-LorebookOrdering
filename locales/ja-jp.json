@@ -1,7 +1,10 @@
 {
   "stlo.jev.enable": "このロアブックでJevを使う",
   "stlo.jev.budget": "Jevの合計予算（トークン）",
-  "stlo.jev.help": "Jevを有効にしたロアブックの常時有効な項目を先に数えます。本ごとの上限も適用されます。Scene ReaderのNanoGPTに接続できない場合は通常の呼び出し方式を使います。",
+  "stlo.jev.provider": "Jev接続",
+  "stlo.jev.nano": "NanoGPTサブスクリプション",
+  "stlo.jev.direct": "TypeSafe Jev公式APIキー",
+  "stlo.jev.help": "常時有効な項目を先に数え、本ごとの上限を適用します。Scene Readerに保存された選択先のキーを使用します。接続に失敗した場合は通常の呼び出し方式を使います。",
   "stlo.button.configure": "STLOの優先度と予算を設定",
   "stlo.warn.title": "⚠️ 注意",
   "stlo.warn.body": "ワールド情報挿入戦略が「均等ソート」に設定されていません。STLOが正しく機能するには「均等ソート」戦略が必要です。どうしますか？",

@@ -1,7 +1,10 @@
 {
   "stlo.jev.enable": "Gunakan Jev untuk buku lore ini",
   "stlo.jev.budget": "Total anggaran Jev (token)",
-  "stlo.jev.help": "Jev menghitung entri yang selalu aktif dari buku lore yang mengaktifkan Jev terlebih dahulu. Batas tiap buku tetap berlaku. Jika koneksi langganan NanoGPT Scene Reader gagal, metode biasa digunakan.",
+  "stlo.jev.provider": "Koneksi Jev",
+  "stlo.jev.nano": "Langganan NanoGPT",
+  "stlo.jev.direct": "Kunci resmi TypeSafe Jev",
+  "stlo.jev.help": "Jev menghitung entri yang selalu aktif lebih dahulu dan mengikuti batas buku. Kunci untuk koneksi yang dipilih diambil dari Scene Reader. Jika gagal, metode biasa digunakan.",
   "stlo.button.configure": "Konfigurasi Prioritas & Anggaran STLO",
   "stlo.warn.title": "⚠️ Perhatian",
   "stlo.warn.body": "Strategi Penyisipan Info Dunia Anda tidak diatur ke \"Diurutkan Merata\". STLO memerlukan strategi \"Diurutkan Merata\" untuk berfungsi dengan baik. Apa yang ingin Anda lakukan?",

@@ -9,7 +9,7 @@ import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../.
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { applyJevRecall, fitJevRecall, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, jevEntryKey, normalizeJevBudget, normalizeJevProvider, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
 
 const EXTENSION_NAME = 'stlo';
 const SELECTORS = {
@@ -609,11 +609,12 @@ async function applyJevSelection(entries) {
     if (!worlds.size) return;
     const prepared = prepareJevRecall(entries, worlds, getContext().chat ?? []);
     if (!prepared) return;
-    const signature = JSON.stringify(prepared.body);
+    const provider = normalizeJevProvider(extension_settings[EXTENSION_NAME]?.jevProvider);
+    const signature = provider + JSON.stringify(prepared.body);
     if (signature !== run.signature) {
         run.signature = signature;
         const signal = AbortSignal.any([run.controller.signal, AbortSignal.timeout(12000)]);
-        run.pending = requestJevRecall(prepared, getRequestHeaders(), signal).catch(error => {
+        run.pending = requestJevRecall(prepared, getRequestHeaders(), signal, undefined, provider).catch(error => {
             if (!run.controller.signal.aborted) console.warn('[STLO] Jev fell back to World Info:', error);
             return null;
         });
@@ -843,7 +844,15 @@ async function openLorebookSettings(worldName = null) {
                     <input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1"
                         value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}" style="width: 100px;">
                 </label>
-                <small data-i18n="stlo.jev.help">Jev uses enabled lorebooks in this chat and counts their always-on entries first. Book limits still apply. Jev uses the Scene Reader NanoGPT subscription. If it cannot connect, standard World Info recall is used.</small>
+                <label class="stlo-inline-number" for="stlo-jev-provider">
+                    <span data-i18n="stlo.jev.provider">Jev connection</span>
+                    <select id="stlo-jev-provider" class="text_pole textarea_compact">
+                        <option value="nanogpt" data-i18n="stlo.jev.nano">NanoGPT subscription</option>
+                        <option value="typesafe" ${normalizeJevProvider(extension_settings[EXTENSION_NAME]?.jevProvider) === 'typesafe' ? 'selected' : ''}
+                            data-i18n="stlo.jev.direct">TypeSafe Jev API key</option>
+                    </select>
+                </label>
+                <small data-i18n="stlo.jev.help">Jev counts always-on entries from enabled books first. Book limits still apply. It uses the selected key saved in Scene Reader. If the connection fails, standard World Info recall is used.</small>
             </div>
             <div class="world_entry_form_control stlo-section">
                 <h3 data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>
@@ -1003,6 +1012,7 @@ async function openLorebookSettings(worldName = null) {
                 const protectAlwaysOnInput = document.getElementById(SELECTORS.PROTECT_ALWAYS_ON);
                 const jevRecall = document.getElementById('stlo-jev-recall');
                 const jevBudget = document.getElementById('stlo-jev-budget');
+                const jevProvider = document.getElementById('stlo-jev-provider');
 
                 if (prioritySelect && budgetModeSelect && budgetValueInput && orderAdjustmentEnabled && orderAdjustmentInput && orderAdjustmentGroupOnly && onlyWhenSpeaking) {
                     return {
@@ -1018,6 +1028,7 @@ async function openLorebookSettings(worldName = null) {
                         protectAlwaysOn: Boolean(protectAlwaysOnInput?.checked),
                         jevRecall: jevRecall?.checked === true,
                         jevBudget: normalizeJevBudget(jevBudget?.value),
+                        jevProvider: normalizeJevProvider(jevProvider?.value),
                         timestamp: Date.now()
                     };
                 }
@@ -1058,7 +1069,10 @@ async function openLorebookSettings(worldName = null) {
                 }
 
                 // Validate character overrides (this may return null if duplicates found)
-                const characterOverrides = getCharacterOverrides();
+                const hasRenderedOverrides = Boolean(document.getElementById('advanced-priority-sections')?.childElementCount);
+                const characterOverrides = hasRenderedOverrides
+                    ? getCharacterOverrides()
+                    : currentSettings.characterOverrides || {};
                 if (characterOverrides === null) {
                     return null; // Validation failed due to duplicate characters
                 }
@@ -1100,6 +1114,7 @@ async function openLorebookSettings(worldName = null) {
                     protectAlwaysOn: formState.protectAlwaysOn,
                     jevRecall: formState.jevRecall,
                     jevBudget: formState.jevBudget,
+                    jevProvider: formState.jevProvider,
                     vectorThreshold: validatedThreshold,
                     vectorThresholdEnabled: rawThreshold !== '',
                     priority: validatedPriority,
@@ -1182,12 +1197,13 @@ async function openLorebookSettings(worldName = null) {
         // Save the settings if we got them
         if (result) {
             try {
-                const { protectAlwaysOn, jevBudget, ...lorebookSettings } = result;
+                const { protectAlwaysOn, jevBudget, jevProvider, ...lorebookSettings } = result;
                 const saved = await setLorebookSettings(currentLorebook, lorebookSettings);
 
                 if (saved) {
                     extension_settings[EXTENSION_NAME] ??= {};
                     extension_settings[EXTENSION_NAME].jevBudget = jevBudget;
+                    extension_settings[EXTENSION_NAME].jevProvider = jevProvider;
                     setProtectAlwaysOn(protectAlwaysOn);
                     toastr.success(tKey('stlo.settings.saved', 'STLO settings saved for ${0}', currentLorebook));
                 } else {
@@ -1351,8 +1367,8 @@ function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
     // Set up Budget controls
     setupBudgetControls(modalEventListeners, currentSettings);
 
-    // Set up Group Chat Overrides behavior
-    setupAdvancedBehavior(modalEventListeners, currentSettings);
+    setupPriorityDisplaySync(modalEventListeners);
+    setupDrawerBehavior(modalEventListeners, () => setupAdvancedBehavior(modalEventListeners, currentSettings));
 }
 
 /**
@@ -1389,15 +1405,15 @@ function setupPriorityDisplaySync(modalEventListeners = []) {
  * Set up simple drawer toggle behavior
  * @param {Array} modalEventListeners - Array to track event listeners for cleanup
  */
-function setupDrawerBehavior(modalEventListeners = []) {
-    const drawer = document.querySelector('.inline-drawer');
-    const drawerIcon = document.querySelector('.inline-drawer-icon');
-    const drawerToggle = document.querySelector('.inline-drawer-toggle');
+function setupDrawerBehavior(modalEventListeners = [], mountOverrides) {
+    const drawer = document.querySelector('.stlo-advanced-drawer');
+    const drawerIcon = drawer?.querySelector('.inline-drawer-icon');
+    const drawerToggle = drawer?.querySelector('.inline-drawer-toggle');
 
     if (drawer && drawerIcon && drawerToggle) {
         const drawerToggleHandler = (e) => {
             e.preventDefault();
-            drawer.classList.toggle('openDrawer');
+            if (drawer.classList.toggle('openDrawer')) mountOverrides();
             drawerIcon.classList.toggle('down');
             drawerIcon.classList.toggle('up');
         };
@@ -1576,17 +1592,10 @@ function generateAdvancedContent() {
  * @param {Object} currentSettings - Current lorebook settings
  */
 function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
-    // Generate and insert advanced content first
     const advancedSectionsContainer = document.getElementById('advanced-priority-sections');
-    if (advancedSectionsContainer) {
-        advancedSectionsContainer.innerHTML = generateAdvancedContent();
-    }
-
-    // Set up priority display sync
-    setupPriorityDisplaySync(modalEventListeners);
-
-    // Set up drawer behavior
-    setupDrawerBehavior(modalEventListeners);
+    if (!advancedSectionsContainer || advancedSectionsContainer.childElementCount) return;
+    advancedSectionsContainer.innerHTML = generateAdvancedContent();
+    applyLocale(advancedSectionsContainer);
 
     // Set up override behavior for all priority levels
     setupOverrideBehavior(modalEventListeners);

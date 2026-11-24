@@ -1,7 +1,10 @@
 {
   "stlo.jev.enable": "对此世界书使用 Jev",
   "stlo.jev.budget": "Jev 总预算（令牌）",
-  "stlo.jev.help": "先计入启用 Jev 的世界书中的常驻条目。各书的预算仍然有效。无法连接 Scene Reader 的 NanoGPT 订阅时，使用常规调用方式。",
+  "stlo.jev.provider": "Jev 连接",
+  "stlo.jev.nano": "NanoGPT 订阅",
+  "stlo.jev.direct": "TypeSafe 官方 Jev 密钥",
+  "stlo.jev.help": "优先计入常驻条目，同时应用每本书的预算。使用 Scene Reader 中为所选连接保存的密钥。连接失败时使用常规调用方式。",
   "stlo.button.configure": "配置 STLO 优先级与预算",
   "stlo.warn.title": "⚠️ 注意",
   "stlo.warn.body": "您的世界信息插入策略未设置为“均匀排序”。STLO 需要“均匀排序”策略才能正常工作。您想要如何处理？",
