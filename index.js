@@ -63,6 +63,15 @@ function getCachedLorebook(world) {
     return worldInfoCache instanceof Map ? Map.prototype.get.call(worldInfoCache, world) : worldInfoCache.get(world);
 }
 
+function getJevCharacterAvatar(context = getContext()) {
+    return context.groupId == null ? characters?.[this_chid]?.avatar : undefined;
+}
+
+function getCharacterJevRecall(avatar) {
+    const byCharacter = extension_settings[EXTENSION_NAME]?.jevByCharacter;
+    return avatar && byCharacter && Object.hasOwn(byCharacter, avatar) ? byCharacter[avatar] : undefined;
+}
+
 async function hasActiveJevLorebook(context) {
     const worlds = new Set([
         ...selected_world_info,
@@ -97,7 +106,7 @@ function guardNativeVectorInterceptor() {
         const run = jevGeneration;
         if (run && run.chatId === getCurrentChatId() && hasEnabledVectorRecall()) {
             const context = getContext();
-            const useJev = await hasActiveJevLorebook(context);
+            const useJev = run.characterRecall ?? await hasActiveJevLorebook(context);
             if (run !== jevGeneration || run.chatId !== getCurrentChatId()) return;
             // Pick one recall path for the whole generation. A book that fails
             // to load here may become available later during the reply scan.
@@ -129,7 +138,10 @@ function startJevGeneration(type, _options, dryRun) {
     stopJevGeneration();
     const chatId = getCurrentChatId();
     if (!dryRun && chatId && ['normal', 'continue', 'regenerate', 'swipe'].includes(type)) {
-        jevGeneration = { chatId, controller: new AbortController() };
+        jevGeneration = {
+            chatId, controller: new AbortController(),
+            characterRecall: getCharacterJevRecall(getJevCharacterAvatar()),
+        };
         if (HAS_WORLDINFO_SCAN_DONE && hasEnabledVectorRecall()) guardNativeVectorInterceptor();
     }
 }
@@ -670,10 +682,10 @@ async function handleWorldInfoEntriesLoaded(eventData) {
 
 async function applyJevSelection(entries) {
     const run = jevGeneration;
-    if (!run || run.vectorRecall || run.chatId !== getCurrentChatId()) return;
+    if (!run || run.vectorRecall || run.characterRecall === false || run.chatId !== getCurrentChatId()) return;
     run.selection = null;
     const settings = EXTENSION_STATE.scanWorldSettings;
-    const worlds = new Set([...settings].filter(([, book]) => book.jevRecall === true).map(([world]) => world));
+    const worlds = new Set([...settings].filter(([, book]) => run.characterRecall === true || book.jevRecall === true).map(([world]) => world));
     if (!worlds.size) return;
     const prepared = prepareJevRecall(entries, worlds, getContext().chat ?? []);
     if (!prepared) return;
@@ -896,32 +908,14 @@ async function openLorebookSettings(worldName = null) {
 
         // Get current settings
         const currentSettings = await getLorebookSettings(currentLorebook);
+        const context = getContext();
+        const characterAvatar = getJevCharacterAvatar(context);
+        const initialJevRecall = getCharacterJevRecall(characterAvatar) ??
+            (characterAvatar && HAS_WORLDINFO_SCAN_DONE ? await hasActiveJevLorebook(context) : currentSettings.jevRecall === true);
 
         // Create modal HTML - single vertical scrolling content
         const modalHtml = `
             <div class="stlo-modal-ui">
-            <div class="world_entry_form_control stlo-section" ${HAS_WORLDINFO_SCAN_DONE ? '' : 'hidden'}>
-                <label class="checkbox_label stlo-checkrow" for="stlo-jev-recall">
-                    <input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? 'checked' : ''}>
-                    <span class="checkmark"></span>
-                    <span data-i18n="stlo.jev.enable">Use Jev for this lorebook</span>
-                </label>
-                <label class="stlo-inline-number" for="stlo-jev-budget">
-                    <span data-i18n="stlo.jev.budget">Total Jev budget (tokens)</span>
-                    <input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1"
-                        value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}" style="width: 100px;">
-                </label>
-                <label class="stlo-inline-number" for="stlo-jev-provider">
-                    <span data-i18n="stlo.jev.provider">Jev connection</span>
-                    <select id="stlo-jev-provider" class="text_pole textarea_compact">
-                        <option value="nanogpt" data-i18n="stlo.jev.nano">NanoGPT subscription</option>
-                        <option value="typesafe" ${normalizeJevProvider(extension_settings[EXTENSION_NAME]?.jevProvider) === 'typesafe' ? 'selected' : ''}
-                            data-i18n="stlo.jev.direct">TypeSafe Jev API key</option>
-                    </select>
-                </label>
-                <small data-i18n="stlo.jev.help">Jev counts always-on entries first, respects book limits, and uses the selected key from Scene Reader. When Jev is enabled in this chat, replies skip vector search. If Jev fails, keyword search is used.</small>
-                <small data-i18n="stlo.jev.inputHelp">Every Jev request sends all eligible entries from all active lorebooks with Jev enabled in this chat. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.</small>
-            </div>
             <div class="world_entry_form_control stlo-section">
                 <h3 data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>
                 <div class="stlo-field-heading">
@@ -1019,6 +1013,29 @@ async function openLorebookSettings(worldName = null) {
                            ? currentSettings.vectorThreshold : ''}">
             </div>
 
+            <div class="world_entry_form_control stlo-section" ${HAS_WORLDINFO_SCAN_DONE ? '' : 'hidden'}>
+                <label class="checkbox_label stlo-checkrow" for="stlo-jev-recall">
+                    <input type="checkbox" id="stlo-jev-recall" ${initialJevRecall ? 'checked' : ''}>
+                    <span class="checkmark"></span>
+                    <span data-i18n="${characterAvatar ? 'stlo.jev.enable' : 'stlo.jev.enableBook'}">${characterAvatar
+                        ? 'Use Jev to select entries in chats with this character' : 'Use Jev for this lorebook'}</span>
+                </label>
+                <label class="stlo-inline-number" for="stlo-jev-budget">
+                    <span data-i18n="stlo.jev.budget">Total Jev budget (tokens)</span>
+                    <input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1"
+                        value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}" style="width: 100px;">
+                </label>
+                <label class="stlo-inline-number" for="stlo-jev-provider">
+                    <span data-i18n="stlo.jev.provider">Jev connection</span>
+                    <select id="stlo-jev-provider" class="text_pole textarea_compact">
+                        <option value="nanogpt" data-i18n="stlo.jev.nano">NanoGPT subscription</option>
+                        <option value="typesafe" ${normalizeJevProvider(extension_settings[EXTENSION_NAME]?.jevProvider) === 'typesafe' ? 'selected' : ''}
+                            data-i18n="stlo.jev.direct">TypeSafe Jev API key</option>
+                    </select>
+                </label>
+                <small data-i18n="stlo.jev.help">Jev counts always-on entries first, respects book limits, and uses the selected key from Scene Reader. When Jev is enabled in this chat, replies skip vector search. If Jev fails, keyword search is used.</small>
+                <small data-i18n="${characterAvatar ? 'stlo.jev.inputHelpForCharacter' : 'stlo.jev.inputHelp'}">Every Jev request sends all eligible entries from the active lorebooks using Jev. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.</small>
+            </div>
             <!-- Group chat controls share one section, without dividers between toggles. -->
             <div class="world_entry_form_control stlo-section stlo-group-section">
                 <div class="stlo-toggle-block">
@@ -1265,13 +1282,20 @@ async function openLorebookSettings(worldName = null) {
         // Save the settings if we got them
         if (result) {
             try {
-                const { protectAlwaysOn, jevBudget, jevProvider, ...lorebookSettings } = result;
+                const { protectAlwaysOn, jevRecall, jevBudget, jevProvider, ...lorebookSettings } = result;
+                if (!characterAvatar) lorebookSettings.jevRecall = jevRecall;
                 const saved = await setLorebookSettings(currentLorebook, lorebookSettings);
 
                 if (saved) {
                     extension_settings[EXTENSION_NAME] ??= {};
                     extension_settings[EXTENSION_NAME].jevBudget = jevBudget;
                     extension_settings[EXTENSION_NAME].jevProvider = jevProvider;
+                    if (characterAvatar && jevRecall !== initialJevRecall) {
+                        extension_settings[EXTENSION_NAME].jevByCharacter = {
+                            ...extension_settings[EXTENSION_NAME].jevByCharacter,
+                            [characterAvatar]: jevRecall,
+                        };
+                    }
                     setProtectAlwaysOn(protectAlwaysOn);
                     toastr.success(tKey('stlo.settings.saved', 'STLO settings saved for ${0}', currentLorebook));
                 } else {
