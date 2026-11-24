@@ -913,7 +913,8 @@ async function openLorebookSettings(worldName = null) {
         const currentSettings = await getLorebookSettings(currentLorebook);
         const context = getContext();
         const characterAvatar = getJevCharacterAvatar(context);
-        const initialJevRecall = getCharacterJevRecall(characterAvatar) ??
+        const savedCharacterJevRecall = getCharacterJevRecall(characterAvatar);
+        const initialJevRecall = savedCharacterJevRecall ??
             (characterAvatar && HAS_WORLDINFO_SCAN_DONE ? await hasActiveJevLorebook(context) : currentSettings.jevRecall === true);
 
         // Create modal HTML - single vertical scrolling content
@@ -1292,7 +1293,9 @@ async function openLorebookSettings(worldName = null) {
                     extension_settings[EXTENSION_NAME] ??= {};
                     extension_settings[EXTENSION_NAME].jevBudget = jevBudget;
                     extension_settings[EXTENSION_NAME].jevProfileId = jevProfileId;
-                    if (characterAvatar && jevRecall !== initialJevRecall) {
+                    // Saving an inherited checked box adopts character-wide recall.
+                    const inheritedLegacyRecall = savedCharacterJevRecall === undefined && initialJevRecall;
+                    if (characterAvatar && (jevRecall !== initialJevRecall || inheritedLegacyRecall)) {
                         extension_settings[EXTENSION_NAME].jevByCharacter = {
                             ...extension_settings[EXTENSION_NAME].jevByCharacter,
                             [characterAvatar]: jevRecall,
