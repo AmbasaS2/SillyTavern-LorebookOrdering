@@ -590,7 +590,7 @@ async function handleWorldInfoEntriesLoaded(eventData) {
 
         // Delegate consolidation, sorting, and budget to dedicated functions
         await applyPriorityOrdering(eventData);
-        if (HAS_WORLDINFO_SCAN_DONE) await applyJevSelection(eventData.globalLore);
+        if (HAS_WORLDINFO_SCAN_DONE) await applyJevSelection(eventData);
         // In newer branches (with WORLDINFO_SCAN_DONE), we trim per-loop and skip pre-scan entirely.
         if (!HAS_WORLDINFO_SCAN_DONE) {
             await enforceBudgetPreScan(eventData);
@@ -600,7 +600,8 @@ async function handleWorldInfoEntriesLoaded(eventData) {
     }
 }
 
-async function applyJevSelection(entries) {
+async function applyJevSelection(eventData) {
+    const entries = eventData.globalLore;
     const run = jevGeneration;
     if (!run || run.chatId !== getCurrentChatId()) return;
     run.selection = null;
@@ -629,7 +630,10 @@ async function applyJevSelection(entries) {
     });
     if (run !== jevGeneration || run.signature !== signature || run.chatId !== getCurrentChatId()) return;
     run.selection = { accepted, worlds, budget };
-    applyJevRecall(entries, worlds, accepted);
+    const applied = applyJevRecall(entries, worlds, accepted);
+    // Optional display-only receipt; absence/failure of WorldInfo Info never affects recall.
+    try { window.STWII?.recordStloJevRecall?.(eventData, applied); }
+    catch { /* Optional integration must not interfere with lore injection. */ }
 }
 
 /**
