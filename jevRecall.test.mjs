@@ -35,7 +35,8 @@ test('Jev selects ordinary entries from all enabled books and preserves special 
         budget: 10000, worldInfoBudget: 20000, bookBudgets: new Map(), countTokens: async text => text.length,
     });
     assert.equal(accepted.size, 8);
-    applyJevRecall(entries, worlds, accepted);
+    const applied = applyJevRecall(entries, worlds, accepted);
+    assert.deepEqual(applied, new Set(positive.map(jevEntryKey)));
     assert.deepEqual(entries.slice(0, 8), positive.map(entry => ({
         ...entry, vectorized: false, content: '@@activate\n'+entry.content,
     })));
