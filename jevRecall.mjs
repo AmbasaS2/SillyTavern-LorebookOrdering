@@ -1,11 +1,4 @@
 export const DEFAULT_JEV_BUDGET = 10000;
-// Jev 1.14 has 32k tokens for state + any question and 64k per request.
-// UTF-8 sizes conservatively bound the input and leave room for framing.
-const STATE_BYTES = 30000;
-const REQUEST_BYTES = 62000;
-const PARALLEL_REQUESTS = 3;
-const utf8 = new TextEncoder();
-const jsonBytes = value => utf8.encode(JSON.stringify(value)).length;
 
 export function normalizeJevBudget(value) {
     const tokens = Number(value);
@@ -62,56 +55,16 @@ export function prepareJevRecall(entries, worlds, messages) {
     return { candidates, body: { model: 'typesafe/jev-1.14', state: { current, assessment: instructions, lore }, questions } };
 }
 
-function splitJevRequests(prepared) {
-    const { model, state: { current, assessment, lore }, questions } = prepared.body;
-    const makeBody = () => ({ model, state: { current, assessment, lore: {} }, questions: {} });
-    const emptyStateBytes = jsonBytes(makeBody().state);
-    const emptyRequestBytes = jsonBytes(makeBody());
-    const batches = [];
-    let stateBytes = emptyStateBytes;
-    let requestBytes = emptyRequestBytes;
-    let largestQuestion = 0;
-    let batch = makeBody();
-    for (const id of prepared.candidates.keys()) {
-        const loreBytes = jsonBytes({ [id]: lore[id] });
-        const questionBytes = jsonBytes({ [id]: questions[id] });
-        if (stateBytes + loreBytes + Math.max(largestQuestion, questionBytes) > STATE_BYTES ||
-            requestBytes + loreBytes + questionBytes > REQUEST_BYTES) {
-            if (!Object.keys(batch.questions).length) throw Error('A Jev candidate exceeds the request context.');
-            batches.push(batch);
-            batch = makeBody();
-            stateBytes = emptyStateBytes;
-            requestBytes = emptyRequestBytes;
-            largestQuestion = 0;
-        }
-        batch.state.lore[id] = lore[id];
-        batch.questions[id] = questions[id];
-        stateBytes += loreBytes;
-        requestBytes += loreBytes + questionBytes;
-        largestQuestion = Math.max(largestQuestion, questionBytes);
-    }
-    batches.push(batch);
-    return batches;
-}
-
 export async function requestJevRecall(prepared, headers, signal, fetchImpl = fetch, provider = 'nanogpt') {
     const direct = normalizeJevProvider(provider) === 'typesafe';
     const route = direct ? '/api/plugins/scene-reader-jev/systemone' : '/api/plugins/scene-reader-jev/nanogpt/systemone';
-    const results = new Map();
-    const batches = splitJevRequests(prepared);
-    for (let start = 0; start < batches.length; start += PARALLEL_REQUESTS) {
-        await Promise.all(batches.slice(start, start + PARALLEL_REQUESTS).map(async batch => {
-            const response = await fetchImpl(route, {
-                method: 'POST', headers, body: JSON.stringify(direct ? { ...batch, model: 'jev-1.14.0' } : batch), signal,
-            });
-            if (!response.ok) throw Error('Jev is unavailable (' + response.status + ').');
-            const { answers } = await response.json();
-            for (const id of Object.keys(batch.questions)) results.set(id, answers?.[id]);
-        }));
-    }
+    const body = direct ? { ...prepared.body, model: 'jev-1.14.0' } : prepared.body;
+    const response = await fetchImpl(route, { method: 'POST', headers, body: JSON.stringify(body), signal });
+    if (!response.ok) throw Error('Jev is unavailable (' + response.status + ').');
+    const { answers } = await response.json();
     const selected = [];
     for (const [id, key] of prepared.candidates) {
-        const result = results.get(id);
+        const result = answers?.[id];
         if (result?.choice !== 'include' && result?.choice !== 'skip') {
             throw Error('Jev did not return a decision for every candidate.');
         }

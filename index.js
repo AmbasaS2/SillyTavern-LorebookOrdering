@@ -611,7 +611,10 @@ async function applyJevSelection(entries) {
     if (!prepared) return;
     const provider = normalizeJevProvider(extension_settings[EXTENSION_NAME]?.jevProvider);
     const signature = provider + JSON.stringify(prepared.body);
-    if (signature !== run.signature) {
+    // A new scan in this generation can reuse an identical selection.
+    // If the input changed, leave that scan to the native World Info rules.
+    if (run.pending && signature !== run.signature) return;
+    if (!run.pending) {
         run.signature = signature;
         const signal = AbortSignal.any([run.controller.signal, AbortSignal.timeout(12000)]);
         run.pending = requestJevRecall(prepared, getRequestHeaders(), signal, undefined, provider).catch(error => {

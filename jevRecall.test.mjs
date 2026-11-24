@@ -65,7 +65,7 @@ test('Jev reserves all applicable constants and fits books in model score order'
     assert.equal(normalizeJevBudget('12500'), 12500);
 });
 
-test('Every eligible entry reaches Jev, in size-bounded requests and through the chosen connection', async () => {
+test('Every eligible entry reaches the chosen Jev connection in one request', async () => {
     const worlds = new Set(['Memory', 'NPC']);
     const big = Array.from({length:72}, (_, i) => lore('Memory', i, '등불 '.repeat(240)));
     const npc = lore('NPC', 72, 'A rare promise');
@@ -78,8 +78,8 @@ test('Every eligible entry reaches Jev, in size-bounded requests and through the
         assert.equal(route, '/api/plugins/scene-reader-jev/systemone');
         const body = JSON.parse(request.body);
         assert.equal(body.model, 'jev-1.14.0');
-        assert.ok(new TextEncoder().encode(JSON.stringify(body.state)).length < 30000);
-        assert.ok(new TextEncoder().encode(request.body).length < 62000);
+        assert.ok(new TextEncoder().encode(JSON.stringify(body.state)).length > 30000);
+        assert.equal(Object.keys(body.questions).length, 73);
         const answers = Object.fromEntries(Object.keys(body.questions).map(id => {
             assert.equal(seen.has(id), false);
             seen.add(id);
@@ -87,7 +87,7 @@ test('Every eligible entry reaches Jev, in size-bounded requests and through the
         }));
         return { ok:true, json:async()=>({answers}) };
     }, 'typesafe');
-    assert.ok(requests > 1);
+    assert.equal(requests, 1);
     assert.equal(seen.size, 73);
     assert.deepEqual(selected, [jevEntryKey(npc)]);
 });
@@ -98,6 +98,12 @@ test('A missing decision or unavailable provider fails without substituting inco
     await assert.rejects(requestJevRecall(request, {}, undefined, async () => ({
         ok: false, status: 404,
     })), /unavailable/);
+    let calls = 0;
+    await assert.rejects(requestJevRecall(request, {}, undefined, async () => {
+        calls++;
+        return { ok: false, status: 413 };
+    }), /413/);
+    assert.equal(calls, 1);
     await assert.rejects(requestJevRecall(request, {}, undefined, async () => ({
         ok: true, json: async () => ({ answers: { e1: { choice: 'skip' } } }),
     })), /every candidate/);
