@@ -14,10 +14,16 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 
 <p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
 
+**A. Budget management (no Jev required)**
+
 1. Install only this fork and reload. Use SillyTavern 1.18 with the structured World Info scan event for budget trimming and Jev.
 2. Open Extensions → Lorebook Budget Management. Add books; set priority (1–5), cap and optional Protect Always-On. Save.
-3. If native keyword/vector recall works for you, stop here. To try Jev, prepare the subscription-only NanoGPT Custom connection profile below. Open Lorebook Jev Recall, enable it for the current character, select the profile and save.
-4. Generate a normal RP reply and check the latest recall report if needed. Compatible WorldInfo Info 1.7.1-ambasa.4+ marks actual activated Jev entries with 🔮.
+3. Generate a normal RP reply. If you use WorldInfo Info, open the floating book to check activated entries. If native keyword/vector recall works for you, stop here.
+
+**B. Optional scene-aware recall with Jev**
+
+1. Prepare the subscription-only NanoGPT Custom connection profile below. Open Lorebook Jev Recall, enable it for the current character, select the profile and total injection budget, then save.
+2. Generate a normal RP reply and check the latest recall report if needed. Compatible WorldInfo Info 1.7.1-ambasa.4+ marks actual activated Jev entries with 🔮.
 
 ### Works alone, better together
 
@@ -98,6 +104,46 @@ For an illustrative 8,000-token World Info budget, give the character settings p
 
 Save once and continue roleplaying as usual. If a book uses too many tokens, reduce its cap; if essential always-on entries are missing, check that the book's cap and overall World Info budget can fit them. A budget controls how much can enter the prompt, not how much lore is guaranteed to enter.
 
+## ⚙️ Priority and Order
+
+| Setting | Description |
+|---|---|
+| **Lorebook priority** | 1–5, with 3 as the default. Higher values are processed earlier. |
+| **Order adjustment** | Optional value from −10,000 to +10,000; positive values move entries earlier, negative values later. |
+| **Group chats only** | Apply the main order adjustment only during group chat turns. |
+| **Protect Always-On** | Global fork option, disabled until explicitly enabled. Gives constant entries budget priority over other entries, including Sticky cases. |
+
+Priority and order adjustment are inherited from upstream. The processing order uses `priority × 10,000 + adjustment + entry order` (the entry order contribution is capped at 9,999). Large adjustments can cross priority bands; use small adjustments for fine-tuning. These controls affect World Info processing, not an entry's configured prompt insertion position or activation conditions.
+
+### Protect Always-On (fork option)
+
+When enabled, constant/always-on entries are processed before non-constant entries across lorebooks. Per-book trimming also considers constants first. The fork accounts for native Sticky precedence when reconciling the shared budget.
+
+This is a **global** setting, not a setting for each book. Saving a change from any lorebook applies it to all. It is not a guarantee that all constants will fit: a constant can still be excluded if its book's cap or the overall World Info budget is insufficient. Entries explicitly configured to ignore the budget retain that behavior.
+
+Disable this option if you prefer the original priority behavior.
+
+## 📦 Per-Lorebook Token Budget
+
+<p align="center">
+  <a href="assets/readme/mobile/stlo-budget-guide-mobile.svg"><img src="assets/readme/mobile/stlo-budget-guide-mobile.svg" alt="Four inherited token budget modes and the fork's global always-on priority / 개별 예산과 상시 주입 우선 보호" width="860" /></a>
+</p>
+
+All lorebooks share SillyTavern's global World Info budget. A per-book budget is an upper limit, not a reserved allocation.
+
+| Mode | Description |
+|---|---|
+| **Default / no separate cap** | Let the book share the global World Info budget without an extra STLO cap. |
+| **% of World Info budget** | Limit the book to 1–100% of the current World Info pool. |
+| **% of max context** | Limit it to 1–100% of the prevailing usable context size. |
+| **Fixed tokens** | Limit it to a specified positive integer number of tokens. |
+
+For example, 25% of an 8,000-token World Info budget equals a 2,000-token per-book ceiling. A book may use less, and other books do not receive guaranteed reservations.
+
+**Random trim** is an upstream feature. Instead of always considering entries in order, it shuffles the selection when applying a per-book cap. With Protect Always-On enabled, constants retain their order and only ordinary non-constant entries are shuffled. Jev-selected entries are considered in their relevance order after ordinary native entries in per-book trimming.
+
+The fork trims structured activated entries before the final prompt is assembled instead of deleting matching strings from prompt text. With recursive scanning, an entry excluded from the final prompt may already have triggered another entry; trimming does not undo all earlier activation effects.
+
 ## ✨ Jev Recall — scene-aware lore selection
 
 <p align="center">
@@ -149,46 +195,6 @@ Advanced settings adjust the number of recent messages, optional reading limits,
 **The Jev token budget is an injection limit, not an API input-token limit.** Every eligible entry in the chosen scope is assessed across one or more requests. Large collections therefore increase the request size even when only a few entries are ultimately injected. The NanoGPT endpoint currently documents a 64K request limit and a 32K per-question limit for this model; STLO uses conservative local token estimates (56K/28K planning targets) and splits as needed. If shared context plus one complete question cannot fit, it stops before continuing the RP; reduce recent messages or explicitly enable a reading limit. Estimates are not exact provider token counts.
 
 The request sends recent dialogue, ordinary always-on background and candidate lore to NanoGPT for processing by Jev. Enable it only when you are comfortable sending that content. There is an additional API request and possible latency on eligible RP generations; subscription coverage and allowance depend on the provider and account. Check your [NanoGPT subscription and billing settings](https://nano-gpt.com/support) rather than assuming unlimited or free usage.
-
-## ⚙️ Priority and Order
-
-| Setting | Description |
-|---|---|
-| **Lorebook priority** | 1–5, with 3 as the default. Higher values are processed earlier. |
-| **Order adjustment** | Optional value from −10,000 to +10,000; positive values move entries earlier, negative values later. |
-| **Group chats only** | Apply the main order adjustment only during group chat turns. |
-| **Protect Always-On** | Global fork option, disabled until explicitly enabled. Gives constant entries budget priority over other entries, including Sticky cases. |
-
-Priority and order adjustment are inherited from upstream. The processing order uses `priority × 10,000 + adjustment + entry order` (the entry order contribution is capped at 9,999). Large adjustments can cross priority bands; use small adjustments for fine-tuning. These controls affect World Info processing, not an entry's configured prompt insertion position or activation conditions.
-
-### Protect Always-On (fork option)
-
-When enabled, constant/always-on entries are processed before non-constant entries across lorebooks. Per-book trimming also considers constants first. The fork accounts for native Sticky precedence when reconciling the shared budget.
-
-This is a **global** setting, not a setting for each book. Saving a change from any lorebook applies it to all. It is not a guarantee that all constants will fit: a constant can still be excluded if its book's cap or the overall World Info budget is insufficient. Entries explicitly configured to ignore the budget retain that behavior.
-
-Disable this option if you prefer the original priority behavior.
-
-## 📦 Per-Lorebook Token Budget
-
-<p align="center">
-  <a href="assets/readme/mobile/stlo-budget-guide-mobile.svg"><img src="assets/readme/mobile/stlo-budget-guide-mobile.svg" alt="Four inherited token budget modes and the fork's global always-on priority / 개별 예산과 상시 주입 우선 보호" width="860" /></a>
-</p>
-
-All lorebooks share SillyTavern's global World Info budget. A per-book budget is an upper limit, not a reserved allocation.
-
-| Mode | Description |
-|---|---|
-| **Default / no separate cap** | Let the book share the global World Info budget without an extra STLO cap. |
-| **% of World Info budget** | Limit the book to 1–100% of the current World Info pool. |
-| **% of max context** | Limit it to 1–100% of the prevailing usable context size. |
-| **Fixed tokens** | Limit it to a specified positive integer number of tokens. |
-
-For example, 25% of an 8,000-token World Info budget equals a 2,000-token per-book ceiling. A book may use less, and other books do not receive guaranteed reservations.
-
-**Random trim** is an upstream feature. Instead of always considering entries in order, it shuffles the selection when applying a per-book cap. With Protect Always-On enabled, constants retain their order and only ordinary non-constant entries are shuffled. Jev-selected entries are considered in their relevance order after ordinary native entries in per-book trimming.
-
-The fork trims structured activated entries before the final prompt is assembled instead of deleting matching strings from prompt text. With recursive scanning, an entry excluded from the final prompt may already have triggered another entry; trimming does not undo all earlier activation effects.
 
 ## 🔎 Per-Lorebook Vector Similarity Threshold (fork option)
 
@@ -259,10 +265,16 @@ If an always-on entry disappears, first check whether its full text fits both th
 
 **현재 버전: 2.2.4-ambasa.1.** 로어북은 RP 모델에게 설정과 기억을 전달합니다. STLO는 책별 우선순위와 최대 주입량을 정하고, 선택 기능인 Jev로 장면에 필요한 항목을 고릅니다. 예산 관리만 쓰려면 메모리북이나 Jev 연결이 필요 없습니다.
 
+**A. 기본 예산 관리만 사용하기 (Jev 불필요)**
+
 1. 원본과 동시에 켜지 말고 설치·새로고침합니다. 예산 트리밍과 Jev는 구조화된 스캔 이벤트가 있는 실리태번 1.18 계열을 기준으로 합니다.
 2. 확장 메뉴 → 로어북 예산 관리 → 책 추가 → 우선순위(1~5)·예산·선택적 상시 주입 우선 보호 → 저장.
-3. 기본 키워드·벡터로 충분하면 여기까지! Jev를 사용하려면 아래 구독 전용 NanoGPT Custom 연결 프로필을 준비하고 별도 로어북 Jev 호출 메뉴에서 현재 캐릭터의 Jev 사용 및 프로필을 저장합니다.
-4. 평소처럼 롤플하고 최근 호출 결과를 확인합니다. 호환 월드인포인포 1.7.1-ambasa.4 이상에서는 실제 활성화된 Jev 로어에 🔮가 표시됩니다.
+3. 평소처럼 롤플하세요. 월드인포인포를 함께 쓴다면 책 버튼으로 발동 로어를 확인합니다. 기본 키워드·벡터로 충분하면 여기까지!
+
+**B. 선택: Jev까지 사용하기**
+
+1. 위 예산 설정을 마친 뒤 아래 구독 전용 NanoGPT Custom 연결 프로필을 준비하고 별도 로어북 Jev 호출 메뉴에서 현재 캐릭터의 Jev 사용·프로필·총예산을 설정해 저장합니다.
+2. 평소처럼 롤플하고 최근 호출 결과를 확인합니다. 호환 월드인포인포 1.7.1-ambasa.4 이상에서는 실제 활성화된 Jev 로어에 🔮가 표시됩니다.
 
 ### 단독으로도 충분하고, 함께 쓰면 더 편리합니다
 
@@ -343,6 +355,44 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 설정을 저장한 뒤에는 평소처럼 롤플하면 됩니다. 메모리북이 토큰을 너무 많이 먹으면 개별 예산을 줄이고, 중요한 파란불 기억이 빠지면 개별 예산과 전체 월드 정보 예산이 충분한지 먼저 확인하세요.
 
+## ⚙️ 우선순위와 순서
+
+| 설정 | 설명 |
+|---|---|
+| **로어북 우선순위** | 1~5, 기본 3. 숫자가 클수록 먼저 처리합니다. |
+| **세부 순서 조정** | −10,000~+10,000. 양수는 앞당기고 음수는 늦춥니다. |
+| **그룹 채팅에만 적용** | 세부 순서 조정을 그룹 채팅에서만 적용합니다. |
+| **상시 주입 우선 보호** | 포크에서 추가한 전역 옵션. 직접 체크해야 적용됩니다. 상시 항목을 다른 항목보다 먼저 고려합니다. |
+
+별도 우선순위나 세부 순서 조정을 설정하지 않은 경우 실리태번의 기본 로어북 순서를 유지합니다. 원본의 처리 순서 계산은 `우선순위 × 10,000 + 세부 순서값 + 항목 순서`입니다(항목 순서값의 상한은 9,999). 큰 조정값은 다른 우선순위 단계에도 영향을 줄 수 있습니다. 우선순위는 월드 정보 처리 순서이며 항목의 프롬프트 삽입 위치나 활성화 조건을 바꾸지 않습니다.
+
+### 상시 주입 우선 보호
+
+모든 로어북에 공통 적용되며 기본값은 꺼짐입니다. 켜면 상시 항목의 예산을 먼저 확보합니다. Sticky 항목도 고려하고, 실제 삽입 순서값은 변경하지 않습니다. 기존에 명시적으로 저장한 켜짐/꺼짐 값은 유지합니다.
+
+상시 항목의 주입을 무조건 보장하는 기능은 아닙니다. 개별 또는 전체 예산을 초과하면 상시 항목도 순서대로 제외될 수 있습니다. 기존에 '예산 무시'가 설정된 항목은 그 설정을 유지합니다. 원래 순서 방식이 더 맞는 경우 끄면 됩니다.
+
+## 📦 로어북별 예산
+
+<p align="center">
+  <a href="assets/readme/mobile/stlo-budget-guide-mobile.svg"><img src="assets/readme/mobile/stlo-budget-guide-mobile.svg" alt="원본의 네 가지 토큰 예산과 포크의 상시 주입 우선 보호" width="860" /></a>
+</p>
+
+모든 로어북은 전체 월드 정보 예산을 공유합니다. 개별 예산은 미리 확보되는 공간이 아니라 해당 로어북의 최대 사용량입니다.
+
+| 예산 종류 | 설명 |
+|---|---|
+| **개별 제한 없음 (전체 예산 공유)** | 별도 STLO 제한을 추가하지 않습니다. |
+| **전체 월드 정보 예산의 비율 (%)** | 전체 월드 정보 예산의 1~100%를 최대치로 설정합니다. |
+| **최대 컨텍스트 크기의 비율 (%)** | 현재 사용 가능 컨텍스트의 1~100%를 최대치로 설정합니다. |
+| **직접 토큰 수 지정** | 양의 정수 토큰 수를 최대치로 지정합니다. |
+
+예를 들어 전체 월드 정보 예산이 8,000토큰이고 어떤 책을 25%로 설정했다면, 그 책은 최대 2,000토큰을 사용할 수 있습니다. 실제 주입량은 더 적을 수 있습니다.
+
+**예산 초과 시 항목을 무작위로 제외**는 원본 STLO의 랜덤 트리밍 기능입니다. 상시 주입 우선 보호를 켜면 상시 항목은 기존 순서를 유지하고 일반 항목을 섞습니다. 책별 예산 트리밍에서는 Jev가 고른 항목을 일반 항목 뒤에서 판정 점수순으로 고려합니다.
+
+포크에서는 최종 프롬프트에서 일치하는 문자열을 찾아 제거하는 대신 활성화 항목 구조에서 직접 제외합니다. 재귀 검색을 사용하면 최종 주입에서 제외된 로어도 앞선 검색 과정에서 다른 로어를 활성화했을 수 있습니다.
+
 ## ✨ Jev — 지금 장면에 필요한 로어를 골라 주입
 
 월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제로 발동한 Jev 로어에 🔮 표시가 붙습니다. 별도 검색이나 AI 호출은 없으며, 두 확장은 각각 단독 사용도 가능합니다.
@@ -396,44 +446,6 @@ Jev는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모�
 **Jev 전체 주입 예산은 RP 답변에 주입되는 토큰 한도입니다. Jev에 보내는 입력 토큰 한도가 아닙니다.** 선택한 판정 범위의 적격 항목을 모두 읽으므로 로어북이 클수록 입력 토큰이 늘어납니다. 나노GPT 모델 안내 기준 요청 전체 64K, 공통 배경과 질문 하나의 합 32K 제한에 맞춰 로컬 추정치 56K/28K로 계획합니다. 필요한 경우 질문을 자동 분할하고, 모든 판정 완료 후 예산을 적용합니다. 단일 질문도 한도를 넘으면 원문을 임의로 자르지 않고 중단합니다.
 
 Jev를 켜면 최근 대화, 일반 상시 주입 배경, 로어 본문이 외부 API인 나노GPT를 통해 Jev 모델에 전달됩니다. 이 점을 고려해서 사용하세요. 별도의 판정 API 요청으로 시간이 추가될 수 있으며, 구독 포함 여부와 사용량 한도는 [나노GPT 구독·결제 정책](https://nano-gpt.com/support)을 확인하세요. 구독이라고 무조건 무제한·무료인 것은 아닙니다.
-
-## ⚙️ 우선순위와 순서
-
-| 설정 | 설명 |
-|---|---|
-| **로어북 우선순위** | 1~5, 기본 3. 숫자가 클수록 먼저 처리합니다. |
-| **세부 순서 조정** | −10,000~+10,000. 양수는 앞당기고 음수는 늦춥니다. |
-| **그룹 채팅에만 적용** | 세부 순서 조정을 그룹 채팅에서만 적용합니다. |
-| **상시 주입 우선 보호** | 포크에서 추가한 전역 옵션. 직접 체크해야 적용됩니다. 상시 항목을 다른 항목보다 먼저 고려합니다. |
-
-별도 우선순위나 세부 순서 조정을 설정하지 않은 경우 실리태번의 기본 로어북 순서를 유지합니다. 원본의 처리 순서 계산은 `우선순위 × 10,000 + 세부 순서값 + 항목 순서`입니다(항목 순서값의 상한은 9,999). 큰 조정값은 다른 우선순위 단계에도 영향을 줄 수 있습니다. 우선순위는 월드 정보 처리 순서이며 항목의 프롬프트 삽입 위치나 활성화 조건을 바꾸지 않습니다.
-
-### 상시 주입 우선 보호
-
-모든 로어북에 공통 적용되며 기본값은 꺼짐입니다. 켜면 상시 항목의 예산을 먼저 확보합니다. Sticky 항목도 고려하고, 실제 삽입 순서값은 변경하지 않습니다. 기존에 명시적으로 저장한 켜짐/꺼짐 값은 유지합니다.
-
-상시 항목의 주입을 무조건 보장하는 기능은 아닙니다. 개별 또는 전체 예산을 초과하면 상시 항목도 순서대로 제외될 수 있습니다. 기존에 '예산 무시'가 설정된 항목은 그 설정을 유지합니다. 원래 순서 방식이 더 맞는 경우 끄면 됩니다.
-
-## 📦 로어북별 예산
-
-<p align="center">
-  <a href="assets/readme/mobile/stlo-budget-guide-mobile.svg"><img src="assets/readme/mobile/stlo-budget-guide-mobile.svg" alt="원본의 네 가지 토큰 예산과 포크의 상시 주입 우선 보호" width="860" /></a>
-</p>
-
-모든 로어북은 전체 월드 정보 예산을 공유합니다. 개별 예산은 미리 확보되는 공간이 아니라 해당 로어북의 최대 사용량입니다.
-
-| 예산 종류 | 설명 |
-|---|---|
-| **개별 제한 없음 (전체 예산 공유)** | 별도 STLO 제한을 추가하지 않습니다. |
-| **전체 월드 정보 예산의 비율 (%)** | 전체 월드 정보 예산의 1~100%를 최대치로 설정합니다. |
-| **최대 컨텍스트 크기의 비율 (%)** | 현재 사용 가능 컨텍스트의 1~100%를 최대치로 설정합니다. |
-| **직접 토큰 수 지정** | 양의 정수 토큰 수를 최대치로 지정합니다. |
-
-예를 들어 전체 월드 정보 예산이 8,000토큰이고 어떤 책을 25%로 설정했다면, 그 책은 최대 2,000토큰을 사용할 수 있습니다. 실제 주입량은 더 적을 수 있습니다.
-
-**예산 초과 시 항목을 무작위로 제외**는 원본 STLO의 랜덤 트리밍 기능입니다. 상시 주입 우선 보호를 켜면 상시 항목은 기존 순서를 유지하고 일반 항목을 섞습니다. 책별 예산 트리밍에서는 Jev가 고른 항목을 일반 항목 뒤에서 판정 점수순으로 고려합니다.
-
-포크에서는 최종 프롬프트에서 일치하는 문자열을 찾아 제거하는 대신 활성화 항목 구조에서 직접 제외합니다. 재귀 검색을 사용하면 최종 주입에서 제외된 로어도 앞선 검색 과정에서 다른 로어를 활성화했을 수 있습니다.
 
 ## 🔎 로어북별 벡터 유사도 임계값
 
