@@ -594,19 +594,31 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-budget-options { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; }
         .stlo-modal-ui .stlo-budget-value { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; }
         .stlo-modal-ui .stlo-budget-value input[type="number"] { width: 130px !important; max-width: 100%; margin: 0 !important; }
-        .stlo-modal-ui .stlo-advanced-drawer { width: 100%; margin: 3px 0 0; }
-        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-toggle { display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; width: max-content; max-width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 2px 4px 0; }
-        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-toggle > b { min-width: 0; }
-        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-icon { flex: 0 0 auto; margin-left: 0 !important; }
-        .stlo-modal-ui .stlo-advanced-drawer .inline-drawer-content { padding-top: 6px; }
-        .stlo-modal-ui .stlo-advanced-drawer .info-block { margin-bottom: 6px !important; }
-        .stlo-modal-ui .stlo-advanced-drawer .priority-section { margin-bottom: 9px; }
+        .stlo-modal-ui .stlo-advanced-drawer { width:100%; margin:3px 0 0; box-sizing:border-box; }
+        .stlo-modal-ui .stlo-advanced-drawer > summary { cursor:pointer; font-weight:600; padding:4px 0; }
+        .stlo-modal-ui .stlo-advanced-drawer > .stlo-group-body { padding-top:6px; width:100%; box-sizing:border-box; }
+        .stlo-modal-ui .stlo-group-cards { display:flex; flex-direction:column; gap:8px; margin-top:8px; width:100%; min-width:0; }
+        .stlo-modal-ui .stlo-group-cards:empty { margin-top:0; }
+        .stlo-modal-ui .stlo-group-card { display:flex; flex-direction:column; gap:6px; border:1px solid var(--SmartThemeBorderColor); border-radius:7px; padding:9px; width:100%; min-width:0; box-sizing:border-box; }
+        .stlo-modal-ui .stlo-group-card-head { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+        .stlo-modal-ui .stlo-group-card select { min-width:0; max-width:100%; margin:0 !important; box-sizing:border-box; }
+        .stlo-modal-ui .stlo-group-card > select { width:100% !important; }
+        .stlo-modal-ui .stlo-group-card .stlo-group-priority { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,156px); gap:6px; align-items:center; }
+        .stlo-modal-ui .stlo-group-card .stlo-group-priority select { width:100% !important; }
+        .stlo-modal-ui .stlo-group-card .stlo-group-adjust-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+        .stlo-modal-ui .stlo-group-card .stlo-group-adjust-row .stlo-option-line { width:auto; flex:1 1 auto; }
+        .stlo-modal-ui .stlo-group-card input.stlo-group-adjustment { width:86px !important; max-width:100%; min-width:0; margin:0 !important; box-sizing:border-box; }
+        .stlo-modal-ui .stlo-group-card input.stlo-group-adjustment[hidden] { display:none !important; }
+        .stlo-modal-ui .stlo-group-card .stlo-group-remove.menu_button { display:inline-flex; flex:0 0 25px; width:25px !important; min-width:25px; height:25px; align-items:center; justify-content:center; margin:0 !important; }
+        .stlo-modal-ui .stlo-group-add.menu_button { display:inline-flex; align-items:center; justify-content:center; gap:6px; width:auto !important; min-width:max-content; max-width:100%; margin:8px 0 0 !important; padding:4px 10px; white-space:nowrap; word-break:keep-all; }
+        .stlo-modal-ui .stlo-advanced-drawer .stlo-group-body > .stlo-toggle-block { margin-top:5px; }
         @media (max-width: 480px) {
             .stlo-modal-ui { gap: 6px; }
             .stlo-modal-ui .stlo-section { gap: 5px; padding-bottom: 8px; }
             .stlo-modal-ui .stlo-jev-field { grid-template-columns: minmax(0, 1fr) minmax(0, 132px); gap: 4px; }
             .stlo-modal-ui .stlo-jev-field > input[type="number"] { max-width:132px; }
             .stlo-modal-ui .stlo-jev-prompt-heading .stlo-field-heading { flex:1 1 130px; }
+            .stlo-modal-ui .stlo-group-card .stlo-group-priority { grid-template-columns:minmax(0,1fr) minmax(0,132px); }
         }
     `;
     document.head.appendChild(style);
@@ -1685,39 +1697,25 @@ async function openLorebookSettings(worldName = null) {
                 <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in group chats</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies when using this book in a group chat.')}</div>
                 </div>
             </div>` : ''}
-            <!-- Group chat controls share one section, without dividers between toggles. -->
             <div class="world_entry_form_control stlo-section stlo-group-section">
-                <div class="stlo-toggle-block">
-                    <div class="stlo-option-line">
-                        <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
-                        <input type="checkbox" id="lorebook-only-when-speaking"
-                               ${currentSettings.onlyWhenSpeaking ? 'checked' : ''}>
-                        <span class="checkmark"></span>
-                        <span data-i18n="stlo.modal.onlyWhenSpeaking.label">Group chats: Only activate for specific characters (requires character assignments below)</span>
-                    </label>
-                    <details class="stlo-info stlo-info-end">
-                        <summary aria-label="설명 보기">i</summary>
-                        <div class="stlo-info-body">
-                            <small data-i18n="stlo.modal.onlyWhenSpeaking.help.1">When enabled, this lorebook will only activate when characters assigned in Group Chat Overrides are speaking.</small>
-                            <small data-i18n="stlo.modal.onlyWhenSpeaking.help.2">If this box is checked but no characters are assigned below, this lorebook WILL NOT ACTIVATE during group chats.</small>
+                <details class="stlo-advanced-drawer">
+                    <summary data-i18n="stlo.modal.groupOverrides.title">Group Chat Overrides</summary>
+                    <div class="stlo-group-body">
+                        <small data-i18n="stlo.modal.groupOverrides.defaultPriority.help">Unassigned characters use the lorebook defaults. Only applies in group chats.</small>
+                        <div class="stlo-toggle-block">
+                            <div class="stlo-option-line">
+                                <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
+                                    <input type="checkbox" id="lorebook-only-when-speaking" ${currentSettings.onlyWhenSpeaking ? 'checked' : ''}>
+                                    <span class="checkmark"></span>
+                                    <span data-i18n="stlo.modal.onlyWhenSpeaking.label">Only use when an assigned character speaks</span>
+                                </label>
+                                ${infoHelp('stlo.modal.onlyWhenSpeaking.help.1', 'Use only on turns by the characters listed below. If none are listed, this book is skipped in group chats.')}
+                            </div>
                         </div>
-                    </details>
+                        <div id="advanced-priority-sections" class="stlo-group-cards"></div>
+                        <button type="button" class="menu_button stlo-group-add" id="stlo-group-add-character"><i class="fa-solid fa-plus" aria-hidden="true"></i><span data-i18n="stlo.modal.groupOverrides.add">Add character</span></button>
                     </div>
-                </div>
-
-            <!-- Group Chat Overrides -->
-            <div class="inline-drawer wide100p world_entry_form_control stlo-advanced-drawer">
-                <div class="inline-drawer-toggle inline-drawer-header">
-                    <b data-i18n="stlo.modal.groupOverrides.title">Group Chat Overrides</b>
-                    <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
-                </div>
-                <div class="inline-drawer-content">
-                    <div class="stlo-field-heading"><h4><span data-i18n="stlo.modal.groupOverrides.defaultPriority.title">Default Priority:</span> <span id="default-priority-display" data-i18n="stlo.modal.groupOverrides.defaultPriority.value">3 - Normal</span></h4><details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.groupOverrides.info">If a character is selected in here, the priority settings here will override the lorebook's default setting only during that character's speaking turns in a group chat.</small><small data-i18n="stlo.modal.groupOverrides.defaultPriority.help">Characters not specifically listed will use the priority level set above. Single-character chats always use the default.</small></div></details></div>
-                    <div id="advanced-priority-sections">
-                        <!-- Priority sections will be inserted here -->
-                    </div>
-                </div>
-            </div>
+                </details>
             </div>
             </div>
         `;
@@ -1793,9 +1791,9 @@ async function openLorebookSettings(worldName = null) {
                 }
 
                 // Validate character overrides (this may return null if duplicates found)
-                const hasRenderedOverrides = Boolean(document.getElementById('advanced-priority-sections')?.childElementCount);
+                const hasRenderedOverrides = document.getElementById('advanced-priority-sections')?.dataset.mounted === 'true';
                 const characterOverrides = hasRenderedOverrides
-                    ? getCharacterOverrides()
+                    ? getCharacterOverrides(currentSettings.characterOverrides || {})
                     : currentSettings.characterOverrides || {};
                 if (characterOverrides === null) {
                     return null; // Validation failed due to duplicate characters
@@ -2091,38 +2089,7 @@ function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
     // Set up Budget controls
     setupBudgetControls(modalEventListeners, currentSettings);
 
-    setupPriorityDisplaySync(modalEventListeners);
     setupDrawerBehavior(modalEventListeners, () => setupAdvancedBehavior(modalEventListeners, currentSettings));
-}
-
-/**
- * Set up priority display synchronization
- * @param {Array} modalEventListeners - Array to track event listeners for cleanup
- */
-function setupPriorityDisplaySync(modalEventListeners = []) {
-    const prioritySelect = document.getElementById(SELECTORS.LOREBOOK_PRIORITY_SELECT);
-    const priorityDisplay = document.getElementById('default-priority-display');
-
-    if (prioritySelect && priorityDisplay) {
-        const updatePriorityDisplay = () => {
-            const selectedOption = prioritySelect.options[prioritySelect.selectedIndex];
-            if (selectedOption) {
-                // Extract just the display text (e.g., "5 - Highest Priority (Processes First)" -> "5 - Highest Priority")
-                const displayText = selectedOption.textContent.replace(/ \(.*\)$/, '');
-                priorityDisplay.textContent = displayText;
-            }
-        };
-
-        prioritySelect.addEventListener('change', updatePriorityDisplay);
-
-        // Track listener for cleanup
-        modalEventListeners.push(
-            { element: prioritySelect, event: 'change', handler: updatePriorityDisplay }
-        );
-
-        // Set initial display
-        updatePriorityDisplay();
-    }
 }
 
 /**
@@ -2131,24 +2098,11 @@ function setupPriorityDisplaySync(modalEventListeners = []) {
  */
 function setupDrawerBehavior(modalEventListeners = [], mountOverrides) {
     const drawer = document.querySelector('.stlo-advanced-drawer');
-    const drawerIcon = drawer?.querySelector('.inline-drawer-icon');
-    const drawerToggle = drawer?.querySelector('.inline-drawer-toggle');
-
-    if (drawer && drawerIcon && drawerToggle) {
-        const drawerToggleHandler = (e) => {
-            e.preventDefault();
-            if (drawer.classList.toggle('openDrawer')) mountOverrides();
-            drawerIcon.classList.toggle('down');
-            drawerIcon.classList.toggle('up');
-        };
-
-        drawerToggle.addEventListener('click', drawerToggleHandler);
-
-        // Track listener for cleanup
-        modalEventListeners.push(
-            { element: drawerToggle, event: 'click', handler: drawerToggleHandler }
-        );
-    }
+    if (!drawer) return;
+    const onToggle = () => { if (drawer.open) mountOverrides(); };
+    drawer.addEventListener('toggle', onToggle);
+    modalEventListeners.push({ element: drawer, event: 'toggle', handler: onToggle });
+    onToggle();
 }
 
 // Render budget controls (mode + value)
@@ -2250,304 +2204,154 @@ function setupBudgetControls(modalEventListeners = [], currentSettings = {}) {
 }
 
 /**
- * Generate advanced mode priority sections
- * @returns {string} HTML string for priority sections
+ * Build per-character overrides on first expansion only. Saved keys are the
+ * same avatar filenames (without extension) used by the generation path.
  */
-function generateAdvancedContent() {
-    const priorityLevels = [
-        { level: 5 },
-        { level: 4 },
-        { level: 3 },
-        { level: 2 },
-        { level: 1 }
-    ];
-
-    const createPrioritySection = (priority) => `
-        <div class="priority-section world_entry_form_control MarginBot10" data-priority="${priority.level}">
-            <div class="stlo-field-heading">
-                <h4>${priority.level} - ${getPriorityName(priority.level)} ${translate('Priority', 'stlo.priority.label')}</h4>
-                <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small>${getPriorityDescription(priority.level)}</small></div></details>
+function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
+    const container = document.getElementById('advanced-priority-sections');
+    const add = document.getElementById('stlo-group-add-character');
+    if (!container || !add || container.dataset.mounted === 'true') return;
+    const stored = currentSettings.characterOverrides || {};
+    const roster = new Map();
+    for (const character of getContext()?.characters || []) {
+        const key = character?.avatar?.replace(/\.[^/.]+$/, '') || character?.name || '';
+        if (key && !roster.has(key)) roster.set(key, character?.name || key);
+    }
+    // Preserve overrides for temporarily missing/deleted characters. They can
+    // still be removed explicitly, but never disappear merely by opening UI.
+    for (const key of Object.keys(stored)) {
+        if (!roster.has(key)) roster.set(key, key + ' (' + translate('Not in character list', 'stlo.modal.groupOverrides.missing') + ')');
+    }
+    const counts = new Map();
+    for (const name of roster.values()) counts.set(name, (counts.get(name) || 0) + 1);
+    const rows = () => [...container.querySelectorAll('.stlo-group-card')];
+    const selectedKeys = () => new Set(rows().map(row => row.querySelector('.stlo-group-character').value).filter(Boolean));
+    const syncChoices = () => {
+        const selected = selectedKeys();
+        const currentRows = rows();
+        for (const row of currentRows) {
+            const select = row.querySelector('.stlo-group-character');
+            for (const option of select.options) {
+                option.disabled = option.value === '' || (option.value !== select.value && selected.has(option.value));
+            }
+        }
+        // Finish an empty card before adding another; never create five
+        // empty priority groups, and do not re-render existing cards.
+        add.disabled = currentRows.some(row => !row.querySelector('.stlo-group-character').value)
+            || ![...roster.keys()].some(key => !selected.has(key));
+    };
+    let serial = 0;
+    const addCard = (key = '', saved = {}) => {
+        const card = document.createElement('div');
+        card.className = 'stlo-group-card';
+        const id = 'stlo-group-card-' + (++serial);
+        card.innerHTML = `
+            <div class="stlo-group-card-head">
+                <label for="${id}-character" data-i18n="stlo.modal.groupOverrides.character">Character</label>
+                <button type="button" class="menu_button stlo-group-remove"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
             </div>
-
-            <div class="flex1 range-block MarginTop10">
-                <div class="range-block-title">
-                    <div class="flex-container justifySpaceBetween">
-                        <small data-i18n="stlo.modal.groupOverrides.characters">Characters</small>
-                    </div>
-                </div>
-                <div class="range-block-range">
-                    <select class="override-character-filter text_pole textarea_compact"
-                            id="priority-${priority.level}-characters"
-                            data-priority="${priority.level}"
-                            multiple>
-                        <option value="" data-i18n="stlo.modal.groupOverrides.placeholderPopulated">-- Characters will be populated --</option>
-                    </select>
-                </div>
+            <select id="${id}-character" class="text_pole textarea_compact stlo-group-character"></select>
+            <div class="stlo-group-priority">
+                <label for="${id}-priority" data-i18n="stlo.modal.groupOverrides.priority">Priority</label>
+                <select id="${id}-priority" class="text_pole textarea_compact stlo-group-priority-select"></select>
             </div>
-
-            <div class="flex1 MarginTop10">
+            <div class="stlo-group-adjust-row">
                 <div class="stlo-option-line">
-                    <label class="checkbox_label stlo-checkrow" for="override-order-adjustment-enabled-${priority.level}">
-                        <input type="checkbox" id="override-order-adjustment-enabled-${priority.level}"
-                               class="override-order-adjustment-enabled" data-priority="${priority.level}">
+                    <label class="checkbox_label stlo-checkrow" for="${id}-enabled">
+                        <input type="checkbox" id="${id}-enabled" class="stlo-group-adjust-enabled">
                         <span class="checkmark"></span>
                         <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
                     </label>
-                    <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.help">Fine-tune processing order within this priority level</small></div></details>
+                    ${infoHelp('stlo.modal.order.explain', 'Higher values process first. Range: -10000 to +10000.')}
                 </div>
-
-                <div class="override-order-adjustment-container" data-priority="${priority.level}"
-                     style="display: none;">
-                    <div class="stlo-field-heading">
-                        <h5 data-i18n="stlo.modal.order.title">Order Adjustment</h5>
-                        <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.explain">Higher values process first. Example: +250 for slight boost, -500 for lower priority.</small></div></details>
-                    </div>
-                    <div class="stlo-inline-number">
-                        <input type="number" class="text_pole textarea_compact override-order-adjustment"
-                               data-priority="${priority.level}" min="-10000" max="10000" step="1"
-                               value="0" placeholder="0" style="width: 100px;">
-                        <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small style="color: #888;" data-i18n="stlo.modal.order.range">-10k to +10k</small></div></details>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    return priorityLevels.map(createPrioritySection).join('');
-}
-
-/**
- * Set up behavior for advanced mode
- * @param {Array} modalEventListeners - Array to track event listeners for cleanup
- * @param {Object} currentSettings - Current lorebook settings
- */
-function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
-    const advancedSectionsContainer = document.getElementById('advanced-priority-sections');
-    if (!advancedSectionsContainer || advancedSectionsContainer.childElementCount) return;
-    advancedSectionsContainer.innerHTML = generateAdvancedContent();
-    applyLocale(advancedSectionsContainer);
-
-    // Set up override behavior for all priority levels
-    setupOverrideBehavior(modalEventListeners);
-
-    // Populate character selectors
-    populateCharacterSelectors();
-
-    // Initialize Select2
-    initializeSelect2();
-
-    // Populate saved character overrides
-    populateCharacterOverrides(currentSettings.characterOverrides || {});
-}
-
-/**
- * Set up override behavior for character-specific priority settings
- * @param {Array} modalEventListeners - Array to track event listeners for cleanup
- */
-function setupOverrideBehavior(modalEventListeners = []) {
-    const priorityLevels = [1, 2, 3, 4, 5];
-
-    for (const priority of priorityLevels) {
-        // Order adjustment behavior
-        const orderAdjustmentEnabled = document.querySelector(`.override-order-adjustment-enabled[data-priority="${priority}"]`);
-        const orderAdjustmentContainer = document.querySelector(`.override-order-adjustment-container[data-priority="${priority}"]`);
-        const orderAdjustmentInput = document.querySelector(`.override-order-adjustment[data-priority="${priority}"]`);
-
-        if (orderAdjustmentEnabled && orderAdjustmentContainer && orderAdjustmentInput) {
-            const orderAdjustmentChangeHandler = () => {
-                if (orderAdjustmentEnabled.checked) {
-                    orderAdjustmentContainer.style.display = 'block';
-                    if (orderAdjustmentInput.value === '' || orderAdjustmentInput.value === '0') {
-                        orderAdjustmentInput.value = '0';
-                    }
-                } else {
-                    orderAdjustmentContainer.style.display = 'none';
-                    orderAdjustmentInput.value = '0';
-                }
-            };
-
-            // Add input validation handler for order adjustment
-            const orderAdjustmentInputHandler = () => {
-                const value = parseInt(orderAdjustmentInput.value);
-                if (value < -10000) {
-                    orderAdjustmentInput.value = '-10000';
-                } else if (value > 10000) {
-                    orderAdjustmentInput.value = '10000';
-                }
-            };
-
-            orderAdjustmentEnabled.addEventListener('change', orderAdjustmentChangeHandler);
-            orderAdjustmentInput.addEventListener('input', orderAdjustmentInputHandler);
-
-            modalEventListeners.push(
-                { element: orderAdjustmentEnabled, event: 'change', handler: orderAdjustmentChangeHandler },
-                { element: orderAdjustmentInput, event: 'input', handler: orderAdjustmentInputHandler }
-            );
-
-            // Set initial state
-            orderAdjustmentChangeHandler();
+                <input type="number" id="${id}-adjustment" class="text_pole textarea_compact stlo-group-adjustment" min="-10000" max="10000" step="1" value="0">
+            </div>`;
+        const select = card.querySelector('.stlo-group-character');
+        select.add(new Option(translate('Select a character', 'stlo.modal.groupOverrides.characterPlaceholder'), ''));
+        for (const [value, name] of roster) {
+            select.add(new Option(counts.get(name) > 1 && name !== value ? name + ' (' + value + ')' : name, value));
         }
+        select.value = key;
+        const priority = card.querySelector('.stlo-group-priority-select');
+        for (const value of [5, 4, 3, 2, 1]) priority.add(new Option(value + ' - ' + getPriorityName(value), String(value)));
+        const base = Number(document.getElementById(SELECTORS.LOREBOOK_PRIORITY_SELECT)?.value);
+        const validPriority = value => Number.isInteger(value) && value >= 1 && value <= 5;
+        const savedPriority = Number(saved?.priority);
+        priority.value = String(validPriority(savedPriority) ? savedPriority : validPriority(base) ? base : 3);
+        const enabled = card.querySelector('.stlo-group-adjust-enabled');
+        const adjustment = card.querySelector('.stlo-group-adjustment');
+        const offset = Number(saved?.orderAdjustment) || 0;
+        adjustment.value = String(offset);
+        enabled.checked = offset !== 0;
+        adjustment.hidden = !enabled.checked;
+        adjustment.setAttribute('aria-label', translate('Order Adjustment', 'stlo.modal.order.title'));
+        const remove = card.querySelector('.stlo-group-remove');
+        remove.title = translate('Remove character', 'stlo.modal.groupOverrides.remove');
+        remove.setAttribute('aria-label', remove.title);
+        container.appendChild(card);
+        applyLocale(card);
+        return card;
+    };
+    // One delegated listener per event; removing a card releases its DOM.
+    const onChange = event => {
+        if (event.target.matches('.stlo-group-character')) syncChoices();
+        else if (event.target.matches('.stlo-group-adjust-enabled')) {
+            const input = event.target.closest('.stlo-group-card').querySelector('.stlo-group-adjustment');
+            input.hidden = !event.target.checked;
+            if (!event.target.checked) input.value = '0';
+        }
+    };
+    const onClick = event => {
+        const button = event.target.closest('.stlo-group-remove');
+        if (!button) return;
+        button.closest('.stlo-group-card').remove();
+        syncChoices();
+    };
+    const onAdd = () => {
+        if (add.disabled) return;
+        const card = addCard();
+        syncChoices();
+        card.querySelector('.stlo-group-character').focus();
+    };
+    for (const [key, value] of Object.entries(stored)) addCard(key, value);
+    for (const [element, event, handler] of [[container, 'change', onChange], [container, 'click', onClick], [add, 'click', onAdd]]) {
+        element.addEventListener(event, handler);
+        modalEventListeners.push({ element, event, handler });
     }
+    container.dataset.mounted = 'true';
+    syncChoices();
 }
 
-/**
- * Populate character selectors with available characters
- */
-function populateCharacterSelectors() {
-    const context = getContext();
-    const characters = context?.characters || [];
-
-    const priorityLevels = [1, 2, 3, 4, 5];
-
-    for (const priority of priorityLevels) {
-        const selector = document.querySelector(`.override-character-filter[data-priority="${priority}"]`);
-        if (selector) {
-            // Clear existing options except the placeholder
-            selector.innerHTML = '';
-
-            // Add default option
-            if (characters.length === 0) {
-                const defaultOption = document.createElement('option');
-                defaultOption.value = '';
-                defaultOption.textContent = translate('-- No characters found --', 'stlo.modal.groupOverrides.noChars');
-                selector.appendChild(defaultOption);
-            } else {
-                const defaultOption = document.createElement('option');
-                defaultOption.value = '';
-                defaultOption.textContent = translate('-- Select characters --', 'stlo.modal.groupOverrides.placeholderSelect');
-                selector.appendChild(defaultOption);
-
-                // Add character options
-                characters.forEach((character) => {
-                    const option = document.createElement('option');
-                    const name = (character?.avatar?.replace(/\.[^/.]+$/, '') || character?.name || '');
-                    option.value = name;
-                    option.textContent = name;
-                    option.setAttribute('data-type', 'character');
-                    selector.appendChild(option);
-                });
-            }
+/** Preserve the existing override map and any additional per-character fields. */
+function getCharacterOverrides(existing = {}) {
+    const container = document.getElementById('advanced-priority-sections');
+    if (container?.dataset.mounted !== 'true') return existing;
+    const overrides = new Map();
+    for (const row of container.querySelectorAll('.stlo-group-card')) {
+        const key = row.querySelector('.stlo-group-character').value;
+        if (!key) {
+            toastr.error(translate('Select a character or remove the empty card.', 'stlo.modal.groupOverrides.emptyCard'));
+            return null;
         }
+        if (overrides.has(key)) {
+            toastr.error(translate('Choose each character only once.', 'stlo.modal.groupOverrides.duplicate'));
+            return null;
+        }
+        const priority = Number(row.querySelector('.stlo-group-priority-select').value);
+        const enabled = row.querySelector('.stlo-group-adjust-enabled').checked;
+        const raw = row.querySelector('.stlo-group-adjustment').value;
+        const orderAdjustment = enabled ? Number(raw) : 0;
+        if (!Number.isInteger(priority) || priority < 1 || priority > 5) {
+            toastr.error(translate('Priority value must be between 1 and 5', 'stlo.validation.priorityRange'));
+            return null;
+        }
+        if ((enabled && !raw.trim()) || !Number.isInteger(orderAdjustment) || orderAdjustment < -10000 || orderAdjustment > 10000) {
+            toastr.error(translate('Order adjustment must be between -10000 and 10000', 'stlo.validation.orderAdjustmentRange'));
+            return null;
+        }
+        overrides.set(key, { ...(Object.hasOwn(existing, key) ? existing[key] : {}), priority, orderAdjustment });
     }
-}
-
-/**
- * Populate character overrides from saved settings
- * @param {Object} characterOverrides - Saved character overrides
- */
-function populateCharacterOverrides(characterOverrides = {}) {
-    // Iterate through saved overrides and populate the form
-    Object.entries(characterOverrides).forEach(([character, settings]) => {
-        const priority = settings.priority;
-        if (!priority || priority < 1 || priority > 5) return;
-
-        // Find the character selector for this priority level
-        const characterSelect = document.querySelector(`.override-character-filter[data-priority="${priority}"]`);
-        if (characterSelect) {
-            // Add the character to the selection
-            $(characterSelect).val([...($(characterSelect).val() || []), character]).trigger('change');
-
-            // Set order adjustment if it exists and is not 0
-            if (settings.orderAdjustment !== undefined && settings.orderAdjustment !== 0) {
-                const orderAdjustmentEnabled = document.querySelector(`.override-order-adjustment-enabled[data-priority="${priority}"]`);
-                const orderAdjustmentInput = document.querySelector(`.override-order-adjustment[data-priority="${priority}"]`);
-                const orderAdjustmentContainer = document.querySelector(`.override-order-adjustment-container[data-priority="${priority}"]`);
-
-                if (orderAdjustmentEnabled) {
-                    orderAdjustmentEnabled.checked = true;
-                    // Trigger change event to update UI
-                    orderAdjustmentEnabled.dispatchEvent(new Event('change'));
-                }
-
-                if (orderAdjustmentInput) {
-                    orderAdjustmentInput.value = settings.orderAdjustment;
-                }
-
-                if (orderAdjustmentContainer) {
-                    orderAdjustmentContainer.style.display = 'block';
-                }
-            }
-        }
-    });
-}
-
-/**
- * Initialize Select2 for character selectors in override popup
- */
-function initializeSelect2() {
-    const priorityLevels = [1, 2, 3, 4, 5];
-
-    for (const priority of priorityLevels) {
-        const selector = document.querySelector(`.override-character-filter[data-priority="${priority}"]`);
-        if (selector && typeof $ === 'function' && $.fn?.select2 && $(selector).length) {
-            $(selector).select2({
-                width: '100%',
-                placeholder: translate('Select characters for this priority level...', 'stlo.modal.groupOverrides.selectPlaceholder'),
-                allowClear: true,
-                closeOnSelect: false,
-                dropdownParent: $(selector).closest('.popup-content, .popup-body, [role="dialog"]').first()
-            });
-        }
-    }
-}
-
-/**
- * Get character overrides from form
- * @returns {Object} Character overrides object
- */
-function getCharacterOverrides() {
-    const overrides = {};
-    const characterAssignments = {}; // Track which priorities each character is assigned to
-    const prioritySections = document.querySelectorAll('.priority-section');
-
-    prioritySections.forEach(section => {
-        const priority = section.getAttribute('data-priority');
-        const characterSelect = section.querySelector('select[data-priority="' + priority + '"].override-character-filter');
-
-        if (characterSelect && characterSelect.value) {
-            const selectedChars = $(characterSelect).val() || [];
-
-            selectedChars.forEach(chid => {
-                // Track priority assignments for duplicate detection
-                if (!characterAssignments[chid]) {
-                    characterAssignments[chid] = [];
-                }
-                characterAssignments[chid].push(parseInt(priority));
-
-                // Get order adjustment values
-                const orderAdjustmentEnabled = section.querySelector(`input[data-priority="${priority}"].override-order-adjustment-enabled`);
-                const orderAdjustmentInput = section.querySelector(`input[data-priority="${priority}"].override-order-adjustment`);
-                const orderAdjustment = (orderAdjustmentEnabled && orderAdjustmentEnabled.checked && orderAdjustmentInput)
-                    ? parseInt(orderAdjustmentInput.value) || 0
-                    : 0;
-
-                overrides[chid] = {
-                    priority: parseInt(priority),
-                    orderAdjustment: orderAdjustment
-                };
-            });
-        }
-    });
-
-    // Check for duplicates and block saving if found
-    const duplicates = Object.entries(characterAssignments).filter(([chid, priorities]) => priorities.length > 1);
-
-    if (duplicates.length > 0) {
-        const context = getContext();
-        const duplicateMessages = duplicates.map(([chid, priorities]) => {
-            const char = context?.characters?.find(c => ((c?.avatar?.replace(/\.[^/.]+$/, '')) || c?.name) === chid);
-            const charName = char?.name || chid;
-            const priorityNames = priorities.map(p => `${p} - ${getPriorityName(p)}`).join(', ');
-            return `• ${charName}: assigned to priorities ${priorityNames}`;
-        });
-
-        const errorMessage = `Cannot save: Characters assigned to multiple priority levels.\n\n${duplicateMessages.join('\n')}\n\nPlease assign each character to only one priority level.`;
-
-        toastr.error(errorMessage, 'Duplicate Character Assignments', { timeOut: 8000 });
-        return null; // Return null to indicate validation failure
-    }
-
-    return overrides;
+    return Object.fromEntries(overrides);
 }
 
 /**
@@ -2564,22 +2368,6 @@ function getPriorityName(priority) {
         1: translate('Lowest', 'stlo.priority.name.1')
     };
     return names[priority] || 'Unknown';
-}
-
-/**
- * Get priority level description for display
- * @param {number} priority - Priority level (1-5)
- * @returns {string} Priority description
- */
-function getPriorityDescription(priority) {
-    const descriptions = {
-        5: translate('Processes first', 'stlo.priority.desc.5'),
-        4: translate('High priority processing', 'stlo.priority.desc.4'),
-        3: translate('Standard priority (SillyTavern default)', 'stlo.priority.desc.3'),
-        2: translate('Lower priority processing', 'stlo.priority.desc.2'),
-        1: translate('Processes last', 'stlo.priority.desc.1')
-    };
-    return descriptions[priority] || 'Unknown';
 }
 
 /**

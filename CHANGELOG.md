@@ -2,6 +2,12 @@
 
 **← [Back to README](README.md)**
 
+## Ambasa fork — character cards (November 25, 2026)
+- Replace five priority-group panels with one card per configured character. Add or remove cards without rebuilding the others; prevent duplicate selections.
+- Keep each character's saved priority, order adjustment and other stored fields. Unopened drawers preserve overrides; explicitly removing all cards saves an empty map.
+- Move the only-when-speaking switch into the group chat drawer. Use native disclosure controls and lazy mount with no observers or polling.
+- Validation: 31 Node tests passed; isolated Chromium checks at 1024px and 360px passed, including existing override preservation, independent edits, deletion, cancellation and adjacent Jev/budget controls. Live SillyTavern validation remains pending.
+
 ## Ambasa fork — simplified settings (November 25, 2026)
 - Restore global always-on protection to the selected lorebook budget dialog. Save it separately from book data; the picker only selects a book.
 - Align group priority and order-adjustment help icons with their labels.

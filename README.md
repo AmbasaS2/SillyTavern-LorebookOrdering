@@ -183,9 +183,9 @@ Different threshold groups can increase vector requests, latency, and provider c
 
 ## 🎭 Group Chat Overrides
 
-The original group-chat controls remain available. Expand **Group Chat Overrides** to assign characters to priority levels and optionally adjust order for those characters. Unassigned characters use the book's normal priority.
+Expand **Group Chat Overrides** and use **Add character** to create a card for each character you want to configure. Set each character's priority and optional order adjustment independently. Unassigned characters use the book's normal settings. Existing overrides are loaded without changing their saved format.
 
-Enable **Only activate for specific characters** to limit the book to turns by assigned characters. If enabled without assignments, the book is excluded on group-chat speaking turns. Single-character chats use the normal settings.
+Inside the same drawer, enable **Only use when an assigned character speaks** to limit the book to turns by assigned characters. If enabled without assignments, the book is excluded on group-chat speaking turns. Single-character chats use the normal settings.
 
 ## 🔧 What This Fork Changes
 
@@ -395,9 +395,9 @@ Jev를 사용하지 않을 때 기존 벡터화된 로어북을 검색하는 유
 
 ## 🎭 그룹 채팅
 
-원본의 **그룹 채팅 캐릭터별 설정**을 펼치면 우선순위 단계별 캐릭터와 세부 순서를 지정할 수 있습니다. 별도로 지정하지 않은 캐릭터는 책의 기본값을 사용합니다.
+**그룹 채팅 캐릭터별 설정**을 펼쳐 **캐릭터 추가**를 누르면 필요한 캐릭터만 카드로 등록할 수 있습니다. 각 카드에서 우선순위와 세부 순서를 독립적으로 지정합니다. 기존 설정을 그대로 불러오며 미지정 캐릭터는 책의 기본값을 사용합니다.
 
-**지정한 캐릭터가 말할 때만 사용**을 켜면 배정한 캐릭터의 그룹 채팅 발언 차례에만 해당 로어북을 사용합니다. 배정한 캐릭터가 없으면 그룹 채팅 발언 차례에 해당 책이 제외됩니다. 1:1 채팅은 일반 설정을 사용합니다.
+같은 그룹 채팅 설정 안에서 **지정한 캐릭터가 말할 때만 사용**을 켜면 배정한 캐릭터의 그룹 채팅 발언 차례에만 해당 로어북을 사용합니다. 배정한 캐릭터가 없으면 그룹 채팅 발언 차례에 해당 책이 제외됩니다. 1:1 채팅은 일반 설정을 사용합니다.
 
 ## 🔧 원본과 달라진 점
 
