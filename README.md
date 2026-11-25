@@ -6,6 +6,8 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 
 [English](#-installation-and-first-steps) · [한국어](#-stlo-포크--로어북-예산-관리) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
+**Start here:** If one book uses too many tokens, open **Lorebook Budget Management**. If your RP forgets relevant old events, open **Lorebook Jev Recall**. These are independent menus; Jev is optional and off for new characters. This extension recalls existing lore; it does not create memories.
+
 ## Who is this for?
 
 - Long-running roleplays where old promises and events are hard to recall, but irrelevant lore often appears.
@@ -17,6 +19,9 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 
 ## 📸 Settings Preview
 
+<p align="center"><img src="assets/readme/mobile/stlo-settings-guide-mobile.svg" alt="Multi-book budget manager / 로어북 예산 관리" width="860" /></p>
+
+<p align="center"><img src="assets/readme/mobile/stlo-jev-settings-guide-mobile.svg" alt="Separate Jev settings / 로어북 Jev 호출" width="860" /></p>
 
 The diagrams in this README are illustrated guides based on the fork's settings, not screenshots. The bilingual labels explain the controls; the current interface retains Korean-only labels for some fork-specific controls.
 
@@ -222,6 +227,8 @@ Inside the same drawer, enable **Only use when an assigned character speaks** to
 
 [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [원본 STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
+**딱 두 가지만 기억하세요.** 로어북이 토큰을 너무 많이 쓰면 **로어북 예산 관리**, 지금 장면에 필요한 과거 기억을 못 찾으면 **로어북 Jev 호출**을 사용하세요. 두 메뉴는 독립적이며 Jev는 선택 기능입니다. 새 캐릭터는 기본적으로 꺼져 있습니다. 새 기억을 만드는 확장은 아닙니다.
+
 ## 이런 분들께 추천합니다!
 
 - 장기 롤플 중 예전에 했던 약속이나 중요한 사건은 잘 안 불려 오고 관계없는 로어만 들어가는 분
@@ -233,6 +240,9 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## 📸 설정 화면
 
+<p align="center"><img src="assets/readme/mobile/stlo-settings-guide-mobile.svg" alt="여러 로어북 카드 / Multi-book budget manager" width="860" /></p>
+
+<p align="center"><img src="assets/readme/mobile/stlo-jev-settings-guide-mobile.svg" alt="별도 Jev 호출 설정 / Jev Recall" width="860" /></p>
 
 이미지는 현재 코드에 맞춘 한영 병기 기능 안내입니다. 실제 화면 캡처가 아니며, 새로 추가한 메뉴·일부 설정의 실제 화면 표기는 현재 한국어로 고정되어 있습니다.
 
