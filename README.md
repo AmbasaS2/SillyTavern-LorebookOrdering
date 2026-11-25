@@ -1,10 +1,10 @@
-# 📚 ST Lorebook Ordering (STLO) — Ambasa Fork
+# 📚 ST Lorebook Ordering (STLO)
 
 **Scene-aware lore recall with Jev, plus lorebook priorities, token budgets, always-on protection, and optional per-lorebook vector thresholds for SillyTavern.**
 
 This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), based on upstream v2.2.4. The original extension provides the core priority, budget, order adjustment, random trimming, and group-chat features. This fork retains those features and adds Jev-based lore selection, always-on protection, and book-specific vector settings. Many thanks to aikohanasaki for the original design and implementation.
 
-[English](#-installation-and-first-steps) · [한국어](#-stlo-포크--로어북-예산-관리) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
+[English](#-installation-and-first-steps) · [한국어](#-stlo--로어북-예산-관리) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
 **Start here:** If one book uses too many tokens, open **Lorebook Budget Management**. If your RP forgets relevant old events, open **Lorebook Jev Recall**. These are independent menus; Jev is optional and off for new characters. This extension recalls existing lore; it does not create memories.
 
@@ -21,7 +21,8 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 
 ### Works alone, better together
 
-Memory Books creates and maintains memories; STLO recalls them like other eligible lore. WorldInfo Info can show confirmed Jev activation, and Lorebook Manager can read those entries. None is required. Jev never changes the RP model or the saved lore.
+> [!TIP]
+> Memory Books creates and maintains memories; STLO recalls them like other eligible lore. WorldInfo Info can show confirmed Jev activation, and Lorebook Manager can read those entries. None is required. Jev never changes the RP model or the saved lore.
 
 [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info / 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) · [Four-extension workflow guide (Korean, bilingual diagrams)](https://app.notion.com/p/423a96b06fd48147be13ec0929ee088d)
 
@@ -215,7 +216,7 @@ Inside the same drawer, enable **Only use when an assigned character speaks** to
 
 ## 🔧 What This Fork Changes
 
-| Feature | Original STLO v2.2.4 | Ambasa fork |
+| Feature | Original STLO v2.2.4 | Current version |
 |---|---|---|
 | Jev scene-aware recall | Not included | Optional decision-model recall with shared and per-book budgets |
 | Priority, order, budget modes, random trim | Included | Retained |
@@ -242,7 +243,7 @@ If an always-on entry disappears, first check whether its full text fits both th
 
 ---
 
-# 📚 STLO 포크 · 로어북 예산 관리
+# 📚 STLO · 로어북 예산 관리
 
 **Jev(Jev)로 현재 RP에 필요한 로어를 골라 주입하고, 로어북별 우선순위와 토큰 예산까지 관리하는 실리태번 확장입니다.**
 
@@ -263,7 +264,8 @@ If an always-on entry disappears, first check whether its full text fits both th
 
 ### 단독으로도 충분하고, 함께 쓰면 더 편리합니다
 
-메모리북은 기억을 저장하고 STLO는 그 기억을 포함한 기존 로어를 호출합니다. 월드인포인포에서는 실제 Jev 발동을 확인하고 로어북 매니저에서는 내용을 읽을 수 있습니다. 모두 선택 사항이며 STLO는 원문과 RP 모델을 변경하지 않습니다.
+> [!TIP]
+> 메모리북은 기억을 저장하고 STLO는 그 기억을 포함한 기존 로어를 호출합니다. 월드인포인포에서는 실제 Jev 발동을 확인하고 로어북 매니저에서는 내용을 읽을 수 있습니다. 모두 선택 사항이며 STLO는 원문과 RP 모델을 변경하지 않습니다.
 
 [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info / 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) · [4개 확장 연동 사용설명서](https://app.notion.com/p/423a96b06fd48147be13ec0929ee088d)
 
