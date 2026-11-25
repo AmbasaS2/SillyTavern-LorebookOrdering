@@ -30,7 +30,7 @@ The diagrams in this README are illustrated guides based on the fork's settings,
    ```
 
 3. Install and reload SillyTavern. Use a recent SillyTavern version with the `WORLDINFO_SCAN_DONE` event (e.g. the 1.18 series) for Jev and per-lorebook budget trimming.
-4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, choose a lorebook, configure its budget and priority, and save. For character-level Jev activation and shared settings, open **Jev injection settings** directly from the extensions menu.
+4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, edit one or more lorebooks in collapsible cards, then save them together. For character-level Jev activation and shared settings, open **Jev injection settings** directly from the extensions menu.
 
 ## 🧭 How to Use
 
@@ -46,10 +46,12 @@ The original slash command is retained: `/stlo My Lorebook` selects the named bo
 
 Book-specific controls are in Lorebook Budget Management; character-level Jev and shared controls are in Jev injection settings. You do not need to change every option.
 
+The budget manager opens the current linked book (or the first available linked book). Use **Add lorebook** to select more attached books; **Show all lorebooks** reveals the rest. Each card collapses independently and shows priority and budget. Removing a card does not delete or unlink a book. Only changed settings are written; failed saves remain in the manager for retry. Global always-on protection is saved once for all books.
+
 | Control | When to use it |
 |---|---|
 | Lorebook priority (1–5) | Give important books first consideration. Normal is 3. |
-| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Shared setting in the selected book’s budget editor, on by default. |
+| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Shared setting at the top of the budget manager, on by default. |
 | Order adjustment | Fine-tune ordering only when ordinary priority levels are not enough. |
 | Per-book budget | Set a maximum contribution for this book. With Jev, this is also its preferred share of the common budget. |
 | Random trim | Vary which already-active ordinary entries fit if the same ones always win. |
@@ -244,7 +246,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
    ```
 
 3. 설치 후 새로고침합니다. Jev 및 로어북별 예산 트리밍은 `WORLDINFO_SCAN_DONE`을 지원하는 최근 버전(예: 1.18 계열)을 권장합니다.
-4. **확장 메뉴 → 로어북 예산 관리**에서 책을 선택하고 예산·우선순위를 설정한 뒤 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **Jev 주입 설정**에서 바로 변경합니다.
+4. **확장 메뉴 → 로어북 예산 관리**에서 필요한 로어북을 카드로 추가하고 예산·우선순위를 한 번에 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **Jev 주입 설정**에서 바로 변경합니다.
 
 ## 🧭 사용 흐름
 
@@ -260,10 +262,12 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 책별 설정은 로어북 예산 관리, 캐릭터별 Jev 사용 여부와 공통값은 Jev 주입 설정으로 나뉩니다. 모든 기능을 사용할 필요는 없습니다.
 
+로어북 예산 관리에서는 현재 캐릭터와 연결된 책을 기본으로 표시하고 **로어북 추가**로 다른 연결 책을 고를 수 있습니다. **모든 로어북 보기**를 켜면 다른 책도 추가할 수 있습니다. 카드마다 접기·펼치기와 우선순위·예산 요약을 지원합니다. X는 편집 목록에서만 제외하며 책이나 연결을 삭제하지 않습니다. 바꾼 설정만 저장하고, 저장 확인에 실패한 책은 다시 시도할 수 있습니다.
+
 | 설정 | 언제, 어떻게 쓰나요? |
 |---|---|
 | 로어북 우선순위 (1–5) | 중요한 책을 먼저 처리하고 싶을 때 높입니다. 기본 3. |
-| 상시 주입 우선 보호 | 선택한 로어북의 예산 설정에 있는 공통 옵션입니다. 파란불 항목을 먼저 넣으며 기본 켜짐입니다. |
+| 상시 주입 우선 보호 | 로어북 예산 관리 최상단의 공통 옵션입니다. 파란불 항목을 먼저 넣으며 기본 켜짐입니다. |
 | 세부 순서 조정 | 같은 우선순위 내에서 좀 더 세밀하게 순서를 바꾸고 싶을 때만 사용합니다. |
 | 예산 | 해당 책의 최대 주입량입니다. Jev 사용 시 관련 로어에 이 예산을 우선 배정합니다. |
 | 예산 초과 시 항목을 무작위로 제외 | 이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다. |

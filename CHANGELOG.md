@@ -2,6 +2,13 @@
 
 **← [Back to README](README.md)**
 
+## Ambasa fork — multi-lorebook manager (November 25, 2026)
+- Open the budget manager directly, with collapsible book cards and live priority/budget summaries. Add linked books by default, or show all books; remove only editor cards without touching lore or connections.
+- Move the global always-on protection control to the manager header. Keep per-book advanced and group settings independently scoped with unique control IDs.
+- Stage settings until save, validate changes before writing, and merge only changed fields into current books. Verify each native save against persisted values; partial failures stay open for retry without resaving completed cards. Native save notifications are not duplicated.
+- Existing generation, Jev, priority and budget engines remain unchanged. Native disclosure controls and event handlers only; no new observers, polling or global redraw loops.
+- Validation: Node tests and isolated Chromium multi-card checks at 1024px and 360px passed. Actual installed SillyTavern and live persistence verification remain pending.
+
 ## Ambasa fork — character cards (November 25, 2026)
 - Replace five priority-group panels with one card per configured character. Add or remove cards without rebuilding the others; prevent duplicate selections.
 - Keep each character's saved priority, order adjustment and other stored fields. Unopened drawers preserve overrides; explicitly removing all cards saves an empty map.

@@ -328,7 +328,6 @@ const PRIORITY_LEVELS = {
 // Extension state tracking
 const EXTENSION_STATE = {
     modalOpen: false,
-    pendingAnimationFrame: null,
     currentSpeakingCharacter: null,  // Track current speaking character for group chat overrides
     budgetHandlersRegistered: false,
     // These settings were read once when the current World Info scan began.
@@ -612,8 +611,39 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-group-card .stlo-group-remove.menu_button { display:inline-flex; flex:0 0 25px; width:25px !important; min-width:25px; height:25px; align-items:center; justify-content:center; margin:0 !important; }
         .stlo-modal-ui .stlo-group-add.menu_button { display:inline-flex; align-items:center; justify-content:center; gap:6px; width:auto !important; min-width:max-content; max-width:100%; margin:8px 0 0 !important; padding:4px 10px; white-space:nowrap; word-break:keep-all; }
         .stlo-modal-ui .stlo-advanced-drawer .stlo-group-body > .stlo-toggle-block { margin-top:5px; }
+        .stlo-book-manager { gap:10px; }
+        .stlo-book-manager .stlo-manager-top { gap:6px; padding-bottom:9px; }
+        .stlo-book-manager .stlo-manager-heading { display:flex; align-items:center; gap:7px; padding-bottom:3px; }
+        .stlo-book-manager .stlo-manager-heading h3 { margin:0; }
+        .stlo-book-manager .stlo-manager-heading i { font-size:1.05em; }
+        .stlo-book-manager .stlo-book-cards { display:flex; flex-direction:column; gap:9px; width:100%; min-width:0; }
+        .stlo-book-manager .stlo-book-cards:empty { display:none; }
+        .stlo-book-manager .stlo-book-card { position:relative; width:100%; min-width:0; box-sizing:border-box; border:1px solid var(--SmartThemeBorderColor, #8885); border-radius:8px; }
+        .stlo-book-manager .stlo-book-disclosure { width:100%; margin:0; box-sizing:border-box; }
+        .stlo-book-manager .stlo-book-disclosure > summary { display:flex; align-items:center; gap:8px; cursor:pointer; min-width:0; padding:10px 42px 10px 12px; list-style:none; }
+        .stlo-book-manager .stlo-book-disclosure > summary::-webkit-details-marker { display:none; }
+        .stlo-book-manager .stlo-book-disclosure > summary::before { content:""; flex:0 0 7px; width:7px; height:7px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(-45deg); opacity:.75; }
+        .stlo-book-manager .stlo-book-disclosure[open] > summary::before { transform:rotate(45deg); }
+        .stlo-book-manager .stlo-book-heading { display:flex; flex-direction:column; gap:2px; min-width:0; overflow-wrap:anywhere; }
+        .stlo-book-manager .stlo-book-title { font-size:1em; line-height:1.35; }
+        .stlo-book-manager .stlo-book-summary { font-size:.82em; font-weight:400; opacity:.72; }
+        .stlo-book-manager .stlo-book-remove.menu_button { position:absolute; top:10px; right:10px; display:inline-flex; align-items:center; justify-content:center; width:25px !important; min-width:25px; height:25px; padding:0; margin:0 !important; }
+        .stlo-book-manager .stlo-book-body { padding:11px; border-top:1px solid var(--SmartThemeBorderColor, #8885); box-sizing:border-box; min-width:0; }
+        .stlo-book-manager .stlo-book-picker { width:100% !important; min-width:0; margin:0 !important; box-sizing:border-box; }
+        .stlo-book-manager .stlo-book-editor { display:flex; flex-direction:column; gap:8px; min-width:0; }
+        .stlo-book-manager .stlo-book-editor .stlo-section { gap:5px; padding-bottom:8px; }
+        .stlo-book-manager .stlo-book-editor .stlo-section:last-child { padding-bottom:0; }
+        .stlo-book-manager .stlo-book-editor .stlo-section > select, .stlo-book-manager .stlo-budget-options > select { width:100% !important; }
+        .stlo-book-manager .stlo-book-advanced { width:100%; }
+        .stlo-book-manager .stlo-book-advanced > summary { font-weight:600; cursor:pointer; padding:3px 0; }
+        .stlo-book-manager .stlo-book-advanced-body { display:flex; flex-direction:column; gap:8px; padding:7px 0 0; min-width:0; }
+        .stlo-book-manager .stlo-book-vector { display:flex; flex-direction:column; gap:4px; width:100%; min-width:0; }
+        .stlo-book-manager .stlo-book-vector input { width:min(100%, 156px) !important; margin:0 !important; }
+        .stlo-book-manager .stlo-manager-add.menu_button { display:inline-flex; align-items:center; justify-content:center; gap:6px; width:100% !important; min-width:0; padding:7px; margin:0 !important; white-space:nowrap; word-break:keep-all; }
+        .stlo-book-manager .stlo-manager-status:empty, .stlo-book-manager .stlo-manager-empty[hidden] { display:none !important; }
         @media (max-width: 480px) {
             .stlo-modal-ui { gap: 6px; }
+            .stlo-book-manager .stlo-book-body { padding:9px; }
             .stlo-modal-ui .stlo-section { gap: 5px; padding-bottom: 8px; }
             .stlo-modal-ui .stlo-jev-field { grid-template-columns: minmax(0, 1fr) minmax(0, 132px); gap: 4px; }
             .stlo-modal-ui .stlo-jev-field > input[type="number"] { max-width:132px; }
@@ -656,83 +686,11 @@ function getCurrentCharacterLinkedLorebooks() {
 }
 
 /**
- * Open the STLO editor from the extensions menu. During a character chat,
- * show attached character lorebooks first; the checkbox reveals all books.
- * This filter is display-only and never changes lorebook connections.
+ * Open the multi-book STLO manager directly. Its add list defaults to
+ * the current character's attached lorebooks.
  */
 async function openLorebookBudgetFromMenu() {
-    const available = (Array.isArray(world_names) ? world_names : [])
-        .filter(name => typeof name === 'string' && name.trim() !== '');
-    if (available.length === 0) {
-        toastr.info(translate('Create or select a World Info file first.', 'stlo.info.noLorebook'));
-        return;
-    }
-
-    const linked = getCurrentCharacterLinkedLorebooks();
-    const current = getCurrentLorebookName();
-    const form = document.createElement('div');
-    form.className = 'world_entry_form_control';
-    const label = document.createElement('label');
-    label.htmlFor = 'stlo_menu_lorebook_select';
-    label.textContent = '로어북 선택';
-
-    const select = document.createElement('select');
-    select.id = 'stlo_menu_lorebook_select';
-    select.className = 'text_pole textarea_compact';
-
-    const allLabel = document.createElement('label');
-    allLabel.className = 'checkbox_label';
-    allLabel.style.marginTop = '10px';
-    const showAll = document.createElement('input');
-    showAll.type = 'checkbox';
-    showAll.id = 'stlo_menu_show_all_lorebooks';
-    showAll.checked = linked === null;
-    showAll.disabled = linked === null;
-    const checkmark = document.createElement('span');
-    checkmark.className = 'checkmark';
-    const allText = document.createElement('span');
-    allText.textContent = '모든 로어북 보기';
-    allLabel.append(showAll, checkmark, allText);
-
-    const updateOptions = () => {
-        const names = showAll.checked || linked === null
-            ? available
-            : available.filter(name => linked.has(name));
-        const previous = select.value;
-        select.replaceChildren();
-        if (names.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = '연결된 로어북이 없습니다';
-            option.disabled = true;
-            select.appendChild(option);
-            select.value = '';
-            return;
-        }
-        for (const name of names) {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            select.appendChild(option);
-        }
-        select.value = names.includes(previous) ? previous
-            : (current && names.includes(current) ? current : names[0]);
-    };
-    showAll.addEventListener('change', updateOptions);
-    updateOptions();
-    form.append(label, select, allLabel);
-    const selected = await new Promise(resolve => {
-        const popup = new Popup(form, POPUP_TYPE.CONFIRM, '', {
-            okButton: '설정 열기',
-            cancelButton: translate('Cancel', 'stlo.modal.cancel'),
-            onClosing: closingPopup => {
-                resolve(closingPopup.result === 1 ? select.value : null);
-                return true;
-            },
-        });
-        popup.show();
-    });
-    if (selected) await openLorebookSettings(selected);
+    return openLorebookSettings();
 }
 
 /** Add a Font Awesome book entry only to SillyTavern's extensions menu. */
@@ -1195,49 +1153,48 @@ async function getLorebookSettings(worldName) {
  * @param {string} worldName - Name of the lorebook
  * @param {Object} settings - Settings to save
  */
+function equalBookSetting(a, b) {
+    if (Object.is(a, b)) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && equalBookSetting(a[key], b[key]));
+}
+
 async function setLorebookSettings(worldName, settings) {
     try {
-        const worldData = await loadWorldInfo(worldName);
-
-        if (!worldData) {
-            toastr.error(tKey('stlo.settings.loadError.body', 'Could not load settings for lorebook: ${0}', worldName), translate('Settings Error', 'stlo.settings.loadError.title'));
-            return false;
-        }
-
-        // Save extension settings directly on the world data object (preserve existing keys)
-        const existing = (worldData[EXTENSION_NAME] && typeof worldData[EXTENSION_NAME] === 'object') ? worldData[EXTENSION_NAME] : {};
-        const finalSettings = { ...DEFAULT_LOREBOOK_SETTINGS, ...existing, ...settings };
-        worldData[EXTENSION_NAME] = finalSettings;
-
-        // Save the world data back immediately
+        if (!world_names.includes(worldName)) throw Error('Lorebook is no longer available.');
+        const loaded = await loadWorldInfo(worldName);
+        if (!loaded) throw Error('Could not load the selected lorebook.');
+        const existing = loaded[EXTENSION_NAME] || {};
+        // Merge only changed STLO fields into the current book. Never edit
+        // lore entries or character associations from this settings manager.
+        const worldData = { ...loaded, [EXTENSION_NAME]: { ...existing, ...settings } };
         await saveWorldInfo(worldName, worldData, true);
-
-        // Hot-update cache so subsequent reads see fresh settings immediately
-        try {
-            worldInfoCache.set(worldName, worldData);
-        } catch (e) {
-            console.warn('STLO: Failed to update worldInfoCache after save:', e);
+        // The native save emits WORLDINFO_UPDATED itself. Do not emit again.
+        const response = await fetch('/api/worldinfo/get', {
+            method: 'POST', headers: getRequestHeaders(),
+            body: JSON.stringify({ name: worldName }), cache: 'no-cache',
+        });
+        if (!response.ok) throw Error('Could not verify the saved lorebook.');
+        const persisted = await response.json();
+        if (!persisted || typeof persisted !== 'object') throw Error('Could not verify the saved lorebook.');
+        worldInfoCache.set(worldName, persisted);
+        const actual = persisted[EXTENSION_NAME] || {};
+        if (!Object.entries(settings).every(([key, value]) => equalBookSetting(actual[key], value))) {
+            throw Error('Saved values do not match.');
         }
-
-        // Discard any settings snapshot so the next scan uses the saved value.
+        return true;
+    } catch (error) {
+        // Native ST updates its cache before saving. Never leave an
+        // unverified value cached as though the write had succeeded.
+        worldInfoCache.delete(worldName);
+        console.error('[STLO] Error saving or verifying lorebook settings:', worldName, error);
+        return false;
+    } finally {
         EXTENSION_STATE.scanWorldSettings = new Map();
         EXTENSION_STATE.scanBudgetWorlds = new Set();
         EXTENSION_STATE.scanHasExplicitBudgets = false;
-
-        // Notify UI/listeners that World Info has updated so panels can re-render
-        try {
-            if (typeof eventSource?.emit === 'function') {
-                eventSource.emit(event_types.WORLDINFO_UPDATED);
-            }
-        } catch (e) {
-            console.warn('STLO: Failed to emit WORLDINFO_UPDATED after save:', e);
-        }
-
-        return true;
-    } catch (error) {
-        console.error(`Error saving settings for ${worldName}:`, error);
-        toastr.error(tKey('stlo.settings.saveError.body', 'Error saving settings for ${0}', worldName), translate('Save Error', 'stlo.settings.saveError.title'));
-        return false;
     }
 }
 
@@ -1303,7 +1260,7 @@ async function openStloForLorebook(name) {
 
     // Attempt selection (silently continue if not possible), then open modal
     await selectLorebookByIndex(idx);
-    await openLorebookSettings();
+    await openLorebookSettings(world_names[idx]);
     return '';
 }
 
@@ -1561,46 +1518,15 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
 
 }
 
-async function openLorebookSettings(worldName = null) {
-    // Use try-finally to ensure modal state is always reset
-    try {
-        // Atomic lock to prevent race conditions
-        if (EXTENSION_STATE.modalOpen) {
-            return;
-        }
+// All IDs inside a book card are namespaced so several editors, including
+// nested character cards, can coexist without selector or label collisions.
+function bookField(root, id) {
+    return root.querySelector('[data-stlo-field="' + id + '"]');
+}
 
-        EXTENSION_STATE.modalOpen = true;
-
-        // Settings opening
-
-        const currentLorebook = worldName || getCurrentLorebookName();
-        if (!currentLorebook) {
-            EXTENSION_STATE.modalOpen = false;
-            toastr.info(
-                translate('Create or select a World Info file first.', 'stlo.info.noLorebook'),
-                translate('World Info is not set', 'stlo.info.noLorebookTitle'),
-                { timeOut: 10000, preventDuplicates: true }
-            );
-            return;
-        }
-
-        // Get current settings
-        if (!worldInfoCache.has(currentLorebook)) {
-            const loaded = await loadWorldInfo(currentLorebook);
-            if (!loaded) throw Error('Could not load the selected lorebook.');
-        }
-        const currentSettings = await getLorebookSettings(currentLorebook);
-        const characterAvatar = getJevCharacterAvatar();
-        const characterRecall = getCharacterJevRecall(characterAvatar);
-        const showBookJev = HAS_WORLDINFO_SCAN_DONE && (!characterAvatar || characterRecall === true);
-        const protectInitially = getProtectAlwaysOn();
-
-        // Create modal HTML - single vertical scrolling content
-        const modalHtml = `
-            <div class="stlo-modal-ui">
+function createBookEditor(root, currentSettings, characterAvatar, showBookJev, prefix) {
+    root.innerHTML = `
             <div class="world_entry_form_control stlo-section">
-                <h3 data-i18n="stlo.modal.title">📚 ST Lorebook Ordering</h3>
-                <small class="stlo-scope-name" id="stlo-book-name"></small>
                 <div class="stlo-field-heading">
                     <h4 data-i18n="stlo.modal.priority.title">Lorebook Priority</h4>
                     <details class="stlo-info">
@@ -1612,10 +1538,20 @@ async function openLorebookSettings(worldName = null) {
                 <select id="${SELECTORS.LOREBOOK_PRIORITY_SELECT}" class="text_pole textarea_compact">
                     <option value="5" ${currentSettings.priority === 5 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.5">5 - Highest Priority (Processes First)</option>
                     <option value="4" ${currentSettings.priority === 4 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.4">4 - High Priority</option>
-                    <option value="null" ${currentSettings.priority === null ? 'selected' : ''} data-i18n="stlo.modal.priority.option.3">3 - Normal (SillyTavern Default)</option>
+                    <option value="null" ${currentSettings.priority == null || Number(currentSettings.priority) === 3 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.3">3 - Normal (SillyTavern Default)</option>
                     <option value="2" ${currentSettings.priority === 2 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.2">2 - Low Priority</option>
                     <option value="1" ${currentSettings.priority === 1 ? 'selected' : ''} data-i18n="stlo.modal.priority.option.1">1 - Lowest Priority (Processes Last)</option>
                 </select>
+            </div>
+
+            <div class="world_entry_form_control stlo-section">
+                ${createBudgetControls('lorebook', currentSettings)}
+            </div>
+
+            <div class="world_entry_form_control stlo-section">
+                <details class="stlo-book-advanced">
+                    <summary data-i18n="stlo.manager.advanced">Advanced settings</summary>
+                    <div class="stlo-book-advanced-body">
                 <div class="stlo-toggle-block">
                     <div class="stlo-option-line">
                         <label class="checkbox_label stlo-checkrow" for="lorebook-order-adjustment-enabled">
@@ -1641,7 +1577,7 @@ async function openLorebookSettings(worldName = null) {
                     </div>
                     <div class="stlo-inline-number">
                         <input type="number" id="lorebook-order-adjustment" class="text_pole textarea_compact"
-                               value="${currentSettings.orderAdjustment}" min="-10000" max="10000" step="1"
+                               value="${Number(currentSettings.orderAdjustment) || 0}" min="-10000" max="10000" step="1"
                                placeholder="0" style="width: 100px;">
                         <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.range">-10k to +10k</small></div></details>
                     </div>
@@ -1661,21 +1597,7 @@ async function openLorebookSettings(worldName = null) {
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="world_entry_form_control stlo-section">
-                ${createBudgetControls('lorebook', currentSettings)}
-                <div class="stlo-option-line">
-                    <label class="checkbox_label stlo-checkrow" for="stlo_protect_always_on">
-                        <input type="checkbox" id="stlo_protect_always_on" ${protectInitially ? 'checked' : ''}>
-                        <span class="checkmark"></span>
-                        <span data-i18n="stlo.budget.protect">Protect always-on entries first</span>
-                    </label>
-                    ${infoHelp('stlo.budget.protectHelp', 'Applies to all lorebooks, not just this book.')}
-                </div>
-            </div>
-
-            <div class="world_entry_form_control stlo-section">
+                    <div class="stlo-book-vector">
                 <div class="stlo-field-heading">
                     <h4>벡터 유사도 임계값</h4>
                     <details class="stlo-info">
@@ -1690,6 +1612,9 @@ async function openLorebookSettings(worldName = null) {
                            ? currentSettings.vectorThreshold : ''}">
             </div>
 
+                    </div>
+                </details>
+            </div>
             ${showBookJev ? `<div class="world_entry_form_control stlo-section">
                 <h4 data-i18n="stlo.jev.bookTitle">Jev · this lorebook</h4>
                 <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
@@ -1717,231 +1642,332 @@ async function openLorebookSettings(worldName = null) {
                     </div>
                 </details>
             </div>
-            </div>
         `;
+    root.dataset.stloPrefix = prefix;
+    for (const node of root.querySelectorAll('[id]')) {
+        const original = node.id;
+        node.dataset.stloField = original;
+        node.id = prefix + original;
+    }
+    for (const label of root.querySelectorAll('label[for]')) label.htmlFor = prefix + label.htmlFor;
+    applyLocale(root);
+}
 
-        // Show the modal and set up behavior
-        const result = await new Promise((resolve) => {
-            let modalEventListeners = [];
-
-            // Function to capture current form state
-            const captureFormState = () => {
-                const prioritySelect = document.getElementById(SELECTORS.LOREBOOK_PRIORITY_SELECT);
-                const budgetModeSelect = document.getElementById(SELECTORS.LOREBOOK_BUDGET_MODE);
-                const budgetValueInput = document.getElementById(SELECTORS.LOREBOOK_BUDGET_VALUE);
-                const orderAdjustmentEnabled = document.getElementById('lorebook-order-adjustment-enabled');
-                const orderAdjustmentInput = document.getElementById('lorebook-order-adjustment');
-                const orderAdjustmentGroupOnly = document.getElementById('lorebook-order-adjustment-group-only');
-                const onlyWhenSpeaking = document.getElementById('lorebook-only-when-speaking');
-                const randomTrimEl = document.getElementById(SELECTORS.LOREBOOK_RANDOM_TRIM);
-                const vectorThresholdInput = document.getElementById(SELECTORS.LOREBOOK_VECTOR_THRESHOLD);
-                const jevRecall = document.getElementById('stlo-jev-recall');
-
-                if (prioritySelect && budgetModeSelect && budgetValueInput && orderAdjustmentEnabled && orderAdjustmentInput && orderAdjustmentGroupOnly && onlyWhenSpeaking) {
-                    return {
-                        priority: prioritySelect.value,
-                        budgetMode: budgetModeSelect.value,
-                        budget: budgetValueInput.value,
-                        orderAdjustmentEnabled: orderAdjustmentEnabled.checked,
-                        orderAdjustment: orderAdjustmentInput.value,
-                        orderAdjustmentGroupOnly: orderAdjustmentGroupOnly.checked,
-                        onlyWhenSpeaking: onlyWhenSpeaking.checked,
-                        randomTrim: Boolean(randomTrimEl?.checked),
-                        protectAlwaysOn: document.getElementById('stlo_protect_always_on')?.checked ?? protectInitially,
-                        vectorThreshold: vectorThresholdInput?.value ?? '',
-                        jevRecall: jevRecall?.checked === true,
-                        jevExclude: document.getElementById('stlo-jev-exclude')?.checked === true,
-                        timestamp: Date.now()
-                    };
-                }
-                return null;
-            };
-
-            // Function to validate and process form data
-            const validateAndProcessForm = (formState) => {
-                if (!formState) {
-                    toastr.error(translate('Settings form not properly loaded. Please try again.', 'stlo.validation.formNotLoaded'));
-                    return null;
-                }
-
-                const priorityValue = formState.priority;
-
-                // Validate priority parsing
-                let validatedPriority = null;
-                if (priorityValue !== '' && priorityValue !== 'null') {
-                    const parsedPriority = parseInt(priorityValue);
-                    if (isNaN(parsedPriority) || parsedPriority < 1 || parsedPriority > 5) {
-                        toastr.error(translate('Priority value must be between 1 and 5', 'stlo.validation.priorityRange'), 'Validation Error');
-                        return null;
-                    }
-                    validatedPriority = parsedPriority;
-                } else if (priorityValue === 'null') {
-                    validatedPriority = null; // Explicitly set to null for default
-                }
-
-                // Validate order adjustment
-                let validatedOrderAdjustment = 0;
-                if (formState.orderAdjustmentEnabled && formState.orderAdjustment !== '') {
-                    const parsed = parseInt(formState.orderAdjustment);
-                    if (isNaN(parsed) || parsed < -10000 || parsed > 10000) {
-                        toastr.error(translate('Order adjustment must be between -10000 and 10000', 'stlo.validation.orderAdjustmentRange'), 'Validation Error');
-                        return null;
-                    }
-                    validatedOrderAdjustment = parsed;
-                }
-
-                // Validate character overrides (this may return null if duplicates found)
-                const hasRenderedOverrides = document.getElementById('advanced-priority-sections')?.dataset.mounted === 'true';
-                const characterOverrides = hasRenderedOverrides
-                    ? getCharacterOverrides(currentSettings.characterOverrides || {})
-                    : currentSettings.characterOverrides || {};
-                if (characterOverrides === null) {
-                    return null; // Validation failed due to duplicate characters
-                }
-
-                // Validate budget settings
-                const mode = formState.budgetMode || 'default';
-                let validatedBudget = 0;
-
-                if (mode === 'percentage_context' || mode === 'percentage_budget') {
-                    const p = parseInt(formState.budget, 10);
-                    if (isNaN(p) || p < 1 || p > 100) {
-                        toastr.error(translate('Budget percent must be between 1 and 100', 'stlo.validation.budgetPercentRange'), 'Validation Error');
-                        return null;
-                    }
-                    validatedBudget = p;
-                } else if (mode === 'fixed') {
-                    const v = parseInt(formState.budget, 10);
-                    if (isNaN(v) || v <= 0) {
-                        toastr.error(translate('Fixed budget must be a positive integer', 'stlo.validation.fixedBudgetPositive'), 'Validation Error');
-                        return null;
-                    }
-                    validatedBudget = v;
-                } else {
-                    validatedBudget = 0; // default mode
-                }
-
-                const rawThreshold = String(formState.vectorThreshold ?? '').trim();
-                let validatedThreshold = null;
-                if (rawThreshold !== '') {
-                    const parsed = Number(rawThreshold);
-                    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
-                        toastr.error('벡터 임계값은 0부터 1까지 입력해 주세요.', 'Validation Error');
-                        return null;
-                    }
-                    validatedThreshold = parsed;
-                }
-
-                const validatedForm = {
-                    protectAlwaysOn: formState.protectAlwaysOn,
-                    jevRecall: formState.jevRecall,
-                    jevExclude: formState.jevExclude,
-                    vectorThreshold: validatedThreshold,
-                    vectorThresholdEnabled: rawThreshold !== '',
-                    priority: validatedPriority,
-                    budgetMode: mode,
-                    budget: validatedBudget,
-                    orderAdjustment: validatedOrderAdjustment,
-                    orderAdjustmentGroupOnly: formState.orderAdjustmentGroupOnly || false,
-                    characterOverrides: characterOverrides,
-                    onlyWhenSpeaking: formState.onlyWhenSpeaking || false,
-                    randomTrim: !!formState.randomTrim
-                };
-
-                return validatedForm;
-            };
-
-            // Function to clean up modal event listeners
-            const cleanupModalListeners = () => {
-                document.getElementById('stlo-info-popup')?.remove();
-                modalEventListeners.forEach(({ element, event, handler, capture }, index) => {
-                    try {
-                        element.removeEventListener(event, handler, Boolean(capture));
-                    } catch (error) {
-                        console.error(`Error removing modal event listener ${index}:`, error);
-                    }
-                    // Null out references immediately after removal
-                    modalEventListeners[index].element = null;
-                    modalEventListeners[index].handler = null;
-                });
-                modalEventListeners.length = 0;
-
-                // Cancel pending animation frame if it exists
-                if (EXTENSION_STATE.pendingAnimationFrame) {
-                    const frameId = EXTENSION_STATE.pendingAnimationFrame;
-                    EXTENSION_STATE.pendingAnimationFrame = null;
-                    cancelAnimationFrame(frameId);
-                }
-            };
-
-            // Create popup with onClosing callback to capture form data
-            const popup = new Popup(modalHtml, POPUP_TYPE.CONFIRM, '', {
-                okButton: translate('Save Settings', 'stlo.modal.save.ok'),
-                cancelButton: translate('Cancel', 'stlo.modal.cancel'),
-                wide: false,
-                large: false,
-                allowVerticalScrolling: true,
-                onClosing: (popup) => {
-
-                    // Only process form if user clicked OK/Save (POPUP_RESULT.AFFIRMATIVE = 1)
-                    if (popup.result === 1) { // POPUP_RESULT.AFFIRMATIVE
-                        const formState = captureFormState();
-                        const validatedFormData = validateAndProcessForm(formState);
-
-
-                        if (validatedFormData) {
-                            resolve(validatedFormData);
-                            cleanupModalListeners();
-                            return true; // Allow popup to close
-                        } else {
-                            return false; // Prevent popup from closing
-                        }
-                    } else {
-                        resolve(null);
-                        cleanupModalListeners();
-                        return true; // Allow popup to close
-                    }
-                }
-            });
-
-            // Show the popup
-            popup.show();
-
-            // Set up modal behavior immediately after popup creation
-            // Use requestAnimationFrame to ensure DOM is ready
-            EXTENSION_STATE.pendingAnimationFrame = requestAnimationFrame(() => {
-                EXTENSION_STATE.pendingAnimationFrame = null;
-                const bookName = document.getElementById('stlo-book-name');
-                if (bookName) bookName.textContent = currentLorebook;
-                setupModalBehavior(modalEventListeners, currentSettings);
-            });
-        });
-
-        // Save the settings if we got them
-        if (result) {
-            try {
-                // Keep the common toggle in extension settings, never in a book.
-                const { protectAlwaysOn, ...bookSettings } = result;
-                if (characterAvatar || !showBookJev) delete bookSettings.jevRecall;
-                if (!showBookJev) delete bookSettings.jevExclude;
-                const saved = await setLorebookSettings(currentLorebook, bookSettings);
-
-                if (saved) {
-                    if (protectAlwaysOn !== protectInitially) setProtectAlwaysOn(protectAlwaysOn);
-                    toastr.success(tKey('stlo.settings.saved', 'STLO settings saved for ${0}', currentLorebook));
-                } else {
-                    toastr.error(tKey('stlo.settings.saveFailed', 'Failed to save settings for ${0}. Check console for details.', currentLorebook), 'Save Error');
-                }
-            } catch (saveError) {
-                console.error('Exception during save operation:', saveError);
-                toastr.error(tKey('stlo.settings.saveException', 'Failed to save settings for ${0}: ${1}', currentLorebook, saveError.message), 'Save Error');
-            }
+function readBookSettings(root, currentSettings, characterAvatar, showBookJev) {
+    const field = id => bookField(root, id);
+    const required = [SELECTORS.LOREBOOK_PRIORITY_SELECT, SELECTORS.LOREBOOK_BUDGET_MODE,
+        SELECTORS.LOREBOOK_BUDGET_VALUE, 'lorebook-order-adjustment-enabled', 'lorebook-order-adjustment',
+        'lorebook-order-adjustment-group-only', 'lorebook-only-when-speaking'];
+    const fail = (fallback, key) => { toastr.error(translate(fallback, key)); return null; };
+    if (required.some(id => !field(id))) return fail('Settings form not properly loaded. Please try again.', 'stlo.validation.formNotLoaded');
+    const priorityValue = field(SELECTORS.LOREBOOK_PRIORITY_SELECT).value;
+    const priority = priorityValue === 'null' ? null : Number(priorityValue);
+    if (priority !== null && (!Number.isInteger(priority) || priority < 1 || priority > 5)) {
+        return fail('Priority value must be between 1 and 5', 'stlo.validation.priorityRange');
+    }
+    const orderEnabled = field('lorebook-order-adjustment-enabled').checked;
+    const rawOrder = field('lorebook-order-adjustment').value;
+    const orderAdjustment = orderEnabled ? Number(rawOrder) : 0;
+    if ((orderEnabled && !rawOrder.trim()) || !Number.isInteger(orderAdjustment) || Math.abs(orderAdjustment) > 10000) {
+        return fail('Order adjustment must be between -10000 and 10000', 'stlo.validation.orderAdjustmentRange');
+    }
+    const mode = field(SELECTORS.LOREBOOK_BUDGET_MODE).value;
+    const rawBudget = field(SELECTORS.LOREBOOK_BUDGET_VALUE).value;
+    const budget = mode === 'default' ? 0 : Number(rawBudget);
+    if (mode === 'percentage_context' || mode === 'percentage_budget') {
+        if (!Number.isInteger(budget) || budget < 1 || budget > 100) {
+            return fail('Budget percent must be between 1 and 100', 'stlo.validation.budgetPercentRange');
         }
+    } else if (mode === 'fixed') {
+        if (!Number.isSafeInteger(budget) || budget <= 0) {
+            return fail('Fixed budget must be a positive integer', 'stlo.validation.fixedBudgetPositive');
+        }
+    } else if (mode !== 'default') {
+        return fail('Settings form not properly loaded. Please try again.', 'stlo.validation.formNotLoaded');
+    }
+    const rawThreshold = String(field(SELECTORS.LOREBOOK_VECTOR_THRESHOLD)?.value ?? '').trim();
+    const vectorThreshold = rawThreshold === '' ? null : Number(rawThreshold);
+    if (vectorThreshold !== null && (!Number.isFinite(vectorThreshold) || vectorThreshold < 0 || vectorThreshold > 1)) {
+        return fail('Enter a vector threshold between 0 and 1.', 'stlo.manager.thresholdRange');
+    }
+    // A collapsed or unopened drawer does not discard its saved assignments.
+    const characterOverrides = getCharacterOverrides(root, currentSettings.characterOverrides || {});
+    if (characterOverrides === null) return null;
+    const result = {
+        priority, budgetMode: mode, budget, orderAdjustment, characterOverrides,
+        orderAdjustmentGroupOnly: field('lorebook-order-adjustment-group-only').checked,
+        onlyWhenSpeaking: field('lorebook-only-when-speaking').checked,
+        randomTrim: Boolean(field(SELECTORS.LOREBOOK_RANDOM_TRIM)?.checked),
+        vectorThreshold, vectorThresholdEnabled: rawThreshold !== '',
+    };
+    if (showBookJev) {
+        result.jevExclude = field('stlo-jev-exclude')?.checked === true;
+        if (!characterAvatar) result.jevRecall = field('stlo-jev-recall')?.checked === true;
+    }
+    return result;
+}
 
+function changedBookFields(baseline, next) {
+    return Object.fromEntries(Object.entries(next).filter(([key, value]) => !baseline || !equalBookSetting(baseline[key], value)));
+}
+
+function summarizeBook(root) {
+    const priority = Number(bookField(root, SELECTORS.LOREBOOK_PRIORITY_SELECT)?.value) || 3;
+    const mode = bookField(root, SELECTORS.LOREBOOK_BUDGET_MODE)?.value || 'default';
+    const value = bookField(root, SELECTORS.LOREBOOK_BUDGET_VALUE)?.value || '0';
+    const name = translate('Priority', 'stlo.modal.groupOverrides.priority');
+    let budget = translate('Shared budget', 'stlo.manager.sharedBudget');
+    if (mode === 'fixed') budget = Number(value).toLocaleString() + ' ' + translate('tokens', 'stlo.manager.tokens');
+    else if (mode === 'percentage_budget') budget = value + '% ' + translate('of WI budget', 'stlo.manager.wiPercent');
+    else if (mode === 'percentage_context') budget = value + '% ' + translate('of context', 'stlo.manager.contextPercent');
+    return name + ' ' + priority + ' · ' + budget;
+}
+
+function removeModalListeners(listeners) {
+    for (const { element, event, handler, capture } of listeners) element.removeEventListener(event, handler, Boolean(capture));
+    listeners.length = 0;
+}
+
+async function openLorebookSettings(worldName = null) {
+    if (EXTENSION_STATE.modalOpen) return;
+    EXTENSION_STATE.modalOpen = true;
+    const listeners = [];
+    const cards = [];
+    let alive = true, saving = false, serial = 0;
+    try {
+        const available = [...new Set((Array.isArray(world_names) ? world_names : []).filter(name => typeof name === 'string' && name.trim()))];
+        const context = getContext();
+        const characterAvatar = getJevCharacterAvatar(context);
+        const linked = context.groupId == null ? getCurrentCharacterLinkedLorebooks() : null;
+        const showBookJev = HAS_WORLDINFO_SCAN_DONE && (!characterAvatar || getCharacterJevRecall(characterAvatar) === true);
+        const protectInitially = getProtectAlwaysOn();
+        const tr = (fallback, key) => translate(fallback, 'stlo.manager.' + key);
+        const root = document.createElement('div');
+        root.className = 'stlo-modal-ui stlo-book-manager';
+        root.innerHTML = `
+            <div class="stlo-section stlo-manager-top">
+                <div class="stlo-manager-heading"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><h3 data-i18n="stlo.manager.title">Lorebook Budget Management</h3></div>
+                <div class="stlo-option-line">
+                    <label class="checkbox_label stlo-checkrow" for="stlo-manager-protect">
+                        <input type="checkbox" id="stlo-manager-protect" ${protectInitially ? 'checked' : ''}>
+                        <span class="checkmark"></span><span data-i18n="stlo.budget.protect">Protect always-on entries first</span>
+                    </label>
+                    ${infoHelp('stlo.budget.protectHelp', 'Applies to all lorebooks.')}
+                </div>
+                <div class="stlo-option-line">
+                    <label class="checkbox_label stlo-checkrow" for="stlo-manager-all">
+                        <input type="checkbox" id="stlo-manager-all" ${linked === null ? 'checked disabled' : ''}>
+                        <span class="checkmark"></span><span data-i18n="stlo.manager.all">Show all lorebooks</span>
+                    </label>
+                    ${infoHelp('stlo.manager.filterHelp', 'Changes only the add list, never lorebook connections.')}
+                </div>
+            </div>
+            <div class="stlo-book-cards"></div>
+            <small class="stlo-manager-empty" role="status"></small>
+            <button type="button" class="menu_button stlo-manager-add"><i class="fa-solid fa-plus" aria-hidden="true"></i><span data-i18n="stlo.manager.add">Add lorebook</span></button>
+            <small class="stlo-manager-status" role="status" aria-live="polite"></small>`;
+        applyLocale(root);
+        const list = root.querySelector('.stlo-book-cards');
+        const add = root.querySelector('.stlo-manager-add');
+        const showAll = root.querySelector('#stlo-manager-all');
+        const protect = root.querySelector('#stlo-manager-protect');
+        const status = root.querySelector('.stlo-manager-status');
+        const empty = root.querySelector('.stlo-manager-empty');
+        const picked = () => new Set(cards.map(card => card.name).filter(Boolean));
+        const eligible = () => available.filter(name => showAll.checked || linked === null || linked.has(name));
+        const listen = (element, event, handler, bag = listeners) => {
+            element.addEventListener(event, handler);
+            bag.push({ element, event, handler });
+        };
+        const updateChoices = () => {
+            const taken = picked();
+            const names = eligible().filter(name => !taken.has(name));
+            for (const card of cards) {
+                if (!card.picker || card.name) continue;
+                card.picker.replaceChildren(new Option(tr('Choose a lorebook', 'choose'), ''), ...names.map(name => new Option(name, name)));
+                card.picker.value = '';
+                card.picker.disabled = !names.length;
+            }
+            const pending = cards.some(card => !card.name || card.loading);
+            add.disabled = saving || pending || !names.length;
+            add.title = !pending && !names.length
+                ? (showAll.checked || linked === null ? tr('All available books are already listed.', 'allAdded') : tr('All linked books are already listed. Enable Show all lorebooks for other books.', 'linkedAdded'))
+                : '';
+            empty.textContent = !cards.length && !names.length
+                ? tr('No lorebooks in this list. Enable Show all lorebooks to see other books.', 'empty')
+                : '';
+            empty.hidden = !empty.textContent;
+        };
+        const removeCard = card => {
+            removeModalListeners(card.editorListeners);
+            removeModalListeners(card.listeners);
+            cards.splice(cards.indexOf(card), 1);
+            card.element.remove();
+            updateChoices();
+        };
+        const setTitle = card => {
+            card.title.textContent = card.name || tr('New lorebook', 'new');
+            card.summary.textContent = card.loading ? tr('Loading settings…', 'loading')
+                : card.editor ? summarizeBook(card.editor) : tr('Choose a lorebook', 'choose');
+            if (card.dirty && card.editor) card.summary.textContent += ' · ' + tr('Modified', 'modified');
+        };
+        const loadCard = async (card, name) => {
+            if (!alive || card.loading || !name || picked().has(name)) return;
+            card.name = name;
+            card.loading = true;
+            card.picker.disabled = true;
+            card.remove.disabled = true;
+            setTitle(card);
+            updateChoices();
+            try {
+                const data = await loadWorldInfo(name);
+                if (!data || typeof data !== 'object') throw Error('Could not load the selected lorebook.');
+                if (!alive || !cards.includes(card)) return;
+                const settings = { ...DEFAULT_LOREBOOK_SETTINGS, ...structuredClone(data[EXTENSION_NAME] || {}) };
+                card.settings = settings;
+                const editor = document.createElement('div');
+                editor.className = 'stlo-book-editor';
+                createBookEditor(editor, settings, characterAvatar, showBookJev, card.prefix);
+                card.editor = editor;
+                card.body.replaceChildren(editor);
+                setupModalBehavior(card.editorListeners, settings, editor);
+                card.baseline = readBookSettings(editor, settings, characterAvatar, showBookJev);
+                const onEdit = () => { card.dirty = true; setTitle(card); };
+                for (const event of ['change', 'input', 'stlo-book-change']) listen(editor, event, onEdit, card.editorListeners);
+            } catch (error) {
+                console.error('[STLO] Could not open book settings:', name, error);
+                if (!alive || !cards.includes(card)) return;
+                removeModalListeners(card.editorListeners);
+                card.name = '';
+                card.editor = null;
+                card.body.replaceChildren(card.picker);
+                card.picker.disabled = false;
+                toastr.error(tr('Could not load lorebook settings.', 'loadFailed') + ' ' + name);
+            } finally {
+                card.loading = false;
+                card.remove.disabled = false;
+                if (alive && cards.includes(card)) { setTitle(card); updateChoices(); }
+            }
+        };
+        const addCard = (initialName = '') => {
+            if (!alive || saving) return;
+            const element = document.createElement('section');
+            element.className = 'stlo-book-card';
+            element.innerHTML = `
+                <details class="stlo-book-disclosure" open>
+                    <summary><span class="stlo-book-heading"><strong class="stlo-book-title"></strong><small class="stlo-book-summary"></small></span></summary>
+                    <div class="stlo-book-body"></div>
+                </details>
+                <button type="button" class="menu_button stlo-book-remove"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>`;
+            const body = element.querySelector('.stlo-book-body');
+            const picker = document.createElement('select');
+            picker.className = 'text_pole textarea_compact stlo-book-picker';
+            picker.setAttribute('aria-label', tr('Choose a lorebook', 'choose'));
+            body.appendChild(picker);
+            const card = {
+                element, body, picker, name: '', prefix: 'stlo-book-' + (++serial) + '-',
+                title: element.querySelector('.stlo-book-title'),
+                summary: element.querySelector('.stlo-book-summary'),
+                remove: element.querySelector('.stlo-book-remove'),
+                disclosure: element.querySelector('.stlo-book-disclosure'),
+                listeners: [], editorListeners: [], loading: false, dirty: false, editor: null,
+            };
+            card.remove.title = tr('Remove from editor (does not delete the lorebook)', 'remove');
+            card.remove.setAttribute('aria-label', card.remove.title);
+            cards.push(card);
+            list.appendChild(element);
+            listen(picker, 'change', () => void loadCard(card, picker.value), card.listeners);
+            listen(card.remove, 'click', async () => {
+                if (saving || card.loading) return;
+                if (card.dirty) {
+                    const message = document.createElement('div');
+                    message.textContent = tr('Discard unsaved edits to this book and remove its card? The lorebook itself is not deleted.', 'discard');
+                    if (await new Popup(message, POPUP_TYPE.CONFIRM, '').show() !== 1) return;
+                }
+                if (alive && cards.includes(card) && !saving) removeCard(card);
+            }, card.listeners);
+            setTitle(card);
+            updateChoices();
+            if (initialName) void loadCard(card, initialName);
+            else picker.focus();
+            return card;
+        };
+        listen(showAll, 'change', updateChoices);
+        listen(add, 'click', () => { if (!add.disabled) addCard(); });
+        const currentBook = getCurrentLorebookName();
+        const initial = available.includes(worldName) ? worldName :
+            eligible().includes(currentBook) ? currentBook : eligible()[0];
+        if (initial) addCard(initial);
+        else updateChoices();
+        // Prevent changes while async native writes run. The popup stays
+        // open on partial failure, with successful cards marked clean.
+        const setBusy = value => {
+            saving = value;
+            list.inert = value;
+            for (const control of popup.dlg.querySelectorAll('[data-result]')) control.inert = value;
+            protect.disabled = value;
+            showAll.disabled = value || linked === null;
+            updateChoices();
+        };
+        const saveAll = async () => {
+            if (saving || cards.some(card => card.loading)) return false;
+            const jobs = [];
+            // Validate every changed card before the first write.
+            for (const card of cards) {
+                if (!card.editor || !card.dirty) continue;
+                const next = readBookSettings(card.editor, card.settings, characterAvatar, showBookJev);
+                if (!next) { card.disclosure.open = true; card.element.scrollIntoView({ block: 'nearest' }); return false; }
+                const patch = changedBookFields(card.baseline, next);
+                if (Object.keys(patch).length) jobs.push({ card, next, patch });
+                else { card.dirty = false; setTitle(card); }
+            }
+            setBusy(true);
+            status.textContent = jobs.length ? tr('Saving settings…', 'saving') : '';
+            const failed = [];
+            let count = 0;
+            try {
+                for (const { card, next, patch } of jobs) {
+                    if (await setLorebookSettings(card.name, patch)) {
+                        card.baseline = next;
+                        card.settings = { ...card.settings, ...patch };
+                        card.dirty = false;
+                        count++;
+                        setTitle(card);
+                    } else failed.push(card);
+                }
+                if (failed.length) {
+                    status.textContent = tr('Saved', 'savedCount') + ': ' + count + ' · ' + tr('Not verified', 'failedCount') + ': ' + failed.map(card => card.name).join(', ');
+                    toastr.error(status.textContent);
+                    failed[0].disclosure.open = true;
+                    return false;
+                }
+                if (protect.checked !== getProtectAlwaysOn()) setProtectAlwaysOn(protect.checked);
+                toastr.success(translate('Settings saved.', 'stlo.jev.settingsSaved'));
+                return true;
+            } finally { setBusy(false); }
+        };
+        const popup = new Popup(root, POPUP_TYPE.CONFIRM, '', {
+            okButton: translate('Save Settings', 'stlo.modal.save.ok'),
+            cancelButton: translate('Cancel', 'stlo.modal.cancel'),
+            wide: false, large: false, allowVerticalScrolling: true,
+            onClosing: async closingPopup => {
+                if (saving) return false;
+                if (closingPopup.result === 1 && !await saveAll()) return false;
+                alive = false;
+                return true;
+            },
+        });
+        const closed = popup.show();
+        setupStloInfoPopups(listeners, root);
+        await closed;
     } catch (error) {
-        console.error('Error opening lorebook settings:', error);
+        console.error('[STLO] Could not open lorebook manager:', error);
+        toastr.error(translate('Could not open lorebook settings.', 'stlo.manager.loadFailed'));
     } finally {
-        // Always reset modal state when function exits
+        alive = false;
+        for (const card of cards) { removeModalListeners(card.editorListeners); removeModalListeners(card.listeners); }
+        removeModalListeners(listeners);
+        document.getElementById('stlo-info-popup')?.remove();
         EXTENSION_STATE.modalOpen = false;
     }
 }
@@ -1952,8 +1978,7 @@ async function openLorebookSettings(worldName = null) {
  * overlay would render *behind* a modal dialog in the browser's top layer.
  * Placement is clamped to the viewport, including narrow mobile screens.
  */
-function setupStloInfoPopups(modalEventListeners) {
-    const modal = document.querySelector('.stlo-modal-ui');
+function setupStloInfoPopups(modalEventListeners, modal = document.querySelector('.stlo-modal-ui')) {
     if (!modal) return;
 
     document.getElementById('stlo-info-popup')?.remove();
@@ -2044,12 +2069,11 @@ function setupStloInfoPopups(modalEventListeners) {
  * @param {Array} modalEventListeners - Array to track event listeners for cleanup
  * @param {Object} currentSettings - Current lorebook settings
  */
-function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
-    setupStloInfoPopups(modalEventListeners);
+function setupModalBehavior(modalEventListeners = [], currentSettings = {}, root) {
     // Set up order adjustment behavior for main settings
-    const orderAdjustmentEnabled = document.getElementById('lorebook-order-adjustment-enabled');
-    const orderAdjustmentContainer = document.getElementById('lorebook-order-adjustment-container');
-    const orderAdjustmentInput = document.getElementById('lorebook-order-adjustment');
+    const orderAdjustmentEnabled = bookField(root, 'lorebook-order-adjustment-enabled');
+    const orderAdjustmentContainer = bookField(root, 'lorebook-order-adjustment-container');
+    const orderAdjustmentInput = bookField(root, 'lorebook-order-adjustment');
 
     if (orderAdjustmentEnabled && orderAdjustmentContainer && orderAdjustmentInput) {
         const orderAdjustmentChangeHandler = () => {
@@ -2087,17 +2111,17 @@ function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
     }
 
     // Set up Budget controls
-    setupBudgetControls(modalEventListeners, currentSettings);
+    setupBudgetControls(modalEventListeners, currentSettings, root);
 
-    setupDrawerBehavior(modalEventListeners, () => setupAdvancedBehavior(modalEventListeners, currentSettings));
+    setupDrawerBehavior(modalEventListeners, () => setupAdvancedBehavior(modalEventListeners, currentSettings, root), root);
 }
 
 /**
  * Set up simple drawer toggle behavior
  * @param {Array} modalEventListeners - Array to track event listeners for cleanup
  */
-function setupDrawerBehavior(modalEventListeners = [], mountOverrides) {
-    const drawer = document.querySelector('.stlo-advanced-drawer');
+function setupDrawerBehavior(modalEventListeners = [], mountOverrides, root) {
+    const drawer = root.querySelector('.stlo-advanced-drawer');
     if (!drawer) return;
     const onToggle = () => { if (drawer.open) mountOverrides(); };
     drawer.addEventListener('toggle', onToggle);
@@ -2108,7 +2132,7 @@ function setupDrawerBehavior(modalEventListeners = [], mountOverrides) {
 // Render budget controls (mode + value)
 function createBudgetControls(scope, currentSettings = {}) {
     const mode = currentSettings.budgetMode || 'default';
-    const value = (typeof currentSettings.budget === 'number' ? currentSettings.budget : (currentSettings.budget || 0));
+    const value = Number(currentSettings.budget) || 0;
     return `
         <div class="stlo-field-heading">
             <h4 data-i18n="stlo.budget.title">Budget</h4>
@@ -2129,9 +2153,11 @@ function createBudgetControls(scope, currentSettings = {}) {
                 <option value="fixed" ${mode === 'fixed' ? 'selected' : ''} data-i18n="stlo.budget.mode.fixed">Fixed tokens</option>
             </select>
             <div id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}" class="stlo-budget-value" style="${mode === 'default' ? 'display:none;' : ''}">
-                <input type="number" id="${SELECTORS.LOREBOOK_BUDGET_VALUE}" class="text_pole textarea_compact"
-                       value="${value || 0}" placeholder="0" style="width: 120px;">
-                <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint"></small></div></details>
+                <div class="stlo-inline-number">
+                    <input type="number" id="${SELECTORS.LOREBOOK_BUDGET_VALUE}" class="text_pole textarea_compact"
+                           value="${value || 0}" placeholder="0">
+                    <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint"></small></div></details>
+                </div>
                 <div class="stlo-toggle-block">
                     <label class="checkbox_label stlo-checkrow" for="${SELECTORS.LOREBOOK_RANDOM_TRIM}">
                         <input type="checkbox" id="${SELECTORS.LOREBOOK_RANDOM_TRIM}" ${currentSettings.randomTrim ? 'checked' : ''}>
@@ -2145,11 +2171,11 @@ function createBudgetControls(scope, currentSettings = {}) {
 }
 
 // Wire up budget controls (visibility + clamping)
-function setupBudgetControls(modalEventListeners = [], currentSettings = {}) {
-    const modeSelect = document.getElementById(SELECTORS.LOREBOOK_BUDGET_MODE);
-    const valueContainer = document.getElementById(SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER);
-    const valueInput = document.getElementById(SELECTORS.LOREBOOK_BUDGET_VALUE);
-    const hint = document.getElementById(`${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint`);
+function setupBudgetControls(modalEventListeners = [], currentSettings = {}, root) {
+    const modeSelect = bookField(root, SELECTORS.LOREBOOK_BUDGET_MODE);
+    const valueContainer = bookField(root, SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER);
+    const valueInput = bookField(root, SELECTORS.LOREBOOK_BUDGET_VALUE);
+    const hint = bookField(root, `${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint`);
 
     if (!modeSelect || !valueContainer || !valueInput) return;
 
@@ -2207,9 +2233,9 @@ function setupBudgetControls(modalEventListeners = [], currentSettings = {}) {
  * Build per-character overrides on first expansion only. Saved keys are the
  * same avatar filenames (without extension) used by the generation path.
  */
-function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
-    const container = document.getElementById('advanced-priority-sections');
-    const add = document.getElementById('stlo-group-add-character');
+function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}, root) {
+    const container = bookField(root, 'advanced-priority-sections');
+    const add = bookField(root, 'stlo-group-add-character');
     if (!container || !add || container.dataset.mounted === 'true') return;
     const stored = currentSettings.characterOverrides || {};
     const roster = new Map();
@@ -2244,7 +2270,7 @@ function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
     const addCard = (key = '', saved = {}) => {
         const card = document.createElement('div');
         card.className = 'stlo-group-card';
-        const id = 'stlo-group-card-' + (++serial);
+        const id = root.dataset.stloPrefix + 'group-' + (++serial);
         card.innerHTML = `
             <div class="stlo-group-card-head">
                 <label for="${id}-character" data-i18n="stlo.modal.groupOverrides.character">Character</label>
@@ -2274,7 +2300,7 @@ function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
         select.value = key;
         const priority = card.querySelector('.stlo-group-priority-select');
         for (const value of [5, 4, 3, 2, 1]) priority.add(new Option(value + ' - ' + getPriorityName(value), String(value)));
-        const base = Number(document.getElementById(SELECTORS.LOREBOOK_PRIORITY_SELECT)?.value);
+        const base = Number(bookField(root, SELECTORS.LOREBOOK_PRIORITY_SELECT)?.value);
         const validPriority = value => Number.isInteger(value) && value >= 1 && value <= 5;
         const savedPriority = Number(saved?.priority);
         priority.value = String(validPriority(savedPriority) ? savedPriority : validPriority(base) ? base : 3);
@@ -2306,11 +2332,13 @@ function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
         if (!button) return;
         button.closest('.stlo-group-card').remove();
         syncChoices();
+        root.dispatchEvent(new Event('stlo-book-change'));
     };
     const onAdd = () => {
         if (add.disabled) return;
         const card = addCard();
         syncChoices();
+        root.dispatchEvent(new Event('stlo-book-change'));
         card.querySelector('.stlo-group-character').focus();
     };
     for (const [key, value] of Object.entries(stored)) addCard(key, value);
@@ -2323,8 +2351,8 @@ function setupAdvancedBehavior(modalEventListeners = [], currentSettings = {}) {
 }
 
 /** Preserve the existing override map and any additional per-character fields. */
-function getCharacterOverrides(existing = {}) {
-    const container = document.getElementById('advanced-priority-sections');
+function getCharacterOverrides(root, existing = {}) {
+    const container = bookField(root, 'advanced-priority-sections');
     if (container?.dataset.mounted !== 'true') return existing;
     const overrides = new Map();
     for (const row of container.querySelectorAll('.stlo-group-card')) {
