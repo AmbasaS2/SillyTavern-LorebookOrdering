@@ -8,6 +8,25 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 
 **Start here:** If one book uses too many tokens, open **Lorebook Budget Management**. If your RP forgets relevant old events, open **Lorebook Jev Recall**. These are independent menus; Jev is optional and off for new characters. This extension recalls existing lore; it does not create memories.
 
+## Start here — STLO in five minutes
+
+**Current version: 2.2.4-ambasa.1.** World Info supplies facts and memories to your RP model. STLO manages each book's priority and maximum token contribution. Optional Jev chooses relevant entries based on the current scene. Ordinary budget management needs neither Jev nor Memory Books.
+
+<p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
+
+1. Install only this fork and reload. Use SillyTavern 1.18 with the structured World Info scan event for budget trimming and Jev.
+2. Open Extensions → Lorebook Budget Management. Add books; set priority (1–5), cap and optional Protect Always-On. Save.
+3. If native keyword/vector recall works for you, stop here. To try Jev, prepare the subscription-only NanoGPT Custom connection profile below. Open Lorebook Jev Recall, enable it for the current character, select the profile and save.
+4. Generate a normal RP reply and check the latest recall report if needed. Compatible WorldInfo Info 1.7.1-ambasa.4+ marks actual activated Jev entries with 🔮.
+
+### Works alone, better together
+
+Memory Books creates and maintains memories; STLO recalls them like other eligible lore. WorldInfo Info can show confirmed Jev activation, and Lorebook Manager can read those entries. None is required. Jev never changes the RP model or the saved lore.
+
+[Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info / 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) · [Four-extension workflow guide (Korean, bilingual diagrams)](https://app.notion.com/p/423a96b06fd48147be13ec0929ee088d)
+
+The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
+
 ## Who is this for?
 
 - Long-running roleplays where old promises and events are hard to recall, but irrelevant lore often appears.
@@ -209,6 +228,10 @@ Inside the same drawer, enable **Only use when an assigned character speaks** to
 
 [Compare the fork's code changes](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/compare/c593986c315c60292f8f4b888d1fdda65517ba6c...3ca62a5f98168cad03a6080104cb9f3a45345958) (upstream base to the documented fork code, excluding later documentation commits).
 
+## Troubleshooting
+
+If an always-on entry disappears, first check whether its full text fits both the book cap and overall World Info budget. If an old memory is not recalled, check whether its book is active/excluded, entry eligibility, candidate source and the latest Jev report. With compatible WorldInfo Info, 🔮 indicates actual tracked Jev activation, not every candidate approved by the model.
+
 ## 📌 Compatibility and Data
 
 - Jev and per-lorebook trimming require `WORLDINFO_SCAN_DONE`. The fork does not perform final-prompt substring trimming as a fallback on older SillyTavern versions. On older hosts, no unsafe pre-scan budget fallback is used; native activation and budgeting remain in control.
@@ -228,6 +251,23 @@ Inside the same drawer, enable **Only use when an assigned character speaks** to
 [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd481c3afd5c3c90288ba3a) · [원본 STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
 **딱 두 가지만 기억하세요.** 로어북이 토큰을 너무 많이 쓰면 **로어북 예산 관리**, 지금 장면에 필요한 과거 기억을 못 찾으면 **로어북 Jev 호출**을 사용하세요. 두 메뉴는 독립적이며 Jev는 선택 기능입니다. 새 캐릭터는 기본적으로 꺼져 있습니다. 새 기억을 만드는 확장은 아닙니다.
+
+## 먼저 읽어 보세요 · 처음 사용하는 분을 위한 5분 안내
+
+**현재 버전: 2.2.4-ambasa.1.** 로어북은 RP 모델에게 설정과 기억을 전달합니다. STLO는 책별 우선순위와 최대 주입량을 정하고, 선택 기능인 Jev로 장면에 필요한 항목을 고릅니다. 예산 관리만 쓰려면 메모리북이나 Jev 연결이 필요 없습니다.
+
+1. 원본과 동시에 켜지 말고 설치·새로고침합니다. 예산 트리밍과 Jev는 구조화된 스캔 이벤트가 있는 실리태번 1.18 계열을 기준으로 합니다.
+2. 확장 메뉴 → 로어북 예산 관리 → 책 추가 → 우선순위(1~5)·예산·선택적 상시 주입 우선 보호 → 저장.
+3. 기본 키워드·벡터로 충분하면 여기까지! Jev를 사용하려면 아래 구독 전용 NanoGPT Custom 연결 프로필을 준비하고 별도 로어북 Jev 호출 메뉴에서 현재 캐릭터의 Jev 사용 및 프로필을 저장합니다.
+4. 평소처럼 롤플하고 최근 호출 결과를 확인합니다. 호환 월드인포인포 1.7.1-ambasa.4 이상에서는 실제 활성화된 Jev 로어에 🔮가 표시됩니다.
+
+### 단독으로도 충분하고, 함께 쓰면 더 편리합니다
+
+메모리북은 기억을 저장하고 STLO는 그 기억을 포함한 기존 로어를 호출합니다. 월드인포인포에서는 실제 Jev 발동을 확인하고 로어북 매니저에서는 내용을 읽을 수 있습니다. 모두 선택 사항이며 STLO는 원문과 RP 모델을 변경하지 않습니다.
+
+[Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info / 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) · [4개 확장 연동 사용설명서](https://app.notion.com/p/423a96b06fd48147be13ec0929ee088d)
+
+아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
 ## 이런 분들께 추천합니다!
 
