@@ -8,7 +8,9 @@
 - Explicit Jev retry/cancel before RP generation; no automatic retries.
 - Event-only latest recall diagnostics and compact help icons.
 - Separate book settings and character/global Jev settings into independent menu entries. Explicit On/Off and inherited legacy settings retain the existing per-character storage; book settings no longer write global values. Section dividers and responsive field layout added.
-- Node unit and simulated-host tests: 18 passing. Installed SillyTavern and mobile/desktop visual checks still required. Manifest version retained pending release verification.
+- Use a common book-open menu icon, consistent Jev naming, equal-width injection controls, and horizontal advanced action buttons.
+- Add a named Jev prompt library with the Memory Books editor layout: full view, save/rename/save as, JSON import/export and delete. Migrate the active legacy prompt without changing its criteria; stage all changes until Save Settings. Built-in strict/balanced/generous prompts are unchanged.
+- Node tests: 25 passing. Isolated Chromium host harness: 1024px and 360px layout, prompt editing/switching/save/cancel passed. Actual installed SillyTavern and live API not exercised. Manifest version retained pending release verification.
 
 ## v2.2.4 (September 24, 2026)
 - **🪲Bugfix:** Entries removed for budget reasons during recursion returned for rescan each time, causing infinite loops. Fixed.

@@ -13,6 +13,8 @@ import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.j
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
 import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, normalizeJevReserve, JEV_PRESETS, isJevCandidate } from './jevRecall.mjs';
 
+import { createJevPromptLibrary, mountJevPromptLibrary } from './jevPromptLibrary.mjs';
+
 const EXTENSION_NAME = 'stlo';
 const SELECTORS = {
     WORLD_EDITOR_SELECT: '#world_editor_select',
@@ -554,18 +556,31 @@ function installStloModalStyles() {
         .stlo-info-popup small + small { margin-top: 6px; }
         .stlo-modal-ui .stlo-jev-advanced { width: 100%; box-sizing: border-box; margin: 2px 0; }
         .stlo-modal-ui .stlo-jev-advanced > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
-        .stlo-modal-ui .stlo-jev-advanced-body { display: flex; flex-direction: column; gap: 7px; padding: 7px 0 0 6px; }
+        .stlo-modal-ui .stlo-jev-advanced-body { display: flex; flex-direction: column; gap: 7px; padding: 7px 0 0 6px; width:100%; box-sizing:border-box; min-width:0; }
         .stlo-modal-ui .stlo-scope-name { font-weight: 600; overflow-wrap: anywhere; }
         .stlo-modal-ui .stlo-legacy-book { width: 100%; margin: 2px 0 0; }
         .stlo-modal-ui .stlo-legacy-book[hidden] { display: none !important; }
-        .stlo-modal-ui .stlo-jev-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, 44%); align-items: center; gap: 6px; width: 100%; }
+        .stlo-modal-ui .stlo-jev-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 156px); align-items: center; gap: 6px; width: 100%; }
         .stlo-modal-ui .stlo-jev-field .stlo-field-heading > label { min-width: 0; overflow-wrap: anywhere; text-align: left; }
         .stlo-modal-ui .stlo-jev-field > select { width: 100% !important; min-width: 0; max-width: 100%; box-sizing: border-box; margin: 0 !important; }
-        .stlo-modal-ui .stlo-jev-field > input[type="number"] { width: 110px !important; max-width: 100%; box-sizing: border-box; margin: 0 !important; }
-        .stlo-modal-ui #stlo-jev-prompt { width: 100%; min-height: 9em; resize: vertical; box-sizing: border-box; }
+        .stlo-modal-ui .stlo-jev-field > input[type="number"] { width: 100% !important; max-width: 156px; min-width: 0; box-sizing: border-box; margin: 0 !important; }
+        .stlo-modal-ui .stlo-jev-prompt-library { display:grid; gap:5px; width:100%; min-width:0; text-align:start; margin-block:7px; }
+        .stlo-modal-ui .stlo-jev-prompt-library :is(.stlo-jev-prompt-heading,.stlo-jev-prompt-selection,.stlo-jev-prompt-tools) { display:flex; align-items:center; gap:4px; min-width:0; }
+        .stlo-modal-ui .stlo-jev-prompt-heading { justify-content:space-between; flex-wrap:wrap; }
+        .stlo-modal-ui .stlo-jev-prompt-heading .stlo-field-heading { flex:1 1 auto; width:auto; min-width:0; }
+        .stlo-modal-ui .stlo-jev-prompt-tools { flex:0 0 auto; }
+        .stlo-modal-ui .stlo-jev-prompt-selection select { flex:1 1 0; min-width:0; width:auto !important; margin:0 !important; }
+        .stlo-modal-ui .stlo-jev-prompt-library .stlo-jev-prompt-icon.menu_button { display:inline-flex; flex:0 0 max(24px,1.75em); align-items:center; justify-content:center; width:max(24px,1.75em) !important; min-width:24px !important; max-width:none !important; min-height:24px; height:max(24px,1.75em); padding:2px; font-size:.9em; margin:0 !important; box-sizing:border-box; white-space:nowrap; }
+        .stlo-modal-ui .stlo-jev-prompt-icon i { pointer-events:none; }
+        .stlo-modal-ui .stlo-jev-prompt-library textarea.text_pole, .stlo-jev-expanded textarea.text_pole { margin:0; width:100%; box-sizing:border-box; line-height:1.4; resize:vertical; }
+        .stlo-modal-ui .stlo-jev-prompt-library textarea[readonly] { opacity:.86; }
+        .stlo-jev-expanded h3 { margin:0 0 7px; }
+        .stlo-jev-expanded textarea.text_pole { min-height:7em; max-height:min(52dvh,30rem); }
+        .stlo-modal-ui .stlo-jev-prompt-library :is(.stlo-jev-prompt-status:empty,input[type="file"]) { display:none !important; }
         .stlo-modal-ui .stlo-jev-radio { display: flex; align-items: flex-start; gap: 6px; font-weight: normal; }
         .stlo-modal-ui .stlo-jev-radio input { flex: 0 0 auto; }
-        .stlo-modal-ui .stlo-jev-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+        .stlo-modal-ui .stlo-jev-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; width:100%; min-width:0; }
+        .stlo-modal-ui .stlo-jev-actions > .menu_button { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:auto !important; min-width:max-content !important; max-width:100%; margin:0 !important; padding:4px 8px; white-space:nowrap !important; word-break:keep-all; overflow-wrap:normal; }
         #stlo-jev-topbar[data-status="running"], #stlo-jev-topbar[data-status="preparing"] { opacity: .65; }
         #stlo-jev-topbar[data-status="retry"], #stlo-jev-topbar[data-status="cancelled"] { color: var(--SmartThemeQuoteColor, inherit); }
         .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 3px 0 0; padding: 7px 0 0 12px; width: 100%; box-sizing: border-box; }
@@ -585,7 +600,9 @@ function installStloModalStyles() {
         @media (max-width: 480px) {
             .stlo-modal-ui { gap: 6px; }
             .stlo-modal-ui .stlo-section { gap: 5px; padding-bottom: 8px; }
-            .stlo-modal-ui .stlo-jev-field { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+            .stlo-modal-ui .stlo-jev-field { grid-template-columns: minmax(0, 1fr) minmax(0, 132px); gap: 4px; }
+            .stlo-modal-ui .stlo-jev-field > input[type="number"] { max-width:132px; }
+            .stlo-modal-ui .stlo-jev-prompt-heading .stlo-field-heading { flex:1 1 130px; }
         }
     `;
     document.head.appendChild(style);
@@ -723,8 +740,8 @@ function addLorebookBudgetMenuItem() {
         container.appendChild(item);
         menu.appendChild(container);
     };
-    add('stlo_budget_menu_item', 'fa-book', '로어북 예산 관리', openLorebookBudgetFromMenu);
-    add('stlo_jev_settings_menu_item', 'fa-sliders', translate('Jev & shared settings', 'stlo.jev.settingsTitle'), openJevSettings);
+    add('stlo_budget_menu_item', 'fa-book-open', '로어북 예산 관리', openLorebookBudgetFromMenu);
+    add('stlo_jev_settings_menu_item', 'fa-book-open', translate('Jev injection settings', 'stlo.jev.settingsTitle'), openJevSettings);
 }
 
 /**
@@ -1275,10 +1292,18 @@ async function openJevSettings() {
         const saved = getCharacterJevRecall(avatar);
         const choice = saved === true ? 'on' : saved === false ? 'off' : 'inherit';
         const jevOptions = getJevOptions();
+        const tr = (fallback, key) => translate(fallback, 'stlo.jev.' + key);
+        const promptModel = createJevPromptLibrary(jevOptions, extension_settings[EXTENSION_NAME]?.jevPromptLibrary, {
+            defaultName: tr('Default prompt', 'promptDefault'),
+            previousName: tr('Previous prompt', 'promptPrevious'),
+        });
+        let promptUi = null;
+        let dialogOpen = true;
+        const promptIcon = (action, icon, key) => '<button type="button" class="menu_button stlo-jev-prompt-icon" data-jev-prompt-action="' + action + '" data-jev-prompt-label="' + key + '"><i class="fa-solid ' + icon + '" aria-hidden="true"></i></button>';
         const html = `
             <div class="stlo-modal-ui">
                 <div class="world_entry_form_control stlo-section">
-                    <h3 data-i18n="stlo.jev.settingsTitle">Jev & shared settings</h3>
+                    <h3 data-i18n="stlo.jev.dialogTitle">Jev settings</h3>
                     <h4 data-i18n="stlo.jev.characterTitle">Current character</h4>
                     ${HAS_WORLDINFO_SCAN_DONE && avatar ? `
                         <small class="stlo-scope-name" id="stlo-jev-character-name"></small>
@@ -1291,7 +1316,7 @@ async function openJevSettings() {
                 </div>
                 ${HAS_WORLDINFO_SCAN_DONE ? `
                 <div class="world_entry_form_control stlo-section">
-                    <h4 data-i18n="stlo.jev.sharedTitle">Jev · shared by all characters</h4>
+                    <h4 data-i18n="stlo.jev.sharedTitle">Jev injection settings (all characters)</h4>
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-budget" data-i18n="stlo.jev.budget">Total Jev budget (tokens)</label>${infoHelp('stlo.jev.budgetHelp', 'Shared injection ceiling, not an API input-token limit. World Info and individual book limits still apply.')}</div><input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1" value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}"></div>
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-profile" data-i18n="stlo.jev.profile">NanoGPT connection profile</label>${infoHelp('stlo.jev.keyHelp', 'Only NanoGPT connection keys are supported. Use a key with Billing set to Subscription only to block balance charges.')}</div><select id="stlo-jev-profile" class="text_pole textarea_compact"><option value="" data-i18n="stlo.jev.chooseProfile">Select a profile</option></select></div>
                 </div>
@@ -1305,8 +1330,27 @@ async function openJevSettings() {
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-recent" data-i18n="stlo.jev.recent">Recent messages</label>${infoHelp('stlo.jev.recentHelp', 'Number of recent visible messages Jev reads; default 6. More messages increase input size.')}</div><input type="number" id="stlo-jev-recent" class="text_pole textarea_compact" min="1" max="100" step="1" value="${jevOptions.recent}"></div>
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-message-length" data-i18n="stlo.jev.messageLength">Maximum characters per message</label>${infoHelp('stlo.jev.messageLengthHelp', 'Default 1,400; longer messages use their end.')}</div><input type="number" id="stlo-jev-message-length" class="text_pole textarea_compact" min="100" max="20000" step="1" value="${jevOptions.messageLength}"></div>
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-lore-length" data-i18n="stlo.jev.loreLength">Maximum characters per lore excerpt</label>${infoHelp('stlo.jev.loreLengthHelp', 'Default 960. Long lore is represented by its beginning and end; selected lore is injected in full. Larger inputs can exceed provider limits or cost more.')}</div><input type="number" id="stlo-jev-lore-length" class="text_pole textarea_compact" min="100" max="20000" step="1" value="${jevOptions.loreLength}"></div>
-                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Selection preset</label>${infoHelp('stlo.jev.presetHelp', 'Strict favors direct relevance; balanced is the original prompt; generous considers useful indirect context. Same request count and budget.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option><option value="custom" data-i18n="stlo.jev.custom">Custom</option></select></div>
-                <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.prompt">Selection prompt</h4>${infoHelp('stlo.jev.promptHelp', 'Edit decision criteria, not the structured response format. The settings are shared across characters.')}</div><textarea id="stlo-jev-prompt" class="text_pole" rows="7"></textarea>
+                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Selection preset</label>${infoHelp('stlo.jev.presetHelp', 'Strict favors direct relevance; balanced is the original prompt; generous considers useful indirect context. Same request count and budget.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option><option value="custom" disabled data-i18n="stlo.jev.custom">Custom</option></select></div>
+                <div class="stlo-jev-prompt-library" id="stlo-jev-prompt-library">
+                    <header class="stlo-jev-prompt-heading">
+                        <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.prompt">Selection prompt</h4>${infoHelp('stlo.jev.promptHelp', 'Edit decision criteria, not the structured response format. The settings are shared across characters.')}</div>
+                        <div class="stlo-jev-prompt-tools">
+                            ${promptIcon('expand','fa-expand','promptExpand')}
+                            ${promptIcon('export','fa-file-export','promptExport')}
+                            ${promptIcon('import','fa-file-import','promptImport')}
+                            ${promptIcon('delete','fa-trash','promptDelete')}
+                        </div>
+                    </header>
+                    <div class="stlo-jev-prompt-selection">
+                        <select id="stlo-jev-prompt-choice" class="text_pole" aria-label="Jev prompt"></select>
+                        ${promptIcon('save','fa-floppy-disk','promptSave')}
+                        ${promptIcon('rename','fa-pen','promptRename')}
+                        ${promptIcon('copy','fa-file-circle-plus','promptSaveAs')}
+                    </div>
+                    <textarea id="stlo-jev-prompt" class="text_pole" rows="5" spellcheck="false" aria-label="Jev prompt"></textarea>
+                    <small class="stlo-jev-prompt-status" id="stlo-jev-prompt-status" role="status" aria-live="polite"></small>
+                    <input type="file" id="stlo-jev-prompt-file" accept=".json,application/json" hidden>
+                </div>
                 <div class="stlo-jev-actions"><button type="button" class="menu_button" id="stlo-jev-reset" data-i18n="stlo.jev.reset">Restore defaults</button><button type="button" class="menu_button" id="stlo-jev-report" data-i18n="stlo.jev.report">Latest Jev recall</button></div></div></details>
                 </div>` : ''}
                 <div class="world_entry_form_control stlo-section">
@@ -1333,31 +1377,38 @@ async function openJevSettings() {
                 cancelButton: translate('Cancel', 'stlo.modal.cancel'),
                 wide: false, large: false, allowVerticalScrolling: true,
                 onClosing: closingPopup => {
-                    if (closingPopup.result !== 1) { resolve(null); return true; }
+                    if (closingPopup.result !== 1) { dialogOpen = false; resolve(null); return true; }
                     const protectInput = document.getElementById(SELECTORS.PROTECT_ALWAYS_ON);
                     if (!protectInput) return false;
                     const result = { protectAlwaysOn: protectInput.checked };
                     if (HAS_WORLDINFO_SCAN_DONE) {
+                        if (!promptUi || promptUi.isBusy()) return false;
+                        const promptState = promptModel.snapshot();
+                        if (!promptState) {
+                            toastr.warning(tr('Prompt text cannot be empty.', 'promptEmpty'));
+                            return false;
+                        }
                         const val = id => document.getElementById(id)?.value;
                         const opts = {
                             mode: document.querySelector('input[name="stlo-jev-mode"]:checked')?.value,
                             recent: val('stlo-jev-recent'),
                             messageLength: val('stlo-jev-message-length'),
                             loreLength: val('stlo-jev-lore-length'),
-                            preset: val('stlo-jev-preset'),
-                            prompt: val('stlo-jev-prompt'),
+                            preset: promptState.preset,
+                            prompt: promptState.prompt,
                         };
                         const numeric = [[opts.recent, 1, 100], [opts.messageLength, 100, 20000], [opts.loreLength, 100, 20000]];
-                        if (numeric.some(([value, min, max]) => !String(value ?? '').trim() || !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max) ||
-                            (opts.preset === 'custom' && !String(opts.prompt ?? '').trim())) {
+                        if (numeric.some(([value, min, max]) => !String(value ?? '').trim() || !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max)) {
                             toastr.error(translate('Check the Jev numeric settings and custom prompt.', 'stlo.jev.validation'));
                             return false;
                         }
                         result.jevBudget = normalizeJevBudget(val('stlo-jev-budget'));
                         result.jevProfileId = val('stlo-jev-profile') ?? '';
-                        result.jevOptions = normalizeJevOptions({ ...opts, prompt: opts.preset === 'custom' ? opts.prompt : '' });
+                        result.jevOptions = normalizeJevOptions(opts);
+                        result.jevPromptLibrary = promptState.library;
                         result.characterChoice = val('stlo-jev-character-choice');
                     }
+                    dialogOpen = false;
                     resolve(result);
                     return true;
                 },
@@ -1368,7 +1419,9 @@ async function openJevSettings() {
                 const name = document.getElementById('stlo-jev-character-name');
                 if (name) name.textContent = characterName;
                 setupStloInfoPopups(listeners);
-                if (HAS_WORLDINFO_SCAN_DONE) setupJevModalBehavior(listeners);
+                if (HAS_WORLDINFO_SCAN_DONE) {
+                    promptUi = setupJevModalBehavior(listeners, promptModel, tr, () => dialogOpen);
+                }
             });
         });
         if (result) {
@@ -1377,6 +1430,7 @@ async function openJevSettings() {
                 settings.jevBudget = result.jevBudget;
                 settings.jevProfileId = result.jevProfileId;
                 settings.jevOptions = result.jevOptions;
+                settings.jevPromptLibrary = result.jevPromptLibrary;
                 setCharacterJevRecall(settings, avatar, result.characterChoice);
             }
             setProtectAlwaysOn(result.protectAlwaysOn);
@@ -1395,7 +1449,7 @@ async function openJevSettings() {
     }
 }
 
-function setupJevModalBehavior(modalEventListeners) {
+function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
     const jevProfile = document.getElementById('stlo-jev-profile');
     if (jevProfile) {
         for (const profile of extension_settings.connectionManager?.profiles ?? []) {
@@ -1412,34 +1466,37 @@ function setupJevModalBehavior(modalEventListeners) {
     }
 
     const preset = document.getElementById('stlo-jev-preset');
-    const prompt = document.getElementById('stlo-jev-prompt');
+    const target = document.getElementById('stlo-jev-prompt-library');
     const reset = document.getElementById('stlo-jev-reset');
     const report = document.getElementById('stlo-jev-report');
-    if (preset && prompt && reset && report) {
-        const options = getJevOptions();
-        let customDraft = options.prompt;
-        preset.value = customDraft ? 'custom' : options.preset;
-        prompt.value = customDraft || JEV_PRESETS[options.preset];
-        const onPreset = () => {
-            if (preset.value === 'custom') prompt.value = customDraft || prompt.value;
-            else prompt.value = JEV_PRESETS[preset.value] ?? JEV_PRESETS.balanced;
-        };
-        const onPrompt = () => { customDraft = prompt.value; preset.value = 'custom'; };
-        const onReset = () => {
-            const defaults = normalizeJevOptions();
-            document.getElementById('stlo-jev-recent').value = String(defaults.recent);
-            document.getElementById('stlo-jev-message-length').value = String(defaults.messageLength);
-            document.getElementById('stlo-jev-lore-length').value = String(defaults.loreLength);
-            preset.value = 'balanced';
-            customDraft = '';
-            onPreset();
-        };
-        const onReport = () => { void openJevReport(); };
-        for (const [element, event, handler] of [[preset, 'change', onPreset], [prompt, 'input', onPrompt], [reset, 'click', onReset], [report, 'click', onReport]]) {
-            element.addEventListener(event, handler);
-            modalEventListeners.push({ element, event, handler });
-        }
+    if (!preset || !target || !reset || !report) return null;
+    const labelDefaults = {
+        promptExpand: 'View full prompt', promptExport: 'Export prompt', promptImport: 'Import prompt',
+        promptDelete: 'Delete prompt', promptSave: 'Save', promptRename: 'Rename prompt', promptSaveAs: 'Save as new prompt',
+    };
+    for (const button of target.querySelectorAll('[data-jev-prompt-label]')) {
+        const key = button.dataset.jevPromptLabel;
+        const label = tr(labelDefaults[key], key);
+        button.title = label;
+        button.setAttribute('aria-label', label);
     }
+    const ui = mountJevPromptLibrary({ target, model: promptModel, generosity: preset, Popup, POPUP_TYPE, tr,
+        warn: message => toastr.warning(message), isOpen });
+    const onReset = () => {
+        if (ui.isBusy()) return;
+        const defaults = normalizeJevOptions();
+        document.getElementById('stlo-jev-recent').value = String(defaults.recent);
+        document.getElementById('stlo-jev-message-length').value = String(defaults.messageLength);
+        document.getElementById('stlo-jev-lore-length').value = String(defaults.loreLength);
+        promptModel.chooseBuiltin('balanced');
+        ui.render();
+    };
+    const onReport = () => { if (!ui.isBusy()) void openJevReport(); };
+    for (const [element, event, handler] of [[reset, 'click', onReset], [report, 'click', onReport]]) {
+        element.addEventListener(event, handler);
+        modalEventListeners.push({ element, event, handler });
+    }
+    return ui;
 
 }
 
