@@ -740,8 +740,8 @@ function addLorebookBudgetMenuItem() {
         container.appendChild(item);
         menu.appendChild(container);
     };
-    add('stlo_budget_menu_item', 'fa-book-open', '로어북 예산 관리', openLorebookBudgetFromMenu);
-    add('stlo_jev_settings_menu_item', 'fa-book-open', translate('Jev injection settings', 'stlo.jev.settingsTitle'), openJevSettings);
+    add('stlo_budget_menu_item', 'fa-scale-balanced', '로어북 예산 관리', openLorebookBudgetFromMenu);
+    add('stlo_jev_settings_menu_item', 'fa-scale-balanced', translate('Jev injection settings', 'stlo.jev.settingsTitle'), openJevSettings);
 }
 
 /**
