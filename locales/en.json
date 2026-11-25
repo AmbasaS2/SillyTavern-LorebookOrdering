@@ -145,5 +145,22 @@
   "stlo.jev.status.done": "Recall complete",
   "stlo.jev.status.cancelled": "Reply cancelled",
   "stlo.jev.status.empty": "No eligible candidates",
-  "stlo.jev.status.none": "No recall report yet"
+  "stlo.jev.status.none": "No recall report yet",
+  "stlo.jev.settingsTitle": "Jev & shared settings",
+  "stlo.jev.characterTitle": "Current character",
+  "stlo.jev.characterActivation": "Jev selection",
+  "stlo.jev.characterActivationHelp": "Applies to all chats with this character. Inherit preserves legacy per-book behavior; explicit on selects all active books except excluded ones.",
+  "stlo.jev.inherit": "Follow existing lorebook settings",
+  "stlo.jev.on": "On",
+  "stlo.jev.off": "Off",
+  "stlo.jev.noCharacter": "Open a single-character chat to change its Jev setting. Group chats continue to use the existing per-book setting.",
+  "stlo.jev.unsupported": "Jev requires World Info scan support.",
+  "stlo.jev.sharedTitle": "Jev · shared by all characters",
+  "stlo.jev.sharedBudgetTitle": "Shared World Info budget settings",
+  "stlo.jev.bookTitle": "Jev · this lorebook",
+  "stlo.jev.legacyBook": "Use Jev for this book in legacy/group mode",
+  "stlo.jev.legacyBookHelp": "Applies in group chats or for characters without an explicit Jev setting. Explicit character settings take precedence.",
+  "stlo.jev.unavailableProfile": "Saved profile (unavailable)",
+  "stlo.jev.settingsSaved": "Settings saved.",
+  "stlo.jev.settingsError": "Failed to open or save Jev settings."
 }

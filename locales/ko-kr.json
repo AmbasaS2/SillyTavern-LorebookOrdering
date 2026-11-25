@@ -146,5 +146,22 @@
   "stlo.jev.status.done": "기억 검색 완료",
   "stlo.jev.status.cancelled": "답변 취소",
   "stlo.jev.status.empty": "판정 대상 없음",
-  "stlo.jev.status.none": "최근 검색 기록 없음"
+  "stlo.jev.status.none": "최근 검색 기록 없음",
+  "stlo.jev.settingsTitle": "제브 · 공통 설정",
+  "stlo.jev.characterTitle": "현재 캐릭터",
+  "stlo.jev.characterActivation": "제브 판정 사용",
+  "stlo.jev.characterActivationHelp": "이 캐릭터와의 모든 채팅에 적용됩니다. 기존 설정을 따르면 이전 로어북별 활성화 방식을 유지합니다. 사용을 선택하면 제외한 책을 빼고 모든 활성 로어북을 판정합니다.",
+  "stlo.jev.inherit": "기존 로어북 설정 따름",
+  "stlo.jev.on": "사용",
+  "stlo.jev.off": "사용 안 함",
+  "stlo.jev.noCharacter": "1:1 캐릭터 채팅을 열면 캐릭터별 제브 사용 여부를 설정할 수 있습니다. 그룹 채팅은 기존 로어북별 설정을 유지합니다.",
+  "stlo.jev.unsupported": "제브를 사용하려면 월드 정보 스캔을 지원하는 실리태번 버전이 필요합니다.",
+  "stlo.jev.sharedTitle": "제브 공통 설정",
+  "stlo.jev.sharedBudgetTitle": "공통 예산 설정",
+  "stlo.jev.bookTitle": "로어북별 제브 설정",
+  "stlo.jev.legacyBook": "그룹·기존 로어북 기준 제브 사용",
+  "stlo.jev.legacyBookHelp": "그룹 채팅이나 제브 사용 여부를 따로 지정하지 않은 캐릭터에 적용됩니다. 캐릭터별 설정이 우선합니다.",
+  "stlo.jev.unavailableProfile": "저장된 프로필 (현재 사용 불가)",
+  "stlo.jev.settingsSaved": "설정을 저장했습니다.",
+  "stlo.jev.settingsError": "제브 설정을 열거나 저장하지 못했습니다."
 }

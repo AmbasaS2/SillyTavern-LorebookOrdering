@@ -46,7 +46,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         eventSource,event_types:events,extension_settings:settings,document:doc,Popup,POPUP_TYPE:{CONFIRM:2,TEXT:1},NOTE_MODULE_NAME:'note',
         characters:[{avatar:'avatar.png'}],this_chid:0,getCurrentChatId:()=> 'chat1',getContext:()=>ctx,
         getTokenCountAsync:async s=>s.length,getRequestHeaders:()=>({}),getMaxContextSize:()=>10000,
-        getCharacterCardFields:()=>({}),world_info_budget:100,world_info_budget_cap:0,world_info_include_names:false,
+        getCharacterCardFields:()=>({}),world_info:{},getCharaFilename:()=> 'avatar',world_info_budget:100,world_info_budget_cap:0,world_info_include_names:false,
         worldInfoCache:books,world_names:[...books.keys()],selected_world_info:[...books.keys()],power_user:{},METADATA_KEY:'world',
         translate:t=>t,console:{warn(){},error(){},info(){},debug(){}},toastr:{error(){}},
         stopGeneration(){counters.stop++;void eventSource.emit(events.GENERATION_STOPPED);},
@@ -79,7 +79,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLDINFO_FORCE_ACTIVATE,entries.filter(e=>e.vectorized));
     };
     const code=source.replace(/^import .*?;\s*$/gm,'').replace('import.meta.url',JSON.stringify('file:///stlo/index.js'));
-    runInNewContext(code+'\nsetupEventHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration};',sandbox);
+    runInNewContext(code+'\nsetupEventHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration,setCharacterJevRecall};',sandbox);
     async function generate({dryRun=false}={}){
         await eventSource.emit(events.GENERATION_STARTED,'normal',{},dryRun);
         if(dryRun)return;
@@ -92,7 +92,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,active);
         return entries;
     }
-    return {generate,counters,ctx,force,report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
 }
 
 test('all-mode generation skips vectors, honors exclusions and only asks Jev once',async()=>{
@@ -160,4 +160,36 @@ test('disabled and dry-run generations do not call Jev or create its top bar UI'
 
 test('new recall paths use no DOM observer, polling or animation loop',()=>{
     assert.doesNotMatch(source,/\b(?:MutationObserver|ResizeObserver|IntersectionObserver|setInterval)\s*\(/);
+});
+
+
+test('character Jev choice is independent of other characters and book settings', async()=>{
+    const h=harness({enabled:false});
+    h.setChoice('other.png','on');
+    h.setChoice('avatar.png','on');
+    assert.equal(h.settings.stlo.jevByCharacter['other.png'],true);
+    assert.equal(h.settings.stlo.jevByCharacter['avatar.png'],true);
+    assert.equal(h.books.get('C').stlo.jevExclude,true);
+    await h.generate();
+    assert.equal(h.counters.jev,1);
+    h.setChoice('avatar.png','off');
+    assert.equal(h.settings.stlo.jevByCharacter['avatar.png'],false);
+    assert.equal(h.settings.stlo.jevByCharacter['other.png'],true);
+    const off=harness();
+    off.setChoice('avatar.png','off');
+    await off.generate();
+    assert.equal(off.counters.jev,0);
+});
+
+test('inherit removes only the explicit character override and uses legacy book scope', async()=>{
+    const h=harness({enabled:true});
+    h.books.get('A').stlo.jevRecall=true;
+    h.setChoice('other.png','off');
+    h.setChoice('avatar.png','inherit');
+    assert.equal(Object.hasOwn(h.settings.stlo.jevByCharacter,'avatar.png'),false);
+    assert.equal(h.settings.stlo.jevByCharacter['other.png'],false);
+    const entries=await h.generate();
+    assert.equal(h.counters.jev,1);
+    assert.equal(entries.some(e=>e.world==='B'&&e.uid===1&&e.content.startsWith('@@activate')),false);
+    assert.equal(h.books.get('A').stlo.jevRecall,true);
 });
