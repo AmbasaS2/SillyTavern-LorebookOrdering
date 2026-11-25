@@ -1625,16 +1625,15 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                            ? currentSettings.vectorThreshold : ''}">
             </div>
 
+                        ${showBookJev ? `<div class="stlo-toggle-block">
+                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
+                            <div class="stlo-legacy-book" ${characterAvatar ? "hidden" : ""}>
+                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in group chats</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies when using this book in a group chat.')}</div>
+                            </div>
+                        </div>` : ''}
                     </div>
                 </details>
             </div>
-            ${showBookJev ? `<div class="world_entry_form_control stlo-section">
-                <h4 data-i18n="stlo.jev.bookTitle">Jev · this lorebook</h4>
-                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
-                <div class="stlo-legacy-book" ${characterAvatar ? "hidden" : ""}>
-                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in group chats</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies when using this book in a group chat.')}</div>
-                </div>
-            </div>` : ''}
             <div class="world_entry_form_control stlo-section stlo-group-section">
                 <details class="stlo-advanced-drawer">
                     <summary data-i18n="stlo.modal.groupOverrides.title">Group Chat Overrides</summary>
