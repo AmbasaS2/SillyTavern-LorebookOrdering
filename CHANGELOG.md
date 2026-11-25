@@ -2,6 +2,13 @@
 
 **← [Back to README](README.md)**
 
+## Ambasa fork — opt-in and budget stability (November 25, 2026)
+- Always-on budget protection is opt-in; existing explicit settings are retained. Without effective custom ordering, preserve native lorebook source precedence and insertion values. Reserve constant budget only on scan copies and restore temporary flags at final assembly.
+- Count only constants fitting applicable ceilings during Jev planning, including caps of other active books. Reserve actual Jev picks for the native scan and enforce all three applicable ceilings, including zero-pick runs and actual native special entries in managed books. Explicit native budget exemptions remain exempt from native/book caps, but not from the managed-book Jev cap. Outlet handling is unchanged.
+- Keep native chat/file vectors and excluded-book vectors. In all-entries mode omit only complete Jev-managed World Info collections; retain a whole collection when a special entry needs native vectors. No deletion or rebuilding of stored vector indexes.
+- Validate invalid Jev budget values instead of silently resetting. Remove unsafe pre-scan truncation on older hosts lacking the structured scan event. No new UI observers, polling or redraw loops; prompt editor layout and implementation are unchanged.
+- Validation: 48 Node tests and isolated Chromium checks at 1024px, 460px, and 360px passed. Native-host scan and vector behavior are simulated; actual installed SillyTavern and NanoGPT live calls remain unverified. Manifest unchanged.
+
 ## Ambasa fork — compact Jev settings (November 25, 2026)
 - Unify the Jev menu and dialog title as Lorebook Jev Recall (로어북 Jev 호출).
 - Use a per-character checkbox and compact, container-width-responsive two-column input groups; stack fields on narrow screens.

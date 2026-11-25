@@ -15,7 +15,7 @@ const raw = [
 ];
 const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
-function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern'}={}) {
+function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={}}={}) {
     const listeners=new Map();
     const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0};
     const events=new Proxy({}, {get:(_,key)=>key});
@@ -26,11 +26,12 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         async emit(k,...args){for(const fn of [...(listeners.get(k)||[])])await fn(...args);},
     };
     const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode},jevProfileId:'nano',jevBudget:1000},
-        connectionManager:{profiles:[profile]},vectors:{enabled_world_info:vectors},disabledExtensions:[]};
+        connectionManager:{profiles:[profile]},vectors:{enabled_world_info:vectors,enabled_chats:extraVectors,enabled_files:extraVectors},disabledExtensions:[]};
     const books=new Map([['A',{stlo:{}}],['B',{stlo:{}}],['C',{stlo:{jevExclude:true}}]]);
     const ctx={groupId:null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
     const force=new Map();
-    const batches=[];
+    const batches=[], vectorKeys=[];
+    let activated=[];
     eventSource.on(events.WORLDINFO_FORCE_ACTIVATE,entries=>{for(const e of entries)force.set(recall.jevEntryKey(e),e);});
     const elements=new Map();
     const makeNode=()=>{
@@ -46,16 +47,19 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         ...recall,Map,Set,Array,Object,Promise,URL,AbortController,AbortSignal,structuredClone,performance,
         eventSource,event_types:events,extension_settings:settings,document:doc,Popup,POPUP_TYPE:{CONFIRM:2,TEXT:1},NOTE_MODULE_NAME:'note',
         characters:[{avatar:'avatar.png'}],this_chid:0,getCurrentChatId:()=> 'chat1',getContext:()=>ctx,
-        getTokenCountAsync:async s=>s.length,getRequestHeaders:()=>({}),getMaxContextSize:()=>10000,
+        getTokenCountAsync:async s=>s.length,getRequestHeaders:()=>({}),getMaxContextSize:()=>10000,world_info_character_strategy:strategy,world_info_insertion_strategy:{evenly:0,character_first:1,global_first:2},
         getCharacterCardFields:()=>({}),world_info:{},getCharaFilename:()=> 'avatar',world_info_budget:100,world_info_budget_cap:0,world_info_include_names:false,
         worldInfoCache:books,world_names:[...books.keys()],selected_world_info:[...books.keys()],power_user:{},METADATA_KEY:'world',
         translate:t=>t,console:{warn(){},error(){},info(){},debug(){}},toastr:{error(){}},
         stopGeneration(){counters.stop++;void eventSource.emit(events.GENERATION_STOPPED);},
         getSortedEntries:async()=>{
             counters.sorted++;
-            const data={globalLore:structuredClone(entries),characterLore:[],chatLore:[],personaLore:[]};
+            const data={globalLore:[],characterLore:[],chatLore:[],personaLore:[]};
+            for(const e of structuredClone(entries)) data[e.source || 'globalLore'].push(e);
             await eventSource.emit(events.WORLDINFO_ENTRIES_LOADED,data);
-            return data.globalLore;
+            const sort=arr=>arr.sort((a,b)=>(b.order??100)-(a.order??100));
+            const rest=strategy===1?[...sort(data.characterLore),...sort(data.globalLore)]:strategy===2?[...sort(data.globalLore),...sort(data.characterLore)]:sort([...data.globalLore,...data.characterLore]);
+            return [...sort(data.chatLore),...sort(data.personaLore),...rest];
         },
         checkWorldInfo:async()=>{
             counters.preview++;
@@ -71,7 +75,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
             batches.push([...prepared.candidates.keys()]);
             if(counters.jev<=sizeFailures)throw new recall.JevInputLimitError('Jev rejected the input size.');
             if(counters.jev<=failures||counters.jev===failAt)throw Error('Jev is unavailable (503).');
-            return { decisions:[...prepared.candidates.values()].filter(key=>!decisions||decisions.includes(key)).map(key=>({key,score:.9})), inputTokens:100 };
+            return { decisions:[...prepared.candidates.values()].filter(key=>!decisions||decisions.includes(key)).map(key=>({key,score:scores[key]??.9})), inputTokens:100 };
         },
     };
     sandbox.globalThis=sandbox;
@@ -79,7 +83,13 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         if(!vectors)return;
         counters.vector++;
         const entries=await sandbox.getSortedEntries();
-        await eventSource.emit(events.WORLDINFO_FORCE_ACTIVATE,entries.filter(e=>e.vectorized));
+        const hits=entries.filter(e=>e.vectorized);
+        vectorKeys.push(...hits.map(recall.jevEntryKey));
+        if(extraVectors) {
+            ctx.extensionPrompts['3_vectors']={value:'native chat recall'};
+            ctx.extensionPrompts['4_vectors_data_bank']={value:'native file recall'};
+        }
+        await eventSource.emit(events.WORLDINFO_FORCE_ACTIVATE,hits);
     };
     const code=source.replace(/^import .*?;\s*$/gm,'').replace('import.meta.url',JSON.stringify('file:///stlo/index.js'));
     runInNewContext(code+'\nsetupEventHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration,setCharacterJevRecall};',sandbox);
@@ -91,23 +101,37 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         if(!counters.abort&&vectors)await sandbox.vectors_rearrangeChat(ctx.chat,10000,abort,'normal');
         if(counters.abort)return;
         const entries=await sandbox.getSortedEntries();
-        const active=entries.filter(e=>e.content.startsWith('@@activate')||e.constant||e.world==='C');
-        await eventSource.emit(events.WORLD_INFO_ACTIVATED,active);
+        // Simulate native activation and its early budget cutoff, then
+        // run the real extension's structural final-scan handler.
+        const active=new Map();
+        let used=0, overflow=false;
+        for(const e of entries) {
+            if(e.disable||!(e.content.startsWith('@@activate')||e.constant||e.world==='C'||force.has(recall.jevEntryKey(e)))) continue;
+            const copy={...e,content:e.content.replace(/^@@activate\n/,'')};
+            const cost=copy.content.length+1;
+            if(!copy.ignoreBudget && (overflow||used+cost>wiBudget)) {overflow=true;continue;}
+            used+=cost;
+            active.set(recall.jevEntryKey(copy),copy);
+        }
+        await eventSource.emit(events.WORLDINFO_SCAN_DONE,{activated:{entries:active},sortedEntries:entries,state:{next:0},budget:{current:wiBudget}});
+        activated=[...active.values()];
+        await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
 }
 
-test('all-mode generation skips vectors, honors exclusions and only asks Jev once',async()=>{
+test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
     const h=harness();
     const entries=await h.generate();
     assert.equal(h.counters.jev,1);
-    assert.equal(h.counters.vector,0);
+    assert.equal(h.counters.vector,1);
+    assert.deepEqual(h.vectorKeys,[]);
     assert.equal(h.counters.preview,0);
     assert.equal(h.counters.abort,0);
     assert.equal(entries.filter(e=>e.content.startsWith('@@activate')).length,3);
     assert.equal(entries.find(e=>e.world==='C').content,'Excluded native keyword');
-    assert.equal(h.ctx.extensionPrompts['3_vectors'],undefined);
+    assert.equal(h.ctx.extensionPrompts['3_vectors'].value,'old');
     assert.equal(h.report().injected,3);
     assert.equal(h.elements.has('stlo-jev-topbar'),true);
 });
@@ -238,4 +262,114 @@ test('preflight rejects a single oversized question without any paid request',as
     assert.equal(h.counters.jev,0);
     assert.equal(h.counters.abort,1);
     assert.equal(h.report().unassessed,1);
+});
+
+
+test('all-mode preserves excluded book vectors, chat and Data Bank recall', async()=>{
+    const entries=raw.map(e=>e.world==='C'?{...e,vectorized:true}:e);
+    const h=harness({entries,extraVectors:true});
+    await h.generate();
+    assert.deepEqual(h.vectorKeys,['["C",1]']);
+    assert.equal(h.ctx.extensionPrompts['3_vectors'].value,'native chat recall');
+    assert.equal(h.ctx.extensionPrompts['4_vectors_data_bank'].value,'native file recall');
+    assert.equal(h.counters.jev,1);
+});
+
+test('special vector-dependent entries preserve the whole book collection, not just some hashes',async()=>{
+    const entries=[...raw,entry('A',99,'sticky native vector',{sticky:3,vectorized:true})];
+    const h=harness({entries});
+    await h.generate();
+    assert.ok(h.vectorKeys.includes('["A",1]'));
+    assert.ok(h.vectorKeys.includes('["A",99]'));
+    assert.ok(!h.vectorKeys.some(k=>k.startsWith('["B"')));
+});
+
+test('no configured priority or protection preserves native source precedence and raw insertion orders',async()=>{
+    const entries=[entry('A',1,'global',{order:900}),entry('B',1,'character',{order:100,source:'characterLore'}),entry('C',1,'chat',{order:1,source:'chatLore'})];
+    const h=harness({entries,enabled:false,vectors:false,strategy:1});
+    const sorted=await h.generate();
+    assert.deepEqual(sorted.map(e=>[e.world,e.order]),[['C',1],['B',100],['A',900]]);
+    assert.ok(sorted.every(e=>!e.ignoreBudget&&!e.__stloReservedConstant));
+});
+
+test('explicit always-on protection reserves budget but retains raw insertion order',async()=>{
+    const entries=[entry('A',1,'x'.repeat(80),{order:900}),entry('C',2,'p'.repeat(40),{order:1,constant:true}),entry('C',3,'z'.repeat(80),{order:800})];
+    const h=harness({entries,enabled:false,vectors:false,wiBudget:100});
+    h.settings.stlo.protectAlwaysOn=true;
+    await h.generate();
+    assert.deepEqual(h.activated().map(e=>[e.uid,e.order]),[[2,1]]);
+    assert.equal(h.activated()[0].ignoreBudget,false);
+    assert.ok(!Object.hasOwn(h.activated()[0],'__stloReservedConstant'));
+});
+
+test('zero Jev picks still enforce the managed-books cap on constants',async()=>{
+    const entries=[entry('A',1,'x'.repeat(6999),{constant:true,order:300}),entry('A',2,'y'.repeat(5999),{constant:true,order:200})];
+    const h=harness({entries,vectors:false,wiBudget:20000});
+    h.settings.stlo.jevBudget=10000;
+    await h.generate();
+    assert.equal(h.counters.jev,0);
+    assert.equal(h.activated().length,1);
+    assert.equal(h.activated()[0].uid,1);
+    assert.equal(h.activated()[0].order,300);
+});
+
+test('oversized external constant is trimmed and does not block an accepted Jev pick',async()=>{
+    const entries=[entry('C',1,'x'.repeat(8999),{constant:true,order:900}),entry('A',1,'p'.repeat(4999),{constant:true,order:500}),entry('A',2,'m'.repeat(999),{order:100})];
+    const h=harness({entries,vectors:false});
+    h.books.get('C').stlo.budgetMode='fixed';h.books.get('C').stlo.budget=1000;
+    h.settings.stlo.jevBudget=10000;
+    await h.generate();
+    assert.deepEqual(h.activated().map(e=>[e.world,e.uid]),[['A',1],['A',2]]);
+    assert.equal(h.report().accepted,1);
+});
+
+test('explicit original budget exemption remains intact for native books',async()=>{
+    const entries=[entry('C',1,'x'.repeat(149),{constant:true,ignoreBudget:true,order:10})];
+    const h=harness({entries,enabled:false,vectors:false,wiBudget:100});
+    h.settings.stlo.protectAlwaysOn=true;
+    await h.generate();
+    assert.equal(h.activated().length,1);
+    assert.equal(h.activated()[0].ignoreBudget,true);
+});
+
+
+test('explicit STLO ordering is retained while protection leaves effective insertion values intact',async()=>{
+    const entries=[entry('A',1,'constant',{constant:true,order:20}),entry('C',1,'native',{order:10})];
+    const h=harness({entries,enabled:false,vectors:false});
+    h.books.get('A').stlo.priority=5;
+    h.books.get('C').stlo.priority=2;
+    h.settings.stlo.protectAlwaysOn=true;
+    await h.generate();
+    assert.deepEqual(h.activated().map(e=>[e.world,e.order]),[['A',50020],['C',20010]]);
+});
+
+test('actual Jev selection restores swapped insertion slots after final budgeting',async()=>{
+    const entries=[entry('A',1,'first',{order:200}),entry('A',2,'second',{order:100})];
+    const h=harness({entries,vectors:false,scores:{'["A",1]':.1,'["A",2]':.9}});
+    await h.generate();
+    assert.deepEqual(h.activated().map(e=>[e.uid,e.order]),[[2,100],[1,200]]);
+    assert.ok(h.activated().every(e=>e.ignoreBudget===false&&!Object.hasOwn(e,'__stloReservedJev')));
+});
+
+test('native special entries count toward the managed-book Jev ceiling without changing their activation rules',async()=>{
+    const entries=[entry('A',1,'x'.repeat(6999),{constant:true,order:100}),entry('A',2,'y'.repeat(3999),{vectorized:true,sticky:2,order:50})];
+    const h=harness({entries,vectors:true,wiBudget:20000});
+    h.settings.stlo.jevBudget=10000;
+    await h.generate();
+    assert.equal(h.counters.jev,0);
+    assert.deepEqual(h.vectorKeys,['["A",2]']);
+    assert.deepEqual(h.activated().map(e=>e.uid),[1]);
+});
+
+
+test('unconfigured protection and explicit off leave native constant admission unchanged',async()=>{
+    const entries=[entry('C',1,'x'.repeat(79),{order:900}),entry('C',2,'p'.repeat(39),{constant:true,order:100})];
+    for(const explicit of [false,undefined]){
+        const h=harness({entries,enabled:false,vectors:false,wiBudget:100});
+        if(explicit!==undefined)h.settings.stlo.protectAlwaysOn=explicit;
+        const sorted=await h.generate();
+        assert.deepEqual(h.activated().map(e=>e.uid),[1]);
+        assert.deepEqual(sorted.map(e=>e.order),[900,100]);
+        assert.ok(sorted.every(e=>!e.ignoreBudget&&!e.__stloReservedConstant));
+    }
 });

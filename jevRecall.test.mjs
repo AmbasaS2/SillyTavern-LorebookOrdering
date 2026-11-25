@@ -39,7 +39,7 @@ test('budget token counts share an async request and retry a failed count', asyn
     requests[1].reject(Error('tokenizer unavailable'));
     assert.equal(await edited, 0);
     const retry = count(entry);
-    assert.equal(requests[2].text, 'edited');
+    assert.equal(requests[2].text, 'edited\n');
     requests[2].resolve(11);
     assert.equal(await retry, 11);
 });
@@ -121,7 +121,7 @@ test('Jev reserves all applicable constants and fits books in model score order'
     const limits = { budget: 13, worldInfoBudget: 18, bookBudgets: new Map([['Core', 8]]), countTokens: async text => text.length };
     const selection = await fitJevRecall(entries, worlds, ranked, limits);
     assert.deepEqual([...selection.keys()], [small, npc].map(jevEntryKey));
-    assert.equal((await fitJevRecall(entries, worlds, ranked, { ...limits, budget: 4 })).size, 0);
+    assert.deepEqual([...await fitJevRecall(entries, worlds, ranked, { ...limits, budget: 4 })], [[jevEntryKey(small), 0]]);
     assert.deepEqual([...await fitJevRecall(entries, worlds, ranked, { ...limits, bookBudgets: new Map([['Core', 7]]) })],
         [[jevEntryKey(npc), 0]]);
     assert.deepEqual([...await fitJevRecall(entries, worlds, ranked, { ...limits, worldInfoBudget: 14 })],
@@ -297,4 +297,15 @@ test('conflicting preferred budgets use book priority without exceeding the shar
     const result=await fitJevRecall([a,b],new Set(['A','B']),[a,b].map(jevEntryKey),{
         budget:4,worldInfoBudget:100,bookBudgets:new Map([['A',4],['B',4]]),countTokens:async text=>text.length,bookPriorities:new Map([['A',1],['B',5]])});
     assert.deepEqual([...result.keys()],[jevEntryKey(b)]);
+});
+
+
+test('constants that cannot fit their own book or total cap do not reserve phantom space', async () => {
+    const oversized = lore('Other', 1, 'x'.repeat(9000), { constant: true });
+    const pinned = lore('Memory', 1, 'p'.repeat(4999), { constant: true });
+    const selected = lore('Memory', 2, 's'.repeat(999));
+    const opts = { budget: 10000, worldInfoBudget: 10000, bookBudgets: new Map([['Memory',10000], ['Other',1000]]), countTokens: async text=>text.length };
+    assert.deepEqual([...await fitJevRecall([oversized,pinned,selected],new Set(['Memory']),[jevEntryKey(selected)],opts)],[[jevEntryKey(selected),0]]);
+    const huge = lore('Memory',3,'x'.repeat(12000),{constant:true});
+    assert.deepEqual([...await fitJevRecall([huge,selected],new Set(['Memory']),[jevEntryKey(selected)],opts)],[[jevEntryKey(selected),0]]);
 });

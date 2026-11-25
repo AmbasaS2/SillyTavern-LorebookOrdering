@@ -5,7 +5,7 @@
   "stlo.jev.profile": "NanoGPT connection profile",
   "stlo.jev.chooseProfile": "Select a profile",
   "stlo.jev.keyHelp": "Only NanoGPT connection keys are supported. Use a key with Billing set to Subscription only to block balance charges.",
-  "stlo.jev.help": "Jev counts always-on entries first and respects book limits. Replies skip vector search when Jev is enabled. Keyword search is used if Jev is unavailable.",
+  "stlo.jev.help": "Jev counts always-on entries first and respects all budgets. Failed recalls require retry or cancellation.",
   "stlo.jev.inputHelp": "Every Jev request sends all eligible entries from all active lorebooks with Jev enabled in this chat. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.",
   "stlo.jev.inputHelpForCharacter": "When Jev is enabled for a character, every request sends all eligible entries from all lorebooks active in the chat. More entries use more input tokens. The recall budget limits only the lore in the reply prompt.",
   "stlo.button.configure": "Configure STLO Priority & Budget",
@@ -87,10 +87,10 @@
   "stlo.cmd.help": "Open STLO Priority & Budget for a specific lorebook.",
   "stlo.jev.recallHelp": "Select relevant lore within the budgets. Failed requests require retry or cancel.",
   "stlo.jev.exclude": "Exclude this lorebook from Jev",
-  "stlo.jev.excludeHelp": "Use native activation for this book. All-entries mode skips vectors; filtered mode retains them.",
+  "stlo.jev.excludeHelp": "This book keeps native activation, including configured vector retrieval.",
   "stlo.jev.budgetHelp": "Maximum injection across Jev books. This does not limit what Jev reads.",
   "stlo.jev.mode": "Jev candidate source",
-  "stlo.jev.modeHelp": "All: assess every eligible entry. Filtered: assess only keyword/vector hits. Large requests split automatically.",
+  "stlo.jev.modeHelp": "All: assess all eligible entries instead of ordinary vector recall for Jev books. Filtered: assess only keyword/vector hits. Other vector recall is retained.",
   "stlo.jev.modeAll": "All eligible lorebook entries (default)",
   "stlo.jev.modeFiltered": "Vector / keyword search candidates",
   "stlo.jev.advanced": "Advanced Jev settings",
@@ -179,7 +179,7 @@
   "stlo.budget.unifiedHelp": "The maximum this book can inject. When Jev is used, its relevant entries get this share first.",
   "stlo.budget.unifiedTip": "Unused capacity is shared. Always-on entries count toward the budget.",
   "stlo.budget.protect": "Protect always-on entries first",
-  "stlo.budget.protectHelp": "Applies to all lorebooks.",
+  "stlo.budget.protectHelp": "Applies to all lorebooks. Prioritizes budget, not insertion order.",
   "stlo.jev.readingLimits": "Reading limits",
   "stlo.jev.inputTooLarge": "One question with its shared context is too large. Reduce recent messages or explicitly set a reading limit.",
   "stlo.jev.plannedBatches": "Planned batches",
@@ -223,5 +223,6 @@
   "stlo.manager.contextPercent": "of context",
   "stlo.manager.thresholdRange": "Enter a vector threshold between 0 and 1.",
   "stlo.manager.allAdded": "All available books are already listed.",
-  "stlo.manager.linkedAdded": "All linked books are already listed. Enable Show all lorebooks for other books."
+  "stlo.manager.linkedAdded": "All linked books are already listed. Enable Show all lorebooks for other books.",
+  "stlo.jev.invalidBudget": "Enter a positive whole-number injection budget."
 }

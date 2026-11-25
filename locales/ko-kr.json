@@ -5,7 +5,7 @@
   "stlo.jev.profile": "나노GPT 연결 프로필",
   "stlo.jev.chooseProfile": "연결 프로필 선택",
   "stlo.jev.keyHelp": "나노GPT 연결 키만 사용할 수 있습니다. 잔액 결제를 막으려면 키의 Billing을 Subscription only로 설정하세요.",
-  "stlo.jev.help": "상시 항목을 먼저 계산하고 로어북별 예산을 적용합니다. Jev를 켜면 벡터 검색을 건너뜁니다. Jev를 사용할 수 없으면 키워드로 검색합니다.",
+  "stlo.jev.help": "상시 항목을 먼저 계산하고 예산을 적용합니다. 판정 실패 시 재시도하거나 답변을 취소합니다.",
   "stlo.jev.inputHelp": "현재 채팅에서 Jev를 켠 모든 로어북의 판정 대상 항목을 매번 한 요청에 담아 Jev로 보냅니다. 보내는 항목이 많을수록 Jev 입력 토큰이 늘어납니다. 주입 예산은 답변에 넣는 로어 분량만 제한합니다.",
   "stlo.jev.inputHelpForCharacter": "캐릭터에 Jev를 켜면 현재 채팅의 모든 활성 로어북에서 판정 대상 항목을 매번 한 요청에 담아 Jev로 보냅니다. 보내는 항목이 많을수록 Jev 입력 토큰이 늘어납니다. 주입 예산은 답변에 넣는 로어 분량만 제한합니다.",
   "stlo.button.configure": "STLO 우선순위 및 예산 구성",
@@ -88,10 +88,10 @@
   "stlo.budget.randomTrim": "예산 초과 시 항목을 무작위로 제외",
   "stlo.jev.recallHelp": "관련 로어를 예산 내에서 선택합니다. 실패하면 재시도하거나 답변을 취소합니다.",
   "stlo.jev.exclude": "이 로어북은 Jev 판정에서 제외",
-  "stlo.jev.excludeHelp": "이 책은 기존 발동 방식을 따릅니다. 전체 판정 모드에서는 벡터 검색이 생략됩니다.",
+  "stlo.jev.excludeHelp": "이 로어북은 기존 발동 방식과 벡터 검색 설정을 유지합니다.",
   "stlo.jev.budgetHelp": "Jev 적용 책의 전체 주입 상한입니다. Jev가 읽는 분량을 제한하지 않습니다.",
   "stlo.jev.mode": "Jev 판정 대상",
-  "stlo.jev.modeHelp": "전체: 적격 로어를 모두 판정. 검색 후보: 키워드·벡터 검색 결과만 판정. 큰 요청은 자동 분할합니다.",
+  "stlo.jev.modeHelp": "전체: 대상 로어북의 일반 벡터 검색 대신 적격 로어를 모두 판정합니다. 검색 후보: 키워드·벡터 검색 결과만 판정합니다. 다른 벡터 검색은 유지됩니다.",
   "stlo.jev.modeAll": "전체 로어북 항목 (기본값)",
   "stlo.jev.modeFiltered": "벡터·키워드 검색 후보",
   "stlo.jev.advanced": "Jev 고급 설정",
@@ -180,7 +180,7 @@
   "stlo.budget.unifiedHelp": "이 책의 최대 주입량입니다. Jev 사용 시 이 예산을 관련 로어에 우선 배정합니다.",
   "stlo.budget.unifiedTip": "상시 주입 항목도 포함하며, 남은 예산은 다른 책과 공유합니다.",
   "stlo.budget.protect": "상시 주입 우선 보호",
-  "stlo.budget.protectHelp": "모든 로어북에 적용됩니다.",
+  "stlo.budget.protectHelp": "모든 로어북에 적용됩니다. 예산을 우선 배정하며 삽입 순서는 바꾸지 않습니다.",
   "stlo.jev.readingLimits": "읽기 제한",
   "stlo.jev.inputTooLarge": "최근 대화·배경·로어 한 항목의 합이 Jev 입력 한도를 넘습니다. 최근 메시지 수를 줄이거나 읽기 제한을 직접 설정해 주세요.",
   "stlo.jev.plannedBatches": "판정 묶음 수",
@@ -224,5 +224,6 @@
   "stlo.manager.contextPercent": "컨텍스트",
   "stlo.manager.thresholdRange": "벡터 임계값은 0부터 1까지 입력해 주세요.",
   "stlo.manager.allAdded": "모든 로어북이 이미 추가되었습니다.",
-  "stlo.manager.linkedAdded": "연동된 로어북을 모두 추가했습니다. 다른 책은 모든 로어북 보기를 켜서 추가하세요."
+  "stlo.manager.linkedAdded": "연동된 로어북을 모두 추가했습니다. 다른 책은 모든 로어북 보기를 켜서 추가하세요.",
+  "stlo.jev.invalidBudget": "주입 예산은 1 이상의 정수로 입력해 주세요."
 }

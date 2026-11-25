@@ -297,16 +297,23 @@ export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoB
     let usedTotal = 0;
     let usedJev = 0;
     const usedJevByBook = new Map();
+    // Reserve only whole constants which can actually fit all applicable
+    // ceilings. Oversized constants in other books must not consume space
+    // that their own book cap will remove later.
     for (const entry of relevantConstants) {
         const tokens = counts.get(jevEntryKey(entry));
-        if (worlds.has(entry.world)) {
+        const managed = worlds.has(entry.world);
+        const nativeCost = !entry.ignoreBudget || entry.__stloReservedConstant === true ? tokens : 0;
+        const bookUsed = (usedByBook.get(entry.world) ?? 0) + nativeCost;
+        const bookLimit = bookBudgets.get(entry.world);
+        if (nativeCost > 0 && (usedTotal + nativeCost > worldInfoBudget || (bookLimit > 0 && bookUsed > bookLimit))) continue;
+        if (managed && usedJev + tokens > budget) continue;
+        if (managed) {
             usedJev += tokens;
             usedJevByBook.set(entry.world, (usedJevByBook.get(entry.world) ?? 0) + tokens);
         }
-        if (!entry.ignoreBudget || entry.__stloReservedConstant === true) {
-            usedTotal += tokens;
-            usedByBook.set(entry.world, (usedByBook.get(entry.world) ?? 0) + tokens);
-        }
+        usedTotal += nativeCost;
+        usedByBook.set(entry.world, bookUsed);
     }
     const accept = (entry, reserve = null) => {
         const key = jevEntryKey(entry);

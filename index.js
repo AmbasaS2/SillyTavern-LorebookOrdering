@@ -43,9 +43,9 @@ const DEFAULT_LOREBOOK_SETTINGS = {
 };
 
 // Global switch for prioritizing always-on World Info entries across lorebooks.
-// Defaults ON to preserve the current fork's ordering; users may disable it.
+// Explicit opt-in. An unset value must not change SillyTavern's behavior.
 function getProtectAlwaysOn() {
-    return extension_settings[EXTENSION_NAME]?.protectAlwaysOn !== false;
+    return extension_settings[EXTENSION_NAME]?.protectAlwaysOn === true;
 }
 function setProtectAlwaysOn(value) {
     extension_settings[EXTENSION_NAME] = {
@@ -216,21 +216,13 @@ function syncJevTopBar() {
     if (button.dataset.status !== report.phase) button.dataset.status = report.phase;
 }
 
-function clearVectorPrompts(context) {
-    delete context.extensionPrompts?.['3_vectors'];
-    delete context.extensionPrompts?.['4_vectors_data_bank'];
-}
-
 function guardNativeVectorInterceptor() {
     const interceptor = globalThis.vectors_rearrangeChat;
     if (typeof interceptor !== 'function') return false;
     if (interceptor === guardedVectorInterceptor) return true;
     guardedVectorInterceptor = async function (chat, contextSize, abort, type) {
         const run = jevGeneration;
-        if (run?.enabled && isCurrentJev(run) && run.options.mode === 'all') {
-            clearVectorPrompts(getContext());
-            return;
-        }
+        if (!run?.enabled || !isCurrentJev(run)) return interceptor.call(this, chat, contextSize, abort, type);
         nativeVectorPasses++;
         try {
             await interceptor.call(this, chat, contextSize, abort, type);
@@ -305,7 +297,6 @@ async function stloJevInterceptor(chat, contextSize, abort, type) {
         }
         updateJevReport(run, { phase: 'preparing', mode: run.options.mode });
         const nativeAvailable = hasEnabledVectorRecall() && guardNativeVectorInterceptor();
-        if (run.options.mode === 'all') clearVectorPrompts(getContext());
         if (run.options.mode === 'filtered' && nativeAvailable) {
             run.awaitingVector = true;
             return;
@@ -358,7 +349,7 @@ function getEntryTokenCountCached(entry) {
     if (cached?.content === content) return cached.tokens;
 
     const cache = TOKEN_COUNT_CACHE;
-    const tokens = getTokenCountAsync(content).then(value => Number(value) || 0).catch(() => {
+    const tokens = getTokenCountAsync(content + '\n').then(value => Number(value) || 0).catch(() => {
         if (cache.get(entry)?.tokens === tokens) cache.delete(entry);
         return 0;
     });
@@ -845,26 +836,93 @@ function installPerLorebookVectorThresholds() {
  * Handle the WORLDINFO_ENTRIES_LOADED event to apply our sorting
  * @param {Object} eventData - Contains globalLore, characterLore, chatLore, personaLore arrays
  */
+function loreArrays(data) {
+    return ['globalLore', 'characterLore', 'chatLore', 'personaLore'].map(key =>
+        Array.isArray(data[key]) ? data[key] : (data[key] = []));
+}
+
+function nativeLoreOrder(data) {
+    const [global, character, chat, persona] = loreArrays(data);
+    const byOrder = (a, b) => (b?.order ?? 100) - (a?.order ?? 100);
+    const sorted = list => list.slice().sort(byOrder);
+    const strategy = typeof world_info_character_strategy === 'undefined' ? 0 : Number(world_info_character_strategy);
+    const modes = typeof world_info_insertion_strategy === 'undefined' ? { character_first:1, global_first:2 } : world_info_insertion_strategy;
+    const rest = strategy === modes.character_first ? [...sorted(character), ...sorted(global)]
+        : strategy === modes.global_first ? [...sorted(global), ...sorted(character)]
+        : sorted([...global, ...character]);
+    return [...sorted(chat), ...sorted(persona), ...rest];
+}
+
+function omitJevVectorCollections(data, run) {
+    if (!run?.selection || run.options.mode !== 'all') return;
+    const arrays = loreArrays(data);
+    const managed = run.selection.worlds;
+    const keepNative = new Set();
+    const allVectorized = extension_settings.vectors?.enabled_for_all === true;
+    // Special nonconstant entries can still need native vector activation.
+    // Keep their entire book's collection, rather than deleting a subset
+    // from the persistent vector index.
+    for (const list of arrays) for (const entry of list) {
+        if (managed.has(entry.world) && !entry.disable && !entry.constant && entry.content
+            && (entry.vectorized || allVectorized) && !isJevCandidate(entry, managed)) keepNative.add(entry.world);
+    }
+    for (const list of arrays) {
+        let write = 0;
+        for (const entry of list) {
+            if (!managed.has(entry.world) || keepNative.has(entry.world)) list[write++] = entry;
+        }
+        list.length = write;
+    }
+}
+
 async function handleWorldInfoEntriesLoaded(eventData) {
     try {
         if (!eventData || typeof eventData !== 'object') return;
-
-        // Delegate consolidation, sorting, and budget to dedicated functions
         await applyPriorityOrdering(eventData);
-        // Vector Storage uses this same event to synchronize persistent hashes.
-        // Capture entry text and settings once during the optional native
-        // candidate scan. No separate second lorebook load.
         const run = jevGeneration;
+        if (nativeVectorPasses > 0) {
+            if (run?.enabled && isCurrentJev(run)) omitJevVectorCollections(eventData, run);
+            return;
+        }
         if (run?.preview && isCurrentJev(run) && !run.preview.entries) {
-            run.preview.entries = structuredClone(eventData.globalLore);
+            run.preview.entries = structuredClone(nativeLoreOrder(eventData));
             run.preview.settings = new Map(EXTENSION_STATE.scanWorldSettings);
         }
-        // Shape only the actual reply scan; keep the vector pass's full book.
-        if (HAS_WORLDINFO_SCAN_DONE && nativeVectorPasses === 0) applyJevSelection(eventData.globalLore);
-        // In newer branches (with WORLDINFO_SCAN_DONE), we trim per-loop and skip pre-scan entirely.
-        if (!HAS_WORLDINFO_SCAN_DONE) {
-            await enforceBudgetPreScan(eventData);
+        if (HAS_WORLDINFO_SCAN_DONE && run?.selection?.worlds.size && !run.preparing && !run.preview && isCurrentJev(run)) {
+            const arrays = loreArrays(eventData);
+            const [global, character, chat, persona] = arrays;
+            const strategy = typeof world_info_character_strategy === 'undefined' ? 0 : Number(world_info_character_strategy);
+            const modes = typeof world_info_insertion_strategy === 'undefined' ? { character_first:1, global_first:2 } : world_info_insertion_strategy;
+            const byOrder = (a,b) => (b.order ?? 100) - (a.order ?? 100);
+            if (strategy === modes.character_first || strategy === modes.global_first) {
+                for (const list of arrays) {
+                    list.sort(byOrder);
+                    applyJevSelection(list);
+                }
+            } else {
+                // In evenly mode the core sorts both arrays together.
+                const globalKeys = new Set(global.map(jevEntryKey));
+                const combined = [...global, ...character].sort(byOrder);
+                applyJevSelection(combined);
+                global.length = 0;
+                character.length = 0;
+                for (const entry of combined) (globalKeys.has(jevEntryKey(entry)) ? global : character).push(entry);
+                for (const list of [chat, persona]) {
+                    list.sort(byOrder);
+                    applyJevSelection(list);
+                }
+            }
+            for (const list of arrays) for (const entry of list) {
+                if (!run.selection.worlds.has(entry.world) || entry.disable || entry.ignoreBudget
+                    || entry.outletName || Number(entry.position) === 7) continue;
+                if (run.selection.accepted.has(jevEntryKey(entry))) {
+                    entry.__stloReservedJev = true;
+                    entry.ignoreBudget = true;
+                }
+            }
         }
+        // Older hosts lack a structured budget hook. Do not pre-disable
+        // unactivated lore simply because the default global budget is finite.
     } catch (error) {
         console.warn('[STLO] handleWorldInfoEntriesLoaded error:', error);
     }
@@ -1079,7 +1137,7 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         });
         if (!prepared) {
             // Empty candidates are a successful zero-selection, not a failure.
-            run.selection = { accepted: new Map(), worlds, budget };
+            run.selection = { accepted: new Map(), worlds, budget, contextSize };
             await restoreNativeVectorHits(run);
             updateJevReport(run, { phase: 'empty', selected: 0, accepted: 0, injected: 0 });
             return;
@@ -1089,8 +1147,8 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         const ranked = await decideJevWithRetry(run, prepared, batches);
         if (ranked === null || !isCurrentJev(run)) { cancelJevReply(run, abort); return; }
         const worldInfoBudget = calculateTotalWIBudget(contextSize);
-        const bookBudgets = new Map(await Promise.all([...worlds].map(async world =>
-            [world, await calculateLorebookBudget(settings.get(world), worldInfoBudget)])));
+        const bookBudgets = new Map(await Promise.all([...active].map(async world =>
+            [world, await calculateLorebookBudget(settings.get(world), worldInfoBudget, contextSize)])));
         const bookPriorities = new Map([...worlds].map(world => {
             const book = settings.get(world);
             const override = book?.characterOverrides?.[EXTENSION_STATE.currentSpeakingCharacter];
@@ -1102,7 +1160,7 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
             bookPriorities, diagnostics,
         });
         if (!isCurrentJev(run)) { abort(true); return; }
-        run.selection = { accepted, worlds, budget };
+        run.selection = { accepted, worlds, budget, contextSize };
         await restoreNativeVectorHits(run);
         const reasons = [...diagnostics.values()];
         updateJevReport(run, { phase: 'ready', selected: ranked.length, accepted: accepted.size,
@@ -1348,7 +1406,7 @@ async function openJevSettings() {
                     </div>
                 </div>
                 <div class="world_entry_form_control stlo-section">
-                <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All eligible entries: skip vector search. Filtered: judge only vector and keyword hits. Requests split automatically when needed.')}</div>
+                <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All: assess every eligible entry instead of ordinary vector recall for Jev books. Filtered: assess only keyword/vector hits. Other vector recall is retained.')}</div>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="all" ${jevOptions.mode === "all" ? "checked" : ""}><span data-i18n="stlo.jev.modeAll">All eligible lorebook entries (default)</span></label>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="filtered" ${jevOptions.mode === "filtered" ? "checked" : ""}><span data-i18n="stlo.jev.modeFiltered">Vector / keyword search candidates</span></label>
                 </div>
@@ -1418,7 +1476,13 @@ async function openJevSettings() {
                             toastr.error(translate('Check the Jev numeric settings and custom prompt.', 'stlo.jev.validation'));
                             return false;
                         }
-                        result.jevBudget = normalizeJevBudget(val('stlo-jev-budget'));
+                        const rawBudget = val('stlo-jev-budget');
+                        const budget = Number(rawBudget);
+                        if (!String(rawBudget ?? '').trim() || !Number.isSafeInteger(budget) || budget <= 0) {
+                            toastr.error(translate('Enter a positive whole-number injection budget.', 'stlo.jev.invalidBudget'));
+                            return false;
+                        }
+                        result.jevBudget = budget;
                         result.jevProfileId = val('stlo-jev-profile') ?? '';
                         result.jevOptions = normalizeJevOptions(opts);
                         result.jevPromptLibrary = promptState.library;
@@ -1612,7 +1676,7 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                     </div>
                 </div>
                         ${showBookJev ? `<div class="stlo-toggle-block">
-                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
+                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation, including configured vector retrieval.')}</div>
                             <div class="stlo-legacy-book" ${characterAvatar ? "hidden" : ""}>
                             <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in group chats</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies when using this book in a group chat.')}</div>
                             </div>
@@ -1763,7 +1827,7 @@ async function openLorebookSettings(worldName = null) {
                         <input type="checkbox" id="stlo-manager-protect" ${protectInitially ? 'checked' : ''}>
                         <span class="checkmark"></span><span data-i18n="stlo.budget.protect">Protect always-on entries first</span>
                     </label>
-                    ${infoHelp('stlo.budget.protectHelp', 'Applies to all lorebooks.')}
+                    ${infoHelp('stlo.budget.protectHelp', 'Applies to all lorebooks. Prioritizes budget, not insertion order.')}
                 </div>
                 <div class="stlo-option-line">
                     <label class="checkbox_label stlo-checkrow" for="stlo-manager-all">
@@ -2450,170 +2514,76 @@ async function applyPriorityOrdering(eventData) {
         const budgetWorlds = new Set();
         for (const [world, settings] of settingsCache) {
             const configured = (mode, value) => mode && mode !== 'default' && Number(value) > 0;
+            const override = EXTENSION_STATE.currentSpeakingCharacter && settings?.characterOverrides?.[EXTENSION_STATE.currentSpeakingCharacter];
             if (configured(settings?.budgetMode, settings?.budget)
-                || Object.values(settings?.characterOverrides || {}).some(override =>
-                    configured(override?.budgetMode, override?.budget))) {
+                || configured(override?.budgetMode, override?.budget)) {
                 budgetWorlds.add(world);
             }
         }
         EXTENSION_STATE.scanBudgetWorlds = budgetWorlds;
         EXTENSION_STATE.scanHasExplicitBudgets = budgetWorlds.size > 0;
 
-        const processedEntries = [];
+        const arrays = [gl, cl, chat, persona];
+        const speaker = EXTENSION_STATE.currentSpeakingCharacter;
+        const effective = entry => {
+            const settings = settingsCache.get(entry?.world) || {};
+            const override = speaker && settings.characterOverrides?.[speaker];
+            return {
+                priority: override?.priority ?? settings.priority ?? PRIORITY_LEVELS.DEFAULT,
+                adjustment: settings.orderAdjustmentGroupOnly && !speaker
+                    ? 0 : (override?.orderAdjustment ?? settings.orderAdjustment ?? 0),
+            };
+        };
         let skippedOnlyWhenSpeaking = 0;
-
-        for (const entry of allEntries) {
-            try {
-                if (!entry?.world) {
-                    const originalOrder = Math.min(entry?.order ?? 100, 9999);
-                    entry.order = PRIORITY_LEVELS.DEFAULT * 10000 + originalOrder;
-                    processedEntries.push(entry);
+        let customOrder = false;
+        for (const list of arrays) {
+            let write = 0;
+            for (const entry of list) {
+                const settings = settingsCache.get(entry?.world) || {};
+                if (settings.onlyWhenSpeaking && speaker && !Object.hasOwn(settings.characterOverrides || {}, speaker)) {
+                    skippedOnlyWhenSpeaking++;
                     continue;
                 }
-
-                const settings = settingsCache.get(entry.world) || {};
-
-                // FILTERING: onlyWhenSpeaking applies only in group chats (i.e., when a speaker is drafted)
-                if (settings.onlyWhenSpeaking && EXTENSION_STATE.currentSpeakingCharacter) {
-                    const hasOverride = settings.characterOverrides
-                        ? Object.prototype.hasOwnProperty.call(settings.characterOverrides, EXTENSION_STATE.currentSpeakingCharacter)
-                        : false;
-                    if (!hasOverride) {
-                        skippedOnlyWhenSpeaking++;
-                        continue;
-                    }
-                }
-
-                // PRIORITY
-                let priority = settings.priority ?? PRIORITY_LEVELS.DEFAULT;
-                let orderAdjustment = settings.orderAdjustment ?? 0;
-
-                // Character overrides in group chat
-                if (EXTENSION_STATE.currentSpeakingCharacter && settings.characterOverrides) {
-                    const override = settings.characterOverrides[EXTENSION_STATE.currentSpeakingCharacter];
-                    if (override) {
-                        priority = override.priority ?? priority;
-                        orderAdjustment = override.orderAdjustment ?? orderAdjustment;
-                    }
-                }
-
-                // Group-only adjustment
-                if (settings.orderAdjustmentGroupOnly && !EXTENSION_STATE.currentSpeakingCharacter) {
-                    orderAdjustment = 0;
-                }
-
-                const originalOrder = Math.min(entry.order ?? 100, 9999);
-                entry.order = priority * 10000 + orderAdjustment + originalOrder;
-
-                processedEntries.push(entry);
-            } catch (innerErr) {
-                console.warn(`Error setting priority for entry from ${entry?.world}:`, innerErr);
-                processedEntries.push(entry);
+                const { priority, adjustment } = effective(entry);
+                if (Number(priority) !== PRIORITY_LEVELS.DEFAULT || Number(adjustment) !== 0) customOrder = true;
+                list[write++] = entry;
             }
+            list.length = write;
         }
-
-        // Always-on entries must reserve their place before vector/keyword
-        // entries, regardless of their lorebook priority. Keep the relative
-        // priority/order of entries within each group unchanged.
-        if (getProtectAlwaysOn()) {
-            let lowestConstant = Infinity;
-            let highestOther = -Infinity;
-            for (const entry of processedEntries) {
-                if (entry?.constant === true) {
-                    lowestConstant = Math.min(lowestConstant, entry.order);
-                } else {
-                    highestOther = Math.max(highestOther, entry.order);
-                }
-            }
-            if (Number.isFinite(lowestConstant) && Number.isFinite(highestOther)) {
-                const boost = Math.max(0, highestOther - lowestConstant + 1);
-                if (boost > 0) {
-                    for (const entry of processedEntries) {
-                        if (entry?.constant === true) entry.order += boost;
-                    }
-                }
-            }
-        }
-
-        // Core SillyTavern gives active Sticky entries precedence over Order.
-        // Temporarily bypass its early budget check for eligible constants so
-        // Sticky cannot use their space first. The scan-done handler enforces
-        // the actual total WI budget and original per-book limits afterward.
-        // Only scan-local entry clones are touched, never saved lorebook data.
-        // Without any Sticky-configured entries, native Order already puts
-        // constants first. Avoid bypassing core budgeting unnecessarily.
-        const hasStickyCandidates = processedEntries.some(entry =>
-            entry?.disable !== true && Number(entry?.sticky) > 0);
-        if (HAS_WORLDINFO_SCAN_DONE && getProtectAlwaysOn() && hasStickyCandidates) {
-            for (const entry of processedEntries) {
-                if (entry?.constant === true && entry.disable !== true && entry.ignoreBudget !== true) {
+        const run = jevGeneration;
+        const protect = HAS_WORLDINFO_SCAN_DONE && getProtectAlwaysOn();
+        const managed = HAS_WORLDINFO_SCAN_DONE && run?.enabled && isCurrentJev(run)
+            ? getJevWorlds(settingsCache, run.characterRecall) : new Set();
+        // Bypass native early budget admission only for constants whose
+        // priority was explicitly requested, or whose Jev share needs to
+        // be counted first. The structured scan hook re-applies the caps.
+        // Do not change the entry's order, activation flags or saved data.
+        if (protect || managed.size) {
+            for (const list of arrays) for (const entry of list) {
+                if (entry.constant === true && !entry.disable && !entry.ignoreBudget
+                    && (protect || managed.has(entry.world))) {
                     entry.__stloReservedConstant = true;
                     entry.ignoreBudget = true;
                 }
             }
         }
-
-        // Sort processed entries by new order (highest first) with deterministic tie-breakers
-        processedEntries.sort((a, b) => {
-            const ao = (a?.order ?? 100);
-            const bo = (b?.order ?? 100);
-            if (bo !== ao) return bo - ao;
-            const au = (a?.uid ?? 0);
-            const bu = (b?.uid ?? 0);
-            if (au !== bu) return au - bu;
-            const aw = String(a?.world ?? '');
-            const bw = String(b?.world ?? '');
-            if (aw !== bw) return aw.localeCompare(bw);
-            return 0;
-        });
-
-        // Rebuild arrays: everything into globalLore
-        gl.length = 0;
-        cl.length = 0;
-        chat.length = 0;
-        persona.length = 0;
+        // Only an explicit effective priority/adjustment requests source
+        // consolidation. Filtering and budget protection leave native
+        // chat/persona/global/character precedence and order intact.
+        if (!customOrder) return;
+        const processedEntries = arrays.flat();
+        for (const entry of processedEntries) {
+            const { priority, adjustment } = effective(entry);
+            entry.order = Number(priority) * 10000 + Number(adjustment) + Math.min(entry.order ?? 100, 9999);
+        }
+        processedEntries.sort((a,b) => b.order-a.order || (a.uid??0)-(b.uid??0) || String(a.world??'').localeCompare(String(b.world??'')));
+        for (const list of arrays) list.length = 0;
         gl.push(...processedEntries);
-
         if (DEBUG_STLO) {
             stloDebug('applyPriorityOrdering summary:', { processed: processedEntries.length, skippedOnlyWhenSpeaking });
         }
     } catch (error) {
         console.error('Error applying priority ordering:', error);
-    }
-}
-
-/**
- * Budget pre-scan enforcement: disable overflow entries based on total WI budget.
- * Runs at WORLDINFO_ENTRIES_LOADED, before the core scan loop. This allows budget
- * enforcement without modifying base code. Ignores entries with ignoreBudget=true.
- */
-async function enforceBudgetPreScan(eventData) {
-    try {
-        const { globalLore = [], characterLore = [], chatLore = [], personaLore = [] } = eventData || {};
-        // After applyPriorityOrdering, everything resides in globalLore; keep defensive support for others.
-        const ordered = [
-            ...(globalLore || []),
-            ...(characterLore || []),
-            ...(chatLore || []),
-            ...(personaLore || []),
-        ];
-
-        const totalBudget = calculateTotalWIBudget();
-        if (!(totalBudget > 0)) return;
-
-        let used = 0;
-        for (const e of ordered) {
-            if (!e) continue;
-            if (e.ignoreBudget === true) continue; // keep without consuming budget
-            const tokens = await getEntryTokenCountCached(e);
-            if ((used + tokens) <= totalBudget) {
-                used += tokens;
-            } else {
-                e.disable = true; // respected by core checkWorldInfo
-            }
-        }
-    } catch (err) {
-        console.warn('[STLO] enforceBudgetPreScan error:', err);
     }
 }
 
@@ -2688,9 +2658,9 @@ function calculateTotalWIBudget(contextSize = null) {
 
 // Resolve per-lorebook token budget by mode (default | %budget | %context | fixed)
 // Applies character-specific overrides when present
-async function calculateLorebookBudget(settings, totalBudget) {
+async function calculateLorebookBudget(settings, totalBudget, contextSize = null) {
     try {
-        const usableContext = Number(typeof getMaxContextSize === 'function' ? getMaxContextSize() : 0);
+        const usableContext = Number(contextSize ?? (typeof getMaxContextSize === 'function' ? getMaxContextSize() : 0));
 
         let budgetMode = settings?.budgetMode || 'default';
         let budgetValue = Number(settings?.budget || 0) || 0;
@@ -2786,16 +2756,25 @@ function registerPerLoopBudgetTrimmer() {
                 const settingsCache = EXTENSION_STATE.scanWorldSettings;
                 let reserved = false;
                 let hasUnknownWorld = false;
+                let hasTemporaryOrder = false;
                 for (const entry of entries.values()) {
-                    if (entry && Object.hasOwn(entry, '__stloJevInsertionOrder')) {
-                        entry.order = entry.__stloJevInsertionOrder;
-                        delete entry.__stloJevInsertionOrder;
-                    }
-                    if (protect && entry?.__stloReservedConstant === true) reserved = true;
+                    if (Object.hasOwn(entry, '__stloJevInsertionOrder')) hasTemporaryOrder = true;
+                    if (entry.__stloReservedConstant === true || entry.__stloReservedJev === true) reserved = true;
                     if (entry?.world && !settingsCache.has(entry.world)) hasUnknownWorld = true;
                 }
-                if (!reserved && !EXTENSION_STATE.scanHasExplicitBudgets && !hasUnknownWorld && !jev?.accepted.size) {
-                    return; // Nothing to trim; no setting lookups, tokenization, or text rewrites.
+                const finishOrder = () => {
+                    if (args?.state?.next !== 0) return;
+                    for (const entry of entries.values()) {
+                        if (Object.hasOwn(entry, '__stloJevInsertionOrder')) entry.order = entry.__stloJevInsertionOrder;
+                        delete entry.__stloJevInsertionOrder;
+                        if (entry.__stloReservedConstant || entry.__stloReservedJev) entry.ignoreBudget = false;
+                        delete entry.__stloReservedConstant;
+                        delete entry.__stloReservedJev;
+                    }
+                };
+                if (!reserved && !EXTENSION_STATE.scanHasExplicitBudgets && !hasUnknownWorld && !jev?.worlds.size) {
+                    if (hasTemporaryOrder) finishOrder();
+                    return;
                 }
 
                 const nativeBudget = Number(args?.budget?.current);
@@ -2809,20 +2788,36 @@ function registerPerLoopBudgetTrimmer() {
                 }
 
                 let dropped = 0;
+                const scanEntries = new Map();
+                const sourceRank = new Map();
+                for (const [index, entry] of (args?.sortedEntries || []).entries()) {
+                    const key = jevEntryKey(entry);
+                    scanEntries.set(key, entry);
+                    sourceRank.set(key, index);
+                }
+                const countBudgetTokens = async entry => {
+                    const count = await getEntryTokenCountCached(entry);
+                    if (!Number.isFinite(count) || count < 0 || (count === 0 && String(entry.content ?? '').trim())) return Infinity;
+                    return count;
+                };
                 const discard = ({ key, entry }) => {
                     if (!entries.has(key)) return;
                     entries.delete(key);
                     entry.disable = true; // Keep a dropped entry out of recursion rescans.
+                    const original = scanEntries.get(jevEntryKey(entry));
+                    if (original) original.disable = true;
                     dropped++;
                 };
                 const orderDescending = (a, b) => (b.entry.order ?? 100) - (a.entry.order ?? 100);
+                const nativeOrder = (a,b) => (sourceRank.get(jevEntryKey(a.entry)) ?? Infinity)
+                    - (sourceRank.get(jevEntryKey(b.entry)) ?? Infinity) || orderDescending(a,b);
                 const recallOrder = (a, b) => {
                     const aRank = jev?.accepted.get(jevEntryKey(a.entry));
                     const bRank = jev?.accepted.get(jevEntryKey(b.entry));
                     return (aRank ?? -1) - (bRank ?? -1) || orderDescending(a, b);
                 };
                 const originallyIgnored = e =>
-                    e.ignoreBudget === true && e.__stloReservedConstant !== true;
+                    e.ignoreBudget === true && e.__stloReservedConstant !== true && e.__stloReservedJev !== true;
 
                 // Preserve ordinary per-book ordering. Spend the remaining
                 // budget on Jev picks in relevance order.
@@ -2832,7 +2827,7 @@ function registerPerLoopBudgetTrimmer() {
                             continue; // A default-budget book needs no trimming.
                         }
                         const settings = settingsCache.get(world) ?? await getLorebookSettings(world);
-                        const perBudget = await calculateLorebookBudget(settings, totalBudget);
+                        const perBudget = await calculateLorebookBudget(settings, totalBudget, jev?.contextSize);
                         if (!(perBudget > 0)) continue;
 
                         const native = [];
@@ -2842,7 +2837,7 @@ function registerPerLoopBudgetTrimmer() {
                             target.push(item);
                         }
                         let sorted;
-                        if (protect) {
+                        if (protect || jev?.worlds.has(world)) {
                             const always = native.filter(x => x.entry.constant === true).sort(orderDescending);
                             const optional = native.filter(x => x.entry.constant !== true);
                             if (settings.randomTrim) shuffleInPlace(optional);
@@ -2858,15 +2853,32 @@ function registerPerLoopBudgetTrimmer() {
                         let used = 0;
                         for (const item of sorted) {
                             if (originallyIgnored(item.entry)) continue;
-                            const tokens = await getEntryTokenCountCached(item.entry);
+                            const tokens = await countBudgetTokens(item.entry);
                             if (used + tokens <= perBudget) used += tokens;
                             else discard(item);
                         }
                     }
                 }
 
-                // Global budget reconciliation is needed only when this scan
-                // actually bypassed core budgeting to protect a constant entry.
+                if (jev?.worlds.size) {
+                    const constants = [], native = [], selected = [];
+                    for (const [key, entry] of entries) {
+                        if (!jev.worlds.has(entry.world) || entry.outletName || Number(entry.position) === 7) continue;
+                        const item = { key, entry };
+                        if (entry.constant === true) constants.push(item);
+                        else if (jev.accepted.has(jevEntryKey(entry))) selected.push(item);
+                        else native.push(item);
+                    }
+                    let used = 0;
+                    for (const item of [...constants.sort(nativeOrder), ...native.sort(nativeOrder), ...selected.sort(recallOrder)]) {
+                        const tokens = await countBudgetTokens(item.entry);
+                        if (used + tokens <= jev.budget) used += tokens;
+                        else discard(item);
+                    }
+                }
+
+                // Reconcile the shared native budget whenever an activated
+                // entry temporarily bypassed its early budget check.
                 if (reserved && totalBudget > 0) {
                     const timed = args?.timedEffects;
                     // Cache the native Sticky status once per active entry.
@@ -2874,42 +2886,28 @@ function registerPerLoopBudgetTrimmer() {
                     // the sticky-effect buffer for every comparison.
                     const active = [...entries].map(([key, entry]) => {
                         let sticky = 0;
-                        if (entry.constant !== true) {
+                        if (!protect || entry.constant !== true) {
                             try { sticky = timed?.isEffectActive?.('sticky', entry) ? 1 : 0; }
                             catch { /* Keep the original Order fallback. */ }
                         }
                         return { key, entry, sticky };
                     });
                     active.sort((a, b) => {
-                        if (a.entry.constant !== b.entry.constant) {
+                        if (protect && (a.entry.constant === true) !== (b.entry.constant === true)) {
                             return a.entry.constant === true ? -1 : 1;
                         }
-                        if (a.entry.constant !== true) {
-                            const stickyDiff = b.sticky - a.sticky;
-                            if (stickyDiff) return stickyDiff;
-                        }
-                        return a.entry.constant === true ? orderDescending(a, b) : recallOrder(a, b);
+                        const stickyDiff = b.sticky - a.sticky;
+                        if (stickyDiff) return stickyDiff;
+                        // Core source precedence remains intact for native
+                        // entries. Score ordering of Jev picks is enforced
+                        // by their own cap and native admission slots.
+                        return nativeOrder(a,b);
                     });
                     let used = 0;
                     for (const item of active) {
                         if (originallyIgnored(item.entry)) continue;
-                        const tokens = await getEntryTokenCountCached(item.entry);
+                        const tokens = await countBudgetTokens(item.entry);
                         if (used + tokens <= totalBudget) used += tokens;
-                        else discard(item);
-                    }
-                }
-
-                if (jev?.accepted.size) {
-                    let used = 0;
-                    const selected = [];
-                    for (const [key, entry] of entries) {
-                        if (!jev.worlds.has(entry.world) || entry.outletName || Number(entry.position) === 7) continue;
-                        if (entry.constant === true) used += await getEntryTokenCountCached(entry);
-                        else if (jev.accepted.has(jevEntryKey(entry))) selected.push({ key, entry });
-                    }
-                    for (const item of selected.sort(recallOrder)) {
-                        const tokens = await getEntryTokenCountCached(item.entry);
-                        if (used + tokens <= jev.budget) used += tokens;
                         else discard(item);
                     }
                 }
@@ -2919,6 +2917,7 @@ function registerPerLoopBudgetTrimmer() {
                 // so editing activated.text would not undo a recursion trigger.
                 // Leave all text untouched rather than deleting a kept entry
                 // or unrelated system instruction that has matching content.
+                finishOrder();
                 if (dropped) stloDebug('Trimmed WI entries structurally:', dropped);
                 if (run?.selection && args?.state?.next === 0) recordJevActivated([...entries.values()]);
             } catch (e) {

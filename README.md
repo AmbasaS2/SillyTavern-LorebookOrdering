@@ -51,7 +51,7 @@ The budget manager opens the current linked book (or the first available linked 
 | Control | When to use it |
 |---|---|
 | Lorebook priority (1–5) | Give important books first consideration. Normal is 3. |
-| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Shared setting at the top of the budget manager, on by default. |
+| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Shared opt-in setting at the top of the budget manager, off by default. |
 | Order adjustment | Fine-tune ordering only when ordinary priority levels are not enough. |
 | Per-book budget | Set a maximum contribution for this book. With Jev, this is also its preferred share of the common budget. |
 | Random trim | Vary which already-active ordinary entries fit if the same ones always win. |
@@ -103,13 +103,13 @@ In a one-to-one character chat, an explicit On setting applies to the character 
 |---|---|
 | SillyTavern World Info budget | The shared World Info ceiling for the prompt. |
 | STLO per-lorebook budget | The maximum each book may contribute. |
-| Total Jev budget (default 10,000 tokens) | The shared recall ceiling across Jev-managed books, counting their always-on entries first. |
+| Total Jev budget (default 10,000 tokens) | The shared injection ceiling across Jev-managed books (excluding outlets), counting their always-on entries first. |
 
-These three limits are ceilings, not added together. An explicit per-book budget is both the book’s cap and its preferred allocation for relevant Jev-approved entries, including its always-on entries. Books with no individual cap share the remaining pool. Unused preferred space returns to the common pool. Book priority resolves competing reservations; all three ceilings still apply. Whole entries and native activation rules can leave some preferred space unused. For instance, a memory book capped at 3,000 tokens with 2,000 tokens of always-on entries has at most 1,000 tokens left for additional Jev picks, even if the total Jev budget is 10,000. Jev selects relevant entries in score order after preferred allocations, within the remaining limits; the original insertion positions/order are retained. Ordinary native entries and explicitly budget-exempt entries retain their applicable handling; always-on entries themselves are not guaranteed to fit every budget.
+These three limits are ceilings, not added together. An explicit per-book budget is both the book’s cap and its preferred allocation for relevant Jev-approved entries, including its always-on entries. Books with no individual cap share the remaining pool. Unused preferred space returns to the common pool. Book priority resolves competing reservations; all three ceilings still apply. Whole entries and native activation rules can leave some preferred space unused. For instance, a memory book capped at 3,000 tokens with 2,000 tokens of always-on entries has at most 1,000 tokens left for additional Jev picks, even if the total Jev budget is 10,000. Jev selects relevant entries in score order after preferred allocations, within the remaining limits; the original insertion positions/order are retained. Native special entries retain their activation rules, but their actual injected text counts toward the separate Jev ceiling. Explicit native budget exemptions remain exempt from World Info and per-book limits, not from the separate Jev ceiling in managed books. Oversized constants that cannot fit are not counted as reserved space. Native activation, recursion, and whole-entry admission can still leave some space unused.
 
 ### Jev candidate source and exclusions
 
-- **All eligible entries (default):** Jev evaluates eligible entries in active, non-excluded lorebooks. Native vector retrieval is skipped, including chat and Data Bank/file vectors. Excluded books keep native keyword/always-on/special activation.
+- **All eligible entries (default):** Jev evaluates eligible entries in active, non-excluded lorebooks. Ordinary World Info vector recall is skipped for Jev-managed books. Excluded books and native chat/Data Bank/file vector recall remain active according to their settings. A managed book with vector-dependent special entries keeps its whole native collection to preserve special activation and index integrity.
 - **Vector / keyword search candidates:** The existing native vector interceptor runs at its normal position when enabled. A native candidate scan collects matched lore, then Jev evaluates only eligible candidates from non-excluded books. This mode performs one extra local candidate scan, not a second vector search. Existing per-book vector threshold settings can still split native vector requests. Entries missing from the native candidates cannot be recovered by Jev. Native recursion, group inclusion and budget rules can affect which candidates are found and ultimately activated.
 - With Jev disabled, ordinary native activation is unchanged. No saved vector data, lore or activation settings are rewritten.
 
@@ -130,7 +130,7 @@ The request sends recent dialogue, ordinary always-on background and candidate l
 | **Lorebook priority** | 1–5, with 3 as the default. Higher values are processed earlier. |
 | **Order adjustment** | Optional value from −10,000 to +10,000; positive values move entries earlier, negative values later. |
 | **Group chats only** | Apply the main order adjustment only during group chat turns. |
-| **Protect Always-On** | Global fork option, enabled by default. Gives constant entries budget priority over other entries, including Sticky cases. |
+| **Protect Always-On** | Global fork option, disabled until explicitly enabled. Gives constant entries budget priority over other entries, including Sticky cases. |
 
 Priority and order adjustment are inherited from upstream. The processing order uses `priority × 10,000 + adjustment + entry order` (the entry order contribution is capped at 9,999). Large adjustments can cross priority bands; use small adjustments for fine-tuning. These controls affect World Info processing, not an entry's configured prompt insertion position or activation conditions.
 
@@ -206,7 +206,7 @@ Inside the same drawer, enable **Only use when an assigned character speaks** to
 
 ## 📌 Compatibility and Data
 
-- Jev and per-lorebook trimming require `WORLDINFO_SCAN_DONE`. The fork does not perform final-prompt substring trimming as a fallback on older SillyTavern versions. The original pre-scan total-budget fallback remains.
+- Jev and per-lorebook trimming require `WORLDINFO_SCAN_DONE`. The fork does not perform final-prompt substring trimming as a fallback on older SillyTavern versions. On older hosts, no unsafe pre-scan budget fallback is used; native activation and budgeting remain in control.
 - STLO 2.x no longer requires the older “evenly” insertion strategy check; the inherited older README and guides may describe earlier behavior. This fork does not enforce that check.
 - Book settings are stored in the lorebook's existing `stlo` data; Protect Always-On, character-specific Jev switches, the shared Jev budget and connection profile ID are stored in extension settings. Settings are applied with the Save button. If a previously configured book unexpectedly opens with default values, load it in the World Info editor first and reopen the settings before saving.
 - Do not enable upstream and this fork simultaneously. Back up your lorebook files before switching. To return to upstream, disable/remove this fork and enable only upstream.
@@ -267,7 +267,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 | 설정 | 언제, 어떻게 쓰나요? |
 |---|---|
 | 로어북 우선순위 (1–5) | 중요한 책을 먼저 처리하고 싶을 때 높입니다. 기본 3. |
-| 상시 주입 우선 보호 | 로어북 예산 관리 최상단의 공통 옵션입니다. 파란불 항목을 먼저 넣으며 기본 켜짐입니다. |
+| 상시 주입 우선 보호 | 로어북 예산 관리 최상단의 공통 옵션입니다. 파란불 항목의 예산을 우선 확보하며 기본 꺼짐입니다. |
 | 세부 순서 조정 | 같은 우선순위 내에서 좀 더 세밀하게 순서를 바꾸고 싶을 때만 사용합니다. |
 | 예산 | 해당 책의 최대 주입량입니다. Jev 사용 시 관련 로어에 이 예산을 우선 배정합니다. |
 | 예산 초과 시 항목을 무작위로 제외 | 이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다. |
@@ -319,13 +319,13 @@ Jev는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모�
 |---|---|
 | 실리태번 전체 월드 정보 예산 | 모든 로어북이 공유하는 전체 상한 |
 | STLO 로어북별 예산 | 각 책의 최대 사용량 |
-| Jev 전체 주입 예산 (기본 10,000토큰) | Jev 적용 책들의 공통 상한. 그 책들의 상시 항목부터 계산 |
+| Jev 전체 주입 예산 (기본 10,000토큰) | Jev 적용 책들의 실제 주입 상한(Outlet 제외). 그 책들의 상시 항목부터 계산 |
 
-예를 들어 메모리북 개별 예산이 3,000토큰이고 파란불 기억이 2,000토큰이라면, Jev 전체 주입 예산을 10,000으로 설정해도 그 책에서 Jev가 추가 선택할 수 있는 기억은 최대 1,000토큰입니다. 별도의 우선 배정 예산 없이 기존 로어북별 예산을 Jev가 선택한 관련 항목에 먼저 사용합니다. 상시 항목을 포함하며 쓰지 못한 몫은 공통 예산으로 반환합니다. 배정이 겹치면 책 중요도를 따릅니다. 세 가지 상한과 항목 단위 주입 조건은 유지됩니다. 우선 배정 이후 남은 예산은 판정 점수순으로 채우고, 원래의 프롬프트 삽입 위치와 순서 설정은 유지합니다. 일반 항목과 예산 무시 항목의 기존 처리도 유지되며 상시 항목 역시 예산에 따라 빠질 수 있습니다.
+예를 들어 메모리북 개별 예산이 3,000토큰이고 파란불 기억이 2,000토큰이라면, Jev 전체 주입 예산을 10,000으로 설정해도 그 책에서 Jev가 추가 선택할 수 있는 기억은 최대 1,000토큰입니다. 별도의 우선 배정 예산 없이 기존 로어북별 예산을 Jev가 선택한 관련 항목에 먼저 사용합니다. 상시 항목을 포함하며 쓰지 못한 몫은 공통 예산으로 반환합니다. 배정이 겹치면 책 중요도를 따릅니다. 세 가지 상한과 항목 단위 주입 조건은 유지됩니다. 우선 배정 이후 남은 예산은 판정 점수순으로 채우고, 원래의 프롬프트 삽입 위치와 순서 설정은 유지합니다. 특수 항목의 발동 규칙은 유지되며 실제 주입된 본문은 Jev 예산에 포함됩니다. 기존 예산 무시 항목은 월드 정보·책별 예산의 예외를 유지하지만 Jev 적용 책의 별도 총예산에는 포함됩니다. 예산에 들어갈 수 없는 상시 항목은 미리 확보하지 않습니다. 기존 발동·재귀 규칙과 항목 단위 주입으로 남는 공간이 있을 수 있습니다.
 
 ### Jev 판정 대상과 제외 설정
 
-- **전체 로어북 항목(기본값):** 현재 활성화된 로어북의 적격 항목을 Jev가 직접 평가합니다. 로어북뿐 아니라 채팅·데이터뱅크/파일 벡터 검색도 생략합니다. Jev 제외 책은 기존 키워드·상시 주입·특수 발동 규칙을 따릅니다.
+- **전체 로어북 항목(기본값):** 현재 활성화된 로어북의 적격 항목을 Jev가 직접 평가합니다. Jev 적용 책의 일반 로어북 벡터 검색을 대체합니다. Jev 제외 책과 채팅·데이터뱅크/파일 벡터 검색은 기존 설정을 유지합니다. 벡터 검색이 필요한 특수 항목이 포함된 책은 인덱스와 발동 규칙을 보호하기 위해 책 단위의 기존 검색을 유지합니다.
 - **벡터·키워드 검색 후보:** 기존 벡터 검색을 설정대로 한 번 실행하고, 실리태번의 후보 스캔에서 찾은 적격 항목을 Jev가 평가합니다. 선택 모드에 한해 로컬 후보 스캔이 한 번 추가되지만 벡터 검색을 반복하지는 않습니다. 기존 책별 벡터 임계값 설정에 따라 벡터 요청 자체가 나뉠 수 있습니다. 검색에서 빠진 항목은 복구할 수 없으며 재귀·그룹·예산 규칙이 후보 및 최종 활성화에 영향을 줍니다.
 - Jev를 끄면 기존 검색 방식을 그대로 사용합니다. 저장된 벡터나 로어 및 발동 설정은 변경하지 않습니다.
 
@@ -346,13 +346,13 @@ Jev를 켜면 최근 대화, 일반 상시 주입 배경, 로어 본문이 외�
 | **로어북 우선순위** | 1~5, 기본 3. 숫자가 클수록 먼저 처리합니다. |
 | **세부 순서 조정** | −10,000~+10,000. 양수는 앞당기고 음수는 늦춥니다. |
 | **그룹 채팅에만 적용** | 세부 순서 조정을 그룹 채팅에서만 적용합니다. |
-| **상시 주입 우선 보호** | 포크에서 추가한 전역 옵션. 기본 켜짐. 상시 항목을 다른 항목보다 먼저 고려합니다. |
+| **상시 주입 우선 보호** | 포크에서 추가한 전역 옵션. 직접 체크해야 적용됩니다. 상시 항목을 다른 항목보다 먼저 고려합니다. |
 
-원본의 처리 순서 계산은 `우선순위 × 10,000 + 세부 순서값 + 항목 순서`입니다(항목 순서값의 상한은 9,999). 큰 조정값은 다른 우선순위 단계에도 영향을 줄 수 있습니다. 우선순위는 월드 정보 처리 순서이며 항목의 프롬프트 삽입 위치나 활성화 조건을 바꾸지 않습니다.
+별도 우선순위나 세부 순서 조정을 설정하지 않은 경우 실리태번의 기본 로어북 순서를 유지합니다. 원본의 처리 순서 계산은 `우선순위 × 10,000 + 세부 순서값 + 항목 순서`입니다(항목 순서값의 상한은 9,999). 큰 조정값은 다른 우선순위 단계에도 영향을 줄 수 있습니다. 우선순위는 월드 정보 처리 순서이며 항목의 프롬프트 삽입 위치나 활성화 조건을 바꾸지 않습니다.
 
 ### 상시 주입 우선 보호
 
-모든 로어북에 공통 적용됩니다. 켜면 상시 항목이 키워드·벡터 등 다른 항목보다 먼저 예산을 사용하도록 처리합니다. Sticky 항목이 공간을 먼저 사용하는 경우도 고려하며, 책별 예산 트리밍 역시 상시 항목부터 계산합니다.
+모든 로어북에 공통 적용되며 기본값은 꺼짐입니다. 켜면 상시 항목의 예산을 먼저 확보합니다. Sticky 항목도 고려하고, 실제 삽입 순서값은 변경하지 않습니다. 기존에 명시적으로 저장한 켜짐/꺼짐 값은 유지합니다.
 
 상시 항목의 주입을 무조건 보장하는 기능은 아닙니다. 개별 또는 전체 예산을 초과하면 상시 항목도 순서대로 제외될 수 있습니다. 기존에 '예산 무시'가 설정된 항목은 그 설정을 유지합니다. 원래 순서 방식이 더 맞는 경우 끄면 됩니다.
 
