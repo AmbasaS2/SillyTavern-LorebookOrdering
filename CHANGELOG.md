@@ -2,6 +2,15 @@
 
 **← [Back to README](README.md)**
 
+## Ambasa fork — full-text Jev recall (November 25, 2026)
+- Full recent dialogue and candidate text by default; 20 recent messages, optional reading limits. Legacy default 6/1400/960 migrates to 20/0/0; non-default values are retained. Existing custom selection prompts are preserved, with old transport wording adapted at runtime.
+- Shared dialogue and ordinary always-on background; one independent question per candidate. Preflight estimates plan batches at 56K/28K; explicit provider size rejection splits further, normal errors require retry/cancel. No partial selection can reach RP.
+- Unified book budget: an explicit existing cap also becomes the preferred Jev allocation. Old separate reserve values are left in saved books but no longer used; no new cap is invented.
+- Hide per-book Jev controls for characters with Jev disabled; retain hidden settings and legacy/group controls. Move global always-on protection to the book picker. No new observers, polling or redraw loops.
+- Expanded latest-run diagnostics: planned/completed batches, unassessed candidates, reading-limit truncation, estimated and reported token usage.
+
+- Validation: 30 Node tests and isolated Chromium UI checks at 1024px and 360px passed. Live NanoGPT and installed SillyTavern validation remain pending. Manifest version unchanged.
+
 ## Ambasa fork — review build (November 25, 2026)
 - Optional per-book Jev exclusion and preferred budget; unchanged defaults.
 - All-entries or native candidate recall, adjustable excerpts and editable decision presets.

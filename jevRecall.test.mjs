@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, planJevRequests, splitJevBatch, rankJevDecisions, estimateJevTokens, JEV_REQUEST_TARGET, JEV_QUESTION_TARGET } from './jevRecall.mjs';
 
 const lore = (world, uid, text, flags = {}) => ({
     world, uid, comment: world+' '+uid, key: ['lantern'], content: text, vectorized: true, constant: false, ...flags,
@@ -76,24 +76,26 @@ test('Jev selects ordinary entries from all enabled books and preserves special 
     ];
     const entries = [...positive, ...special, native, pinned, rejected, positive[0]];
     const prepared = prepareJevRecall(entries, worlds, [{ name: 'User', mes: 'Lantern?' }]);
-    assert.deepEqual(new Set(Object.values(prepared.body.state.lore).map(entry => entry.book)), worlds);
+    const candidateOf = q => JSON.parse(q.instructions.slice(q.instructions.indexOf('{')));
+    assert.deepEqual(new Set(Object.values(prepared.body.questions).map(q => candidateOf(q).book)), worlds);
     assert.equal(prepared.candidates.size, 9);
     assert.match(prepared.body.state.assessment, /established voice.*scene a natural way to move forward/);
+    assert.deepEqual(prepared.body.state.background.map(x=>x.text), ['Always on']);
+    assert.equal(prepared.body.state.lore, undefined);
     for (const [id, question] of Object.entries(prepared.body.questions)) {
-        assert.deepEqual(question, {
-            type: 'choice',
-            instructions: id,
-            criteria: { include: null, skip: null },
-        });
+        assert.equal(question.type, 'choice');
+        assert.deepEqual(question.criteria, { include: null, skip: null });
+        assert.equal(candidateOf(question).text, entries.find(e => jevEntryKey(e) === prepared.candidates.get(id)).content);
     }
     const answers = Object.fromEntries([...prepared.candidates].map(([id, key]) => [
         id, { choice: key === jevEntryKey(rejected) ? 'skip' : 'include', confidence: 0.8 },
     ]));
-    const ranked = await requestJevRecall(prepared, connection, {}, undefined, async (route, request) => {
+    const result = await requestJevRecall(prepared, connection, {}, undefined, async (route, request) => {
         assert.equal(route, '/api/backends/chat-completions/generate');
         assert.equal(JSON.parse(request.body).model, 'typesafe/jev-1.14');
         return response({ answers });
     });
+    const ranked = rankJevDecisions(prepared, result.decisions);
     const accepted = await fitJevRecall(entries, worlds, ranked, {
         budget: 10000, worldInfoBudget: 20000, bookBudgets: new Map(), countTokens: async text => text.length,
     });
@@ -147,40 +149,75 @@ test('Jev admission follows scores in the available slots without altering nativ
     assert.equal(lower.order, 40);
 });
 
-test('Every eligible entry reaches the chosen Jev connection in one request', async () => {
+test('Every eligible entry reaches the chosen Jev connection once across safe batches', async () => {
     const worlds = new Set(['Memory', 'NPC']);
-    const big = Array.from({length:72}, (_, i) => lore('Memory', i, '등불 '.repeat(240)));
+    const big = Array.from({length:72}, (_, i) => lore('Memory', i, '등불 '.repeat(240) + 'MIDDLE' + 'a'.repeat(1200)));
     const npc = lore('NPC', 72, 'A rare promise');
-    const prepared = prepareJevRecall([...big, npc], worlds, [{ mes: 'A lantern appears.' }]);
+    const entries = [...big, npc];
+    const message = 'Earlier important detail. ' + 'Dialogue. '.repeat(200);
+    const prepared = prepareJevRecall(entries, worlds, [{mes:message}]);
     assert.equal(prepared.candidates.size, 73);
+    assert.deepEqual(prepared.body.state.current, [{speaker:'',text:message}]);
+    assert.equal(prepared.stats.truncatedMessages,0);
+    assert.equal(prepared.stats.truncatedLore,0);
+    const batches = planJevRequests(prepared);
+    assert.ok(batches.length > 1);
     const seen = new Set();
+    const decisions = [];
     let requests = 0;
-    const selected = await requestJevRecall(prepared, connection, {}, undefined, async (route, request) => {
-        requests++;
-        assert.equal(route, '/api/backends/chat-completions/generate');
-        const body = JSON.parse(request.body);
-        const state = JSON.parse(body.messages[0].content);
-        const format = JSON.parse(body.custom_include_body).response_format;
-        assert.equal(body.model, 'typesafe/jev-1.14');
-        assert.equal(body.chat_completion_source, 'custom');
-        assert.equal(body.custom_url, endpoint);
-        assert.equal(body.secret_id, 'vault-entry');
-        assert.deepEqual(body.custom_auth, connection.customAuth);
-        assert.equal(body.stream, false);
-        assert.deepEqual(JSON.parse(body.custom_include_headers), { Accept: 'application/json' });
-        assert.equal(format.type, 'questions');
-        assert.ok(new TextEncoder().encode(body.messages[0].content).length > 30000);
-        assert.equal(Object.keys(format.questions).length, 73);
-        const answers = Object.fromEntries(Object.keys(format.questions).map(id => {
-            assert.equal(seen.has(id), false);
-            seen.add(id);
-            return [id, { choice:state.lore[id].book === 'NPC' ? 'include' : 'skip' }];
-        }));
-        return response(answers);
-    });
-    assert.equal(requests, 1);
+    for (const batch of batches) {
+        assert.ok(batch.estimatedTokens <= JEV_REQUEST_TARGET);
+        assert.ok([...batch.questionCosts.values()].every(cost=>batch.sharedEstimate+cost<=JEV_QUESTION_TARGET));
+        const result = await requestJevRecall(batch, connection, {}, undefined, async (route, request) => {
+            requests++;
+            assert.equal(route, '/api/backends/chat-completions/generate');
+            const body = JSON.parse(request.body);
+            const state = JSON.parse(body.messages[0].content);
+            const format = JSON.parse(body.custom_include_body).response_format;
+            assert.equal(body.model, 'typesafe/jev-1.14');
+            assert.equal(body.chat_completion_source, 'custom');
+            assert.equal(body.custom_url, endpoint);
+            assert.equal(body.secret_id, 'vault-entry');
+            assert.deepEqual(body.custom_auth, connection.customAuth);
+            assert.equal(body.stream, false);
+            assert.deepEqual(JSON.parse(body.custom_include_headers), { Accept: 'application/json' });
+            assert.equal(format.type, 'questions');
+            assert.deepEqual(state, prepared.body.state);
+            const answers = Object.fromEntries(Object.entries(format.questions).map(([id,q]) => {
+                assert.equal(seen.has(id), false);
+                seen.add(id);
+                const candidate = JSON.parse(q.instructions.slice(q.instructions.indexOf('{')));
+                assert.equal(candidate.text, entries.find(e=>jevEntryKey(e)===batch.candidates.get(id)).content);
+                return [id, { choice:candidate.book === 'NPC' ? 'include' : 'skip' }];
+            }));
+            return {ok:true,json:async()=>({usage:{prompt_tokens:123},choices:[{message:{content:JSON.stringify(answers)}}]})};
+        });
+        assert.equal(result.inputTokens,123);
+        decisions.push(...result.decisions);
+    }
+    assert.equal(requests, batches.length);
     assert.equal(seen.size, 73);
-    assert.deepEqual(selected, [jevEntryKey(npc)]);
+    assert.deepEqual(rankJevDecisions(prepared, decisions), [jevEntryKey(npc)]);
+});
+
+test('small requests stay single; splitting preserves question ids, scores and common state', ()=>{
+    const prepared=prepareJevRecall([lore('A',1,'one'),lore('A',2,'two'),lore('A',3,'three')],new Set(['A']),[{mes:'scene'}]);
+    const batches=planJevRequests(prepared);
+    assert.equal(batches.length,1);
+    const [a,b]=splitJevBatch(batches[0]);
+    assert.deepEqual([...a.candidates,...b.candidates],[...prepared.candidates]);
+    assert.equal(a.body.state,b.body.state);
+    assert.deepEqual(rankJevDecisions(prepared,[{key:jevEntryKey(lore('A',3,'three')),score:.9},{key:jevEntryKey(lore('A',2,'two')),score:.7},{key:jevEntryKey(lore('A',1,'one')),score:.7}]), ['["A",3]','["A",1]','["A",2]']);
+    assert.throws(()=>planJevRequests(prepared,56000,100),{name:'JevInputLimitError'});
+    assert.equal(splitJevBatch(b).length,0);
+});
+
+test('oversized single question fails before dispatch without silently removing lore', ()=>{
+    const entry=lore('A',1,'x'.repeat(130000));
+    const prepared=prepareJevRecall([entry],new Set(['A']),[{mes:'scene'}]);
+    assert.ok(prepared.body.questions.e1.instructions.includes(entry.content));
+    assert.throws(()=>planJevRequests(prepared),{name:'JevInputLimitError'});
+    assert.ok(estimateJevTokens('한글 글자')>0);
 });
 
 test('A missing decision or unavailable provider fails without substituting incomplete results', async () => {
@@ -204,7 +241,7 @@ test('A missing decision or unavailable provider fails without substituting inco
     await assert.rejects(requestJevRecall(request, connection, {}, undefined, async () =>
         response({ answers: { e1: { choice: 'skip' } } })), /every candidate/);
     assert.deepEqual(await requestJevRecall(request, connection, {}, undefined, async () =>
-        response({ answers: { e1: { choice: 'skip' }, e2: { choice: 'skip' } } })), []);
+        response({ answers: { e1: { choice: 'skip' }, e2: { choice: 'skip' } } })), {decisions:[],inputTokens:null});
 });
 
 test('Jev defaults, custom criteria and explicit candidate scope', async () => {
@@ -217,8 +254,11 @@ test('Jev defaults, custom criteria and explicit candidate scope', async () => {
     assert.deepEqual([...getJevWorlds(settings, true)], ['A', 'B']);
     assert.deepEqual([...getJevWorlds(settings, undefined)], ['A']);
     assert.equal(getJevWorlds(settings, false).size, 0);
-    assert.deepEqual(normalizeJevOptions(), {mode:'all',recent:6,messageLength:1400,loreLength:960,preset:'balanced',prompt:''});
+    assert.deepEqual(normalizeJevOptions(), {inputVersion:2,mode:'all',recent:20,messageLength:0,loreLength:0,preset:'balanced',prompt:''});
     assert.deepEqual(normalizeJevOptions({recent:0,messageLength:20001,loreLength:NaN}), normalizeJevOptions());
+    assert.deepEqual(normalizeJevOptions({recent:6,messageLength:1400,loreLength:960}),normalizeJevOptions());
+    assert.equal(normalizeJevOptions({inputVersion:2,recent:6,messageLength:1400,loreLength:960}).messageLength,1400);
+    assert.equal(normalizeJevOptions({recent:10,messageLength:2500,loreLength:1500}).loreLength,1500);
     assert.equal(JEV_PRESETS.balanced, DEFAULT_JEV_PROMPT);
     const entries = [lore('A',1,'a'.repeat(1200)), lore('B',1,'b'), lore('C',1,'c')];
     const keys = new Set([jevEntryKey(entries[0]),jevEntryKey(entries[2])]);
@@ -227,7 +267,9 @@ test('Jev defaults, custom criteria and explicit candidate scope', async () => {
     assert.equal(prepared.candidates.size,1);
     assert.equal(prepared.body.state.current.length,1);
     assert.equal(prepared.body.state.current[0].text.length,100);
-    assert.ok(prepared.body.state.lore.e1.gist.length <= 100);
+    assert.ok(JSON.parse(prepared.body.questions.e1.instructions.slice(prepared.body.questions.e1.instructions.indexOf('{'))).text.length <= 100);
+    assert.equal(prepared.stats.truncatedMessages,1);
+    assert.equal(prepared.stats.truncatedLore,1);
     assert.match(prepared.body.state.assessment,/Prefer relationship details/);
     assert.match(prepared.body.state.assessment,/include\/skip/);
     assert.equal(prepareJevRecall(entries,getJevWorlds(settings,true),messages,{},new Set()),null);
@@ -240,8 +282,7 @@ test('preferred budgets share unused space, obey limits and only select Jev-appr
         lore('C',1,'ccc'),
     ];
     const ranked = [entries[0], entries[1], entries[2], entries[4], entries[5]].map(jevEntryKey);
-    const opts = { budget:15,worldInfoBudget:20,bookBudgets:new Map(),countTokens:async text=>text.length,
-        reserveBudgets:new Map([['B',7],['C',5]]),bookPriorities:new Map([['C',5],['B',4]]),diagnostics:new Map()};
+    const opts = { budget:15,worldInfoBudget:20,bookBudgets:new Map([['B',7],['C',5]]),countTokens:async text=>text.length,bookPriorities:new Map([['C',5],['B',4]]),diagnostics:new Map()};
     const result=await fitJevRecall(entries,new Set(['A','B','C']),ranked,opts);
     assert.deepEqual([...result.keys()],[entries[4],entries[0]].map(jevEntryKey));
     assert.equal(result.has(jevEntryKey(entries[6])),false);
@@ -254,7 +295,6 @@ test('preferred budgets share unused space, obey limits and only select Jev-appr
 test('conflicting preferred budgets use book priority without exceeding the shared ceiling', async () => {
     const a=lore('A',1,'aaa'),b=lore('B',1,'bbb');
     const result=await fitJevRecall([a,b],new Set(['A','B']),[a,b].map(jevEntryKey),{
-        budget:4,worldInfoBudget:100,bookBudgets:new Map(),countTokens:async text=>text.length,
-        reserveBudgets:new Map([['A',4],['B',4]]),bookPriorities:new Map([['A',1],['B',5]])});
+        budget:4,worldInfoBudget:100,bookBudgets:new Map([['A',4],['B',4]]),countTokens:async text=>text.length,bookPriorities:new Map([['A',1],['B',5]])});
     assert.deepEqual([...result.keys()],[jevEntryKey(b)]);
 });

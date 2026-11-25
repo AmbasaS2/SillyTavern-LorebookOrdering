@@ -15,7 +15,7 @@ const raw = [
 ];
 const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
-function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0}={}) {
+function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern'}={}) {
     const listeners=new Map();
     const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0};
     const events=new Proxy({}, {get:(_,key)=>key});
@@ -28,8 +28,9 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode},jevProfileId:'nano',jevBudget:1000},
         connectionManager:{profiles:[profile]},vectors:{enabled_world_info:vectors},disabledExtensions:[]};
     const books=new Map([['A',{stlo:{}}],['B',{stlo:{}}],['C',{stlo:{jevExclude:true}}]]);
-    const ctx={groupId:null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:'lantern'}]};
+    const ctx={groupId:null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
     const force=new Map();
+    const batches=[];
     eventSource.on(events.WORLDINFO_FORCE_ACTIVATE,entries=>{for(const e of entries)force.set(recall.jevEntryKey(e),e);});
     const elements=new Map();
     const makeNode=()=>{
@@ -52,7 +53,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         stopGeneration(){counters.stop++;void eventSource.emit(events.GENERATION_STOPPED);},
         getSortedEntries:async()=>{
             counters.sorted++;
-            const data={globalLore:structuredClone(raw),characterLore:[],chatLore:[],personaLore:[]};
+            const data={globalLore:structuredClone(entries),characterLore:[],chatLore:[],personaLore:[]};
             await eventSource.emit(events.WORLDINFO_ENTRIES_LOADED,data);
             return data.globalLore;
         },
@@ -67,8 +68,10 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         },
         requestJevRecall:async(prepared)=>{
             counters.jev++;
-            if(counters.jev<=failures)throw Error('Jev is unavailable (503).');
-            return [...prepared.candidates.values()].filter(key=>!decisions||decisions.includes(key));
+            batches.push([...prepared.candidates.keys()]);
+            if(counters.jev<=sizeFailures)throw new recall.JevInputLimitError('Jev rejected the input size.');
+            if(counters.jev<=failures||counters.jev===failAt)throw Error('Jev is unavailable (503).');
+            return { decisions:[...prepared.candidates.values()].filter(key=>!decisions||decisions.includes(key)).map(key=>({key,score:.9})), inputTokens:100 };
         },
     };
     sandbox.globalThis=sandbox;
@@ -92,7 +95,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,active);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,batches,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
 }
 
 test('all-mode generation skips vectors, honors exclusions and only asks Jev once',async()=>{
@@ -192,4 +195,39 @@ test('inherit removes only the explicit character override and uses legacy book 
     assert.equal(h.counters.jev,1);
     assert.equal(entries.some(e=>e.world==='B'&&e.uid===1&&e.content.startsWith('@@activate')),false);
     assert.equal(h.books.get('A').stlo.jevRecall,true);
+});
+
+
+test('explicit provider size failure splits only the rejected batch and uses no retry popup',async()=>{
+    const h=harness({sizeFailures:1});
+    const result=await h.generate();
+    assert.equal(h.counters.jev,3);
+    assert.equal(h.counters.popup,0);
+    assert.deepEqual([...h.batches[1],...h.batches[2]],h.batches[0]);
+    assert.equal(h.report().unassessed,0);
+    assert.equal(h.report().completedBatches,2);
+    assert.equal(h.report().actualInputTokens,200);
+    assert.equal(result.filter(e=>e.content.startsWith('@@activate')).length,3);
+});
+
+test('failure in later batch retries only that batch; cancelling never injects partial selections',async()=>{
+    const retry=harness({sizeFailures:1,failAt:3,responses:[1]});
+    assert.ok(await retry.generate());
+    assert.equal(retry.counters.jev,4);
+    assert.deepEqual(retry.batches[2],retry.batches[3]);
+    assert.equal(retry.report().completedBatches,2);
+    assert.equal(retry.report().unassessed,0);
+    const cancel=harness({sizeFailures:1,failAt:3,responses:[0]});
+    assert.equal(await cancel.generate(),undefined);
+    assert.equal(cancel.report().completedBatches,1);
+    assert.ok(cancel.report().unassessed>0);
+    assert.equal(cancel.counters.abort,1);
+});
+
+test('preflight rejects a single oversized question without any paid request',async()=>{
+    const h=harness({entries:[entry('A',1,'x'.repeat(130000))],responses:[0]});
+    assert.equal(await h.generate(),undefined);
+    assert.equal(h.counters.jev,0);
+    assert.equal(h.counters.abort,1);
+    assert.equal(h.report().unassessed,1);
 });
