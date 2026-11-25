@@ -30,10 +30,12 @@ The detailed sections below explain optional settings. Compatibility is version-
 
 ## Who is this for?
 
-- Long-running roleplays where old promises and events are hard to recall, but irrelevant lore often appears.
-- Players with several lorebooks (character details, worldbuilding, memories) who want to control their relative priority and token usage.
-- Players who keep recent memories or essential settings always on and want to protect them from being crowded out.
-- Vector users who want different similarity thresholds for different books.
+- Manage several lorebooks with independent priorities and token ceilings without sacrificing important character settings or world lore.
+- Protect recent memories and essential always-on entries within available budgets.
+- Use optional Jev to recall relevant old promises, events and habits even when exact keywords do not match.
+- Keep native keyword/vector recall and set independent per-book vector similarity thresholds.
+- Control lorebook priority, order and activation by speaking character in group chats.
+- Configure multiple books together, opt into Jev per character and exclude specific books, and inspect the latest recall report for selection, budget exclusions, token estimates and timing.
 
 Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection. With [WorldInfo Info](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1, actually activated Jev entries can also display a 🔮 source indicator. Neither extension requires the other.
 
@@ -273,10 +275,12 @@ If an always-on entry disappears, first check whether its full text fits both th
 
 ## 이런 분들께 추천합니다!
 
-- 장기 롤플 중 예전에 했던 약속이나 중요한 사건은 잘 안 불려 오고 관계없는 로어만 들어가는 분
-- 캐릭터 설정·세계관·메모리북 등 여러 책의 토큰 사용량과 우선순위를 따로 관리하고 싶은 분
-- 최근 기억이나 중요한 파란불 설정을 검색된 다른 로어보다 먼저 넣고 싶은 분
-- 기존 벡터 검색을 유지하되 로어북마다 검색 기준을 다르게 설정하고 싶은 분
+- 캐릭터 설정·세계관·메모리북이 서로 예산을 잡아먹지 않도록 책별 우선순위와 최대 토큰을 조절하고 싶은 분
+- 최근 기억과 필수 파란불 항목을 다른 로어보다 먼저 보호하고 싶은 분
+- 정확한 키워드가 없어도 Jev로 지금 필요한 과거 사건·약속·습관을 불러오고 싶은 분
+- 기존 키워드·벡터 호출을 유지하면서 로어북마다 벡터 유사도 임계값을 다르게 설정하고 싶은 분
+- 그룹 채팅의 발언 캐릭터별로 책의 우선순위·순서·활성화 여부를 관리하고 싶은 분
+- 여러 책의 설정을 한 번에 관리하고 캐릭터별 Jev 사용·책별 제외를 선택하며, 호출 결과에서 판정·선택·예산 제외·입력 토큰·소요 시간을 확인하고 싶은 분
 
 Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관리만 사용해도 됩니다.
 
