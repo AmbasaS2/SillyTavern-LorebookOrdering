@@ -56,7 +56,7 @@
   "stlo.modal.order.groupOnly.label": "Group Chats Only",
   "stlo.modal.order.groupOnly.help": "Only apply order adjustment during group chats (ignored in single character chats)",
   "stlo.modal.onlyWhenSpeaking.label": "Only use when an assigned character speaks",
-  "stlo.modal.onlyWhenSpeaking.help.1": "Use only on turns by the characters listed below. If none are listed, this book is skipped in group chats.",
+  "stlo.modal.onlyWhenSpeaking.help.1": "Applies only in group chats. When checked, this lorebook is used only on turns by assigned characters (none assigned means no injection). When unchecked, unassigned characters use the lorebook defaults.",
   "stlo.modal.onlyWhenSpeaking.help.2": "With no characters listed, this book is skipped in group chats.",
   "stlo.modal.groupOverrides.title": "Group Chat Overrides",
   "stlo.modal.groupOverrides.info": "If a character is selected in here, the priority settings here will override the lorebook's default setting only during that character's speaking turns in a group chat.",

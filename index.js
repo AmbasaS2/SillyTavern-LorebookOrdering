@@ -1639,7 +1639,6 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                 <details class="stlo-advanced-drawer">
                     <summary data-i18n="stlo.modal.groupOverrides.title">Group Chat Overrides</summary>
                     <div class="stlo-group-body">
-                        <small data-i18n="stlo.modal.groupOverrides.defaultPriority.help">Unassigned characters use the lorebook defaults. Only applies in group chats.</small>
                         <div class="stlo-toggle-block">
                             <div class="stlo-option-line">
                                 <label class="checkbox_label stlo-checkrow" for="lorebook-only-when-speaking">
@@ -1647,7 +1646,7 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                                     <span class="checkmark"></span>
                                     <span data-i18n="stlo.modal.onlyWhenSpeaking.label">Only use when an assigned character speaks</span>
                                 </label>
-                                ${infoHelp('stlo.modal.onlyWhenSpeaking.help.1', 'Use only on turns by the characters listed below. If none are listed, this book is skipped in group chats.')}
+                                ${infoHelp('stlo.modal.onlyWhenSpeaking.help.1', 'Applies only in group chats. When checked, this lorebook is used only on turns by assigned characters (none assigned means no injection). When unchecked, unassigned characters use the lorebook defaults.')}
                             </div>
                         </div>
                         <div id="advanced-priority-sections" class="stlo-group-cards"></div>
