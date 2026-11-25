@@ -563,10 +563,18 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-reading-summary > small { display:inline; margin-inline-start:7px; font-weight:400; }
         .stlo-modal-ui .stlo-legacy-book { width: 100%; margin: 2px 0 0; }
         .stlo-modal-ui .stlo-legacy-book[hidden] { display: none !important; }
-        .stlo-modal-ui .stlo-jev-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 156px); align-items: center; gap: 6px; width: 100%; }
-        .stlo-modal-ui .stlo-jev-field .stlo-field-heading > label { min-width: 0; overflow-wrap: anywhere; text-align: left; }
-        .stlo-modal-ui .stlo-jev-field > select { width: 100% !important; min-width: 0; max-width: 100%; box-sizing: border-box; margin: 0 !important; }
-        .stlo-modal-ui .stlo-jev-field > input[type="number"] { width: 100% !important; max-width: 156px; min-width: 0; box-sizing: border-box; margin: 0 !important; }
+        .stlo-jev-settings { gap:6px; }
+        .stlo-jev-settings > .stlo-section { gap:4px; padding-bottom:7px; }
+        .stlo-jev-settings > .stlo-section:last-child { padding-bottom:0; }
+        .stlo-jev-settings .stlo-jev-advanced { margin:0; }
+        .stlo-jev-settings .stlo-jev-advanced > summary { padding:3px 0; }
+        .stlo-jev-settings .stlo-jev-advanced-body { gap:5px; padding-top:5px; }
+        .stlo-jev-settings .stlo-jev-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr)); gap:6px 12px; align-items:stretch; width:100%; min-width:0; }
+        .stlo-jev-settings .stlo-jev-limit-fields { padding-top:4px; }
+        .stlo-jev-settings .stlo-jev-field { display:flex; flex-direction:column; justify-content:space-between; align-items:stretch; gap:2px; min-width:0; }
+        .stlo-jev-settings .stlo-jev-field .stlo-field-heading { gap:4px; }
+        .stlo-jev-settings .stlo-jev-field .stlo-field-heading > label { min-width:0; overflow-wrap:anywhere; text-align:left; }
+        .stlo-jev-settings .stlo-jev-field > :is(select,input[type="number"]) { width:100% !important; min-width:0; max-width:100%; min-height:1.8em; box-sizing:border-box; margin:0 !important; }
         .stlo-modal-ui .stlo-jev-prompt-library { display:grid; gap:5px; width:100%; min-width:0; text-align:start; margin-block:7px; }
         .stlo-modal-ui .stlo-jev-prompt-library :is(.stlo-jev-prompt-heading,.stlo-jev-prompt-selection,.stlo-jev-prompt-tools) { display:flex; align-items:center; gap:4px; min-width:0; }
         .stlo-modal-ui .stlo-jev-prompt-heading { justify-content:space-between; flex-wrap:wrap; }
@@ -645,8 +653,6 @@ function installStloModalStyles() {
             .stlo-modal-ui { gap: 6px; }
             .stlo-book-manager .stlo-book-body { padding:9px; }
             .stlo-modal-ui .stlo-section { gap: 5px; padding-bottom: 8px; }
-            .stlo-modal-ui .stlo-jev-field { grid-template-columns: minmax(0, 1fr) minmax(0, 132px); gap: 4px; }
-            .stlo-modal-ui .stlo-jev-field > input[type="number"] { max-width:132px; }
             .stlo-modal-ui .stlo-jev-prompt-heading .stlo-field-heading { flex:1 1 130px; }
             .stlo-modal-ui .stlo-group-card .stlo-group-priority { grid-template-columns:minmax(0,1fr) minmax(0,132px); }
         }
@@ -714,7 +720,7 @@ function addLorebookBudgetMenuItem() {
         menu.appendChild(container);
     };
     add('stlo_budget_menu_item', 'fa-scale-balanced', '로어북 예산 관리', openLorebookBudgetFromMenu);
-    add('stlo_jev_settings_menu_item', 'fa-scale-balanced', translate('Jev injection settings', 'stlo.jev.settingsTitle'), openJevSettings);
+    add('stlo_jev_settings_menu_item', 'fa-scale-balanced', translate('Lorebook Jev Recall', 'stlo.jev.settingsTitle'), openJevSettings);
 }
 
 /**
@@ -1304,8 +1310,7 @@ async function openJevSettings() {
     try {
         const avatar = getJevCharacterAvatar();
         const characterName = avatar ? characters?.[this_chid]?.name || avatar : '';
-        const saved = getCharacterJevRecall(avatar);
-        const choice = saved === true ? 'on' : 'off';
+        const enabled = getCharacterJevRecall(avatar) === true;
         const jevOptions = getJevOptions();
         const tr = (fallback, key) => translate(fallback, 'stlo.jev.' + key);
         const promptModel = createJevPromptLibrary(jevOptions, extension_settings[EXTENSION_NAME]?.jevPromptLibrary, {
@@ -1316,25 +1321,30 @@ async function openJevSettings() {
         let dialogOpen = true;
         const promptIcon = (action, icon, key) => '<button type="button" class="menu_button stlo-jev-prompt-icon" data-jev-prompt-action="' + action + '" data-jev-prompt-label="' + key + '"><i class="fa-solid ' + icon + '" aria-hidden="true"></i></button>';
         const html = `
-            <div class="stlo-modal-ui">
+            <div class="stlo-modal-ui stlo-jev-settings">
                 <div class="world_entry_form_control stlo-section">
-                    <h3 data-i18n="stlo.jev.dialogTitle">Jev settings</h3>
+                    <h3 data-i18n="stlo.jev.settingsTitle">Lorebook Jev Recall</h3>
                     ${HAS_WORLDINFO_SCAN_DONE && avatar ? `
                         <div class="stlo-character-line">
                             <span data-i18n="stlo.jev.characterTitle">Current character</span>
                             <strong id="stlo-jev-character-name"></strong>
                         </div>
-                        <div class="stlo-field-heading"><label for="stlo-jev-character-choice" data-i18n="stlo.jev.characterActivation">Jev selection</label>${infoHelp('stlo.jev.characterActivationHelp', 'Applies to every chat with this character and all active linked lorebooks, except books excluded from Jev.')}</div>
-                        <select id="stlo-jev-character-choice" class="text_pole textarea_compact">
-                            <option value="on" ${choice === 'on' ? 'selected' : ''} data-i18n="stlo.jev.on">On</option>
-                            <option value="off" ${choice === 'off' ? 'selected' : ''} data-i18n="stlo.jev.off">Off</option>
-                        </select>` : HAS_WORLDINFO_SCAN_DONE ? `<small data-i18n="stlo.jev.noCharacter">Open a one-to-one chat to set character-level Jev. Group chats use the book settings.</small>` : `<small data-i18n="stlo.jev.unsupported">Jev requires World Info scan support.</small>`}
+                        <div class="stlo-option-line">
+                            <label class="checkbox_label stlo-checkrow" for="stlo-jev-character-choice">
+                                <input type="checkbox" id="stlo-jev-character-choice" ${enabled ? 'checked' : ''}>
+                                <span class="checkmark"></span>
+                                <span data-i18n="stlo.jev.characterActivation">Use Jev</span>
+                            </label>
+                            ${infoHelp('stlo.jev.characterActivationHelp', 'Applies to every chat with this character and all active linked lorebooks, except books excluded from Jev.')}
+                        </div>` : HAS_WORLDINFO_SCAN_DONE ? `<small data-i18n="stlo.jev.noCharacter">Open a one-to-one chat to set character-level Jev. Group chats use the book settings.</small>` : `<small data-i18n="stlo.jev.unsupported">Jev requires World Info scan support.</small>`}
                 </div>
                 ${HAS_WORLDINFO_SCAN_DONE ? `
                 <div class="world_entry_form_control stlo-section">
                     <h4 data-i18n="stlo.jev.sharedTitle">Jev injection settings (all characters)</h4>
-                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-budget" data-i18n="stlo.jev.budget">Total Jev budget (tokens)</label>${infoHelp('stlo.jev.budgetHelp', 'Shared injection ceiling, not an API input-token limit. World Info and individual book limits still apply.')}</div><input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1" value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}"></div>
-                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-profile" data-i18n="stlo.jev.profile">NanoGPT connection profile</label>${infoHelp('stlo.jev.keyHelp', 'Only NanoGPT connection keys are supported. Use a key with Billing set to Subscription only to block balance charges.')}</div><select id="stlo-jev-profile" class="text_pole textarea_compact"><option value="" data-i18n="stlo.jev.chooseProfile">Select a profile</option></select></div>
+                    <div class="stlo-jev-fields">
+                        <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-budget" data-i18n="stlo.jev.budget">Total Jev budget (tokens)</label>${infoHelp('stlo.jev.budgetHelp', 'Shared injection ceiling, not an API input-token limit. World Info and individual book limits still apply.')}</div><input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1" value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}"></div>
+                        <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-profile" data-i18n="stlo.jev.profile">NanoGPT connection profile</label>${infoHelp('stlo.jev.keyHelp', 'Only NanoGPT connection keys are supported. Use a key with Billing set to Subscription only to block balance charges.')}</div><select id="stlo-jev-profile" class="text_pole textarea_compact"><option value="" data-i18n="stlo.jev.chooseProfile">Select a profile</option></select></div>
+                    </div>
                 </div>
                 <div class="world_entry_form_control stlo-section">
                 <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All eligible entries: skip vector search. Filtered: judge only vector and keyword hits. Requests split automatically when needed.')}</div>
@@ -1343,15 +1353,17 @@ async function openJevSettings() {
                 </div>
                 <div class="world_entry_form_control stlo-section">
                 <details class="stlo-jev-advanced"><summary data-i18n="stlo.jev.advanced">Advanced Jev settings</summary><div class="stlo-jev-advanced-body">
+                <div class="stlo-jev-fields">
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-recent" data-i18n="stlo.jev.recent">Recent messages</label>${infoHelp('stlo.jev.recentHelp', 'Jev reads this many recent messages in full by default. Default: 20.')}</div><input type="number" id="stlo-jev-recent" class="text_pole textarea_compact" min="1" max="100" step="1" value="${jevOptions.recent}"></div>
+                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Default selection style</label>${infoHelp('stlo.jev.presetHelp', 'Strict: direct relevance. Balanced: default. Generous: indirect relevance too. Changing this selects the built-in prompt.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select></div>
+                </div>
                 <details class="stlo-jev-advanced stlo-jev-reading-limits" ${jevOptions.messageLength || jevOptions.loreLength ? 'open' : ''}>
                     <summary class="stlo-reading-summary"><span data-i18n="stlo.jev.readingLimits">Reading limits</span><small id="stlo-jev-reading-status"></small></summary>
-                    <div class="stlo-jev-advanced-body">
+                    <div class="stlo-jev-fields stlo-jev-limit-fields">
                         <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-message-length" data-i18n="stlo.jev.messageLength">Message character limit</label>${infoHelp('stlo.jev.messageLengthHelp', '0 reads the full message. A positive limit keeps the end.')}</div><input type="number" id="stlo-jev-message-length" class="text_pole textarea_compact" min="0" max="20000" step="1" value="${jevOptions.messageLength}"></div>
                         <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-lore-length" data-i18n="stlo.jev.loreLength">Lore character limit</label>${infoHelp('stlo.jev.loreLengthHelp', '0 reads the full entry. A positive limit keeps the beginning and end.')}</div><input type="number" id="stlo-jev-lore-length" class="text_pole textarea_compact" min="0" max="20000" step="1" value="${jevOptions.loreLength}"></div>
                     </div>
                 </details>
-                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Default selection style</label>${infoHelp('stlo.jev.presetHelp', 'Strict: direct relevance. Balanced: default. Generous: indirect relevance too. Changing this selects the built-in prompt.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select></div>
                 <div class="stlo-jev-prompt-library" id="stlo-jev-prompt-library">
                     <header class="stlo-jev-prompt-heading">
                         <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.prompt">Selection prompt</h4>${infoHelp('stlo.jev.promptHelp', 'Edit decision criteria, not the structured response format. The settings are shared across characters.')}</div>
@@ -1409,7 +1421,8 @@ async function openJevSettings() {
                         result.jevProfileId = val('stlo-jev-profile') ?? '';
                         result.jevOptions = normalizeJevOptions(opts);
                         result.jevPromptLibrary = promptState.library;
-                        result.characterChoice = val('stlo-jev-character-choice');
+                        const characterChoice = document.getElementById('stlo-jev-character-choice');
+                        result.characterChoice = characterChoice ? (characterChoice.checked ? 'on' : 'off') : undefined;
                     }
                     dialogOpen = false;
                     resolve(result);

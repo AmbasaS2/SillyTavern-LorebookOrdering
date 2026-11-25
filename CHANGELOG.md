@@ -2,6 +2,12 @@
 
 **← [Back to README](README.md)**
 
+## Ambasa fork — compact Jev settings (November 25, 2026)
+- Unify the Jev menu and dialog title as Lorebook Jev Recall (로어북 Jev 호출).
+- Use a per-character checkbox and compact, container-width-responsive two-column input groups; stack fields on narrow screens.
+- Preserve the prompt editor, model, generation logic, and stored settings. No new observers or redraw loops.
+- Validation: 36 Node tests and isolated Chromium checks at 1024px, 460px and 360px passed. Prompt editor markup, CSS and behavior are unchanged. Installed SillyTavern verification remains pending.
+
 ## Ambasa fork — multi-lorebook manager (November 25, 2026)
 - Open the budget manager directly, with collapsible book cards and live priority/budget summaries. Add linked books by default, or show all books; remove only editor cards without touching lore or connections.
 - Move the global always-on protection control to the manager header. Keep per-book advanced and group settings independently scoped with unique control IDs.

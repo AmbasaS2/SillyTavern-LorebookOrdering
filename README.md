@@ -30,7 +30,7 @@ The diagrams in this README are illustrated guides based on the fork's settings,
    ```
 
 3. Install and reload SillyTavern. Use a recent SillyTavern version with the `WORLDINFO_SCAN_DONE` event (e.g. the 1.18 series) for Jev and per-lorebook budget trimming.
-4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, edit one or more lorebooks in collapsible cards, then save them together. For character-level Jev activation and shared settings, open **Jev injection settings** directly from the extensions menu.
+4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, edit one or more lorebooks in collapsible cards, then save them together. For character-level Jev activation and shared settings, open **Lorebook Jev Recall** directly from the extensions menu.
 
 ## 🧭 How to Use
 
@@ -44,7 +44,7 @@ The original slash command is retained: `/stlo My Lorebook` selects the named bo
 
 ### What can I configure?
 
-Book-specific controls are in Lorebook Budget Management; character-level Jev and shared controls are in Jev injection settings. You do not need to change every option.
+Book-specific controls are in Lorebook Budget Management; character-level Jev and shared controls are in Lorebook Jev Recall. You do not need to change every option.
 
 The budget manager opens the current linked book (or the first available linked book). Use **Add lorebook** to select more attached books; **Show all lorebooks** reveals the rest. Each card collapses independently and shows priority and budget. Removing a card does not delete or unlink a book. Only changed settings are written; failed saves remain in the manager for retry. Global always-on protection is saved once for all books.
 
@@ -56,7 +56,7 @@ The budget manager opens the current linked book (or the first available linked 
 | Per-book budget | Set a maximum contribution for this book. With Jev, this is also its preferred share of the common budget. |
 | Random trim | Vary which already-active ordinary entries fit if the same ones always win. |
 | Vector similarity threshold (벡터 유사도 임계값) | For native vector retrieval without Jev, use a book-specific threshold or leave blank for the global setting. |
-| Jev selection | In Jev injection settings, choose On or Off for the current character. Group chats retain the book-specific setting. |
+| Jev selection | In Lorebook Jev Recall, check or uncheck Use Jev for the current character. Group chats retain the book-specific setting. |
 | Exclude this lorebook from Jev | Keep a book on native activation. Shown when Jev is enabled for the current character, or when managing group settings. |
 | Total Jev budget / NanoGPT connection profile | Configure these only when using Jev. Both are shared extension settings. |
 | Jev candidate source / advanced settings | Choose all eligible entries or native search candidates; configure the reading scope and selection prompt. Shared settings. |
@@ -85,7 +85,7 @@ Jev is a decision model, not the model that writes the RP response. STLO sends s
 
 1. In NanoGPT, create or use an API key for your subscription. Set the key's **Billing → Subscription only** to prevent spending your account balance.
 2. In SillyTavern, save a **Chat Completion → Custom (OpenAI-compatible)** connection profile using the base URL `https://nano-gpt.com/api/subscription/v1` and that key. The profile must have a saved credential bound to this endpoint. The ordinary NanoGPT endpoint or a native NanoGPT connection profile is not selectable for Jev in this implementation.
-3. Open a one-to-one character chat, then **Extensions menu → Jev injection settings**. Set **Jev selection** to On. Select your saved **NanoGPT connection profile**, set **Total Jev budget (tokens)**, and save. No lorebook selection is required.
+3. Open a one-to-one character chat, then **Extensions menu → Lorebook Jev Recall**. Check **Use Jev**. Select your saved **NanoGPT connection profile**, set **Total injection budget (tokens)**, and save. No lorebook selection is required.
 4. Continue your RP normally. The extension requests `typesafe/jev-1.14` automatically; it does not replace your main API or require you to change the profile's saved chat model to Jev.
 
 In a one-to-one character chat, an explicit On setting applies to the character and covers eligible entries from all active, non-excluded lorebooks. Off disables Jev for that character. Group chats retain book-specific opt-ins, with the group control in Lorebook Budget Management. The total Jev budget, connection profile and advanced options remain shared extension settings. The prompt library offers named presets, full editor, save, rename, save as, import/export and delete; changes are applied with the outer Save Settings button. Jev defaults to off for characters without an explicit choice, even if a book has an old Jev opt-in. The book flag remains available for group chats. Older separate Jev reserve values are retained in the saved book but ignored; the existing book budget now controls both its cap and preferred share.
@@ -246,7 +246,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
    ```
 
 3. 설치 후 새로고침합니다. Jev 및 로어북별 예산 트리밍은 `WORLDINFO_SCAN_DONE`을 지원하는 최근 버전(예: 1.18 계열)을 권장합니다.
-4. **확장 메뉴 → 로어북 예산 관리**에서 필요한 로어북을 카드로 추가하고 예산·우선순위를 한 번에 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **Jev 주입 설정**에서 바로 변경합니다.
+4. **확장 메뉴 → 로어북 예산 관리**에서 필요한 로어북을 카드로 추가하고 예산·우선순위를 한 번에 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **로어북 Jev 호출**에서 바로 변경합니다.
 
 ## 🧭 사용 흐름
 
@@ -258,9 +258,9 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 원본의 `/stlo 로어북 이름` 명령어도 남아 있습니다. 월드 정보 편집기에서 해당 로어북을 선택하고 설정창을 엽니다.
 
-### 로어북 예산 관리와 Jev 주입 설정에서 할 수 있는 것
+### 로어북 예산 관리와 로어북 Jev 호출에서 할 수 있는 것
 
-책별 설정은 로어북 예산 관리, 캐릭터별 Jev 사용 여부와 공통값은 Jev 주입 설정으로 나뉩니다. 모든 기능을 사용할 필요는 없습니다.
+책별 설정은 로어북 예산 관리, 캐릭터별 Jev 사용 여부와 공통값은 로어북 Jev 호출로 나뉩니다. 모든 기능을 사용할 필요는 없습니다.
 
 로어북 예산 관리에서는 현재 캐릭터와 연결된 책을 기본으로 표시하고 **로어북 추가**로 다른 연결 책을 고를 수 있습니다. **모든 로어북 보기**를 켜면 다른 책도 추가할 수 있습니다. 카드마다 접기·펼치기와 우선순위·예산 요약을 지원합니다. X는 편집 목록에서만 제외하며 책이나 연결을 삭제하지 않습니다. 바꾼 설정만 저장하고, 저장 확인에 실패한 책은 다시 시도할 수 있습니다.
 
@@ -272,7 +272,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 | 예산 | 해당 책의 최대 주입량입니다. Jev 사용 시 관련 로어에 이 예산을 우선 배정합니다. |
 | 예산 초과 시 항목을 무작위로 제외 | 이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다. |
 | 벡터 유사도 임계값 | Jev를 쓰지 않고 기존 벡터 검색을 사용할 때 책별로 검색 기준을 달리합니다. 비우면 전역값. |
-| Jev 판정 사용 | Jev 주입 설정에서 현재 캐릭터별로 사용 / 사용 안 함을 선택합니다. 그룹 채팅은 기존 책별 설정을 유지합니다. |
+| Jev 판정 사용 | 로어북 Jev 호출에서 현재 캐릭터의 Jev 사용을 체크하거나 해제합니다. 그룹 채팅은 기존 책별 설정을 유지합니다. |
 | 이 로어북은 Jev 판정에서 제외 | 기존 발동 방식을 유지합니다. 현재 캐릭터가 Jev를 사용할 때 표시됩니다. 그룹·기존 설정 관리 예외는 유지됩니다. |
 | Jev 전체 주입 예산 / 나노GPT 연결 프로필 | Jev를 사용할 때만 설정합니다. 두 값은 공통 설정입니다. |
 | Jev 판정 대상 / 고급 설정 | 전체 항목 또는 기존 검색 후보, 인식 범위와 판정 프롬프트를 설정합니다. 공통 설정입니다. |
@@ -301,10 +301,10 @@ Jev는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모�
 
 1. 나노GPT에서 구독용 API 키를 준비합니다. 잔액 결제를 막으려면 해당 키의 **Billing → Subscription only**를 설정하세요.
 2. 실리태번 API 연결에서 **Chat Completion → Custom (OpenAI-compatible)**을 선택하고 주소를 `https://nano-gpt.com/api/subscription/v1`로 지정합니다. 해당 주소에 키가 저장된 연결 프로필을 만듭니다. 일반 나노GPT API 주소나 실리태번의 NanoGPT 전용 연결 방식은 현재 Jev 프로필 선택 대상이 아닙니다.
-3. 1:1 캐릭터 채팅을 열고 **확장 메뉴 → Jev 주입 설정**에서 **Jev 판정 사용**을 사용으로 지정합니다. **나노GPT 연결 프로필**과 **Jev 전체 주입 예산 (토큰)**을 지정한 뒤 설정을 저장합니다. 로어북을 선택할 필요는 없습니다.
+3. 1:1 캐릭터 채팅을 열고 **확장 메뉴 → 로어북 Jev 호출**에서 **Jev 사용**을 체크합니다. **나노GPT 연결 프로필**과 **전체 주입 예산 (토큰)**을 지정한 뒤 설정을 저장합니다. 로어북을 선택할 필요는 없습니다.
 4. 평소처럼 RP를 이어갑니다. STLO가 판정용 모델 `typesafe/jev-1.14`를 자동 지정하므로 메인 RP API나 저장한 프로필의 일반 채팅 모델을 Jev로 바꿀 필요가 없습니다.
 
-1:1 채팅에서는 현재 캐릭터별로 켜고 끌 수 있습니다. 사용을 선택하면 그 캐릭터의 현재 채팅에서 활성화된 로어북 중 제외 설정이 없는 책의 적격 항목을 판정합니다. 사용 안 함을 선택하면 Jev를 끕니다. 그룹 채팅은 로어북 예산 관리의 그룹 채팅용 책별 Jev 설정을 따릅니다. 총예산, 연결 프로필, 고급 설정은 확장 공통값입니다. 프롬프트는 이름을 붙여 여러 개 저장하고 전체 보기, 이름 변경, 복제, 가져오기·내보내기, 삭제할 수 있으며 외부 설정 저장 버튼으로 반영합니다. 캐릭터별로 사용을 지정하지 않았다면 기존 책별 설정과 관계없이 기본적으로 꺼져 있습니다. 책별 설정은 그룹 채팅용으로 유지됩니다. 기존 별도 Jev 확보 예산 값은 저장 데이터에 남겨 두되 사용하지 않으며, 기존 로어북 예산을 최대치 겸 우선 배정량으로 사용합니다.
+1:1 채팅에서는 현재 캐릭터별로 켜고 끌 수 있습니다. Jev 사용을 체크하면 그 캐릭터의 현재 채팅에서 활성화된 로어북 중 제외 설정이 없는 책의 적격 항목을 판정합니다. 체크를 해제하면 Jev를 끕니다. 그룹 채팅은 로어북 예산 관리의 그룹 채팅용 책별 Jev 설정을 따릅니다. 총예산, 연결 프로필, 고급 설정은 확장 공통값입니다. 프롬프트는 이름을 붙여 여러 개 저장하고 전체 보기, 이름 변경, 복제, 가져오기·내보내기, 삭제할 수 있으며 외부 설정 저장 버튼으로 반영합니다. 캐릭터별로 사용을 지정하지 않았다면 기존 책별 설정과 관계없이 기본적으로 꺼져 있습니다. 책별 설정은 그룹 채팅용으로 유지됩니다. 기존 별도 Jev 확보 예산 값은 저장 데이터에 남겨 두되 사용하지 않으며, 기존 로어북 예산을 최대치 겸 우선 배정량으로 사용합니다.
 
 ### 판정 대상과 주입
 
