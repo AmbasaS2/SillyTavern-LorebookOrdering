@@ -2,6 +2,13 @@
 
 **← [Back to README](README.md)**
 
+## Ambasa fork — review build (November 25, 2026)
+- Optional per-book Jev exclusion and preferred budget; unchanged defaults.
+- All-entries or native candidate recall, adjustable excerpts and editable decision presets.
+- Explicit Jev retry/cancel before RP generation; no automatic retries.
+- Event-only latest recall diagnostics and compact help icons.
+- Node unit and simulated-host tests: 16 passing. Installed SillyTavern and mobile/desktop visual checks still required. Manifest version retained pending release verification.
+
 ## v2.2.4 (September 24, 2026)
 - **🪲Bugfix:** Entries removed for budget reasons during recursion returned for rescan each time, causing infinite loops. Fixed.
 

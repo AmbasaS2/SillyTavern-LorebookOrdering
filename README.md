@@ -58,7 +58,9 @@ The book settings dialog is arranged in this order. You do not need to change ev
 | Random trim | Vary which already-active ordinary entries fit if the same ones always win. |
 | Vector similarity threshold (벡터 유사도 임계값) | For native vector retrieval without Jev, use a book-specific threshold or leave blank for the global setting. |
 | Use Jev to select entries in chats with this character | Let Jev judge relevant lore in a one-to-one character chat; in group chats the switch is book-specific. |
+| Exclude this lorebook from Jev / preferred budget | Keep a book on native activation, or give its relevant Jev selections a preferred share of the existing budget. Book-specific. |
 | Total Jev budget / NanoGPT connection profile | Configure these only when using Jev. Both are shared extension settings. |
+| Jev candidate source / advanced settings | Choose all eligible entries or native search candidates; configure excerpts and the selection prompt. Shared settings. |
 | Group chat overrides | Change priority or activation by speaking character. Ignore for one-to-one RP. |
 
 ### My everyday workflow
@@ -91,7 +93,7 @@ In a one-to-one character chat, the switch applies to the character and covers e
 
 ### What Jev sees and selects
 
-- Up to six recent non-system chat messages (up to 1,400 characters per message), and each eligible entry's book name, title, keywords, and a bounded excerpt of its content (up to approximately 960 characters, with beginning and ending excerpts for long entries).
+- By default, up to six recent non-system chat messages (up to 1,400 characters per message), and each eligible entry's book name, title, keywords, and a bounded excerpt of its content (up to approximately 960 characters, with beginning and ending excerpts for long entries).
 - One include/skip decision per eligible entry; the original full content of selected entries is used for injection, not the excerpt sent for assessment.
 - Ordinary eligible non-constant entries in scope, whether keyword-based or marked for vector retrieval. Disabled entries are not candidates. Always-on entries are handled normally and counted first for budgeting; special entries such as outlets, managed side prompts, explicit activation decorators, sticky/cooldown/delay/recursion-only entries, character filters and trigger-restricted entries retain their native handling.
 - Only active lorebooks are considered. Saved lore and activation settings are not rewritten. No automatic memory creation or summarization is performed.
@@ -104,17 +106,21 @@ In a one-to-one character chat, the switch applies to the character and covers e
 | STLO per-lorebook budget | The maximum each book may contribute. |
 | Total Jev budget (default 10,000 tokens) | The shared recall ceiling across Jev-managed books, counting their always-on entries first. |
 
-These limits are not added together or reserved allocations. For instance, a memory book capped at 3,000 tokens with 2,000 tokens of always-on entries has at most 1,000 tokens left for additional Jev picks, even if the total Jev budget is 10,000. Jev selects relevant entries in score order within the remaining limits; the original insertion positions/order are retained. Ordinary native entries and explicitly budget-exempt entries retain their applicable handling; always-on entries themselves are not guaranteed to fit every budget.
+These three limits are ceilings, not added together. An optional preferred per-book budget (default 0, disabled) first allocates space to relevant Jev-approved entries, including that book’s always-on entries. Unused preferred space returns to the common pool. Book priority resolves competing reservations; all three ceilings still apply. Whole entries and native activation rules can leave some preferred space unused. For instance, a memory book capped at 3,000 tokens with 2,000 tokens of always-on entries has at most 1,000 tokens left for additional Jev picks, even if the total Jev budget is 10,000. Jev selects relevant entries in score order after preferred allocations, within the remaining limits; the original insertion positions/order are retained. Ordinary native entries and explicitly budget-exempt entries retain their applicable handling; always-on entries themselves are not guaranteed to fit every budget.
 
-### Jev or native vector retrieval
+### Jev candidate source and exclusions
 
-One generation uses one recall path. When Jev is enabled for that generation, STLO skips SillyTavern's native vector retrieval, including chat and Data Bank/file vector injections. It does not delete vector data or change the user's saved Vector Storage settings. When Jev is disabled, ordinary World Info and configured native vector retrieval remain available, including this fork's per-book vector thresholds.
+- **All eligible entries (default):** Jev evaluates eligible entries in active, non-excluded lorebooks. Native vector retrieval is skipped, including chat and Data Bank/file vectors. Excluded books keep native keyword/always-on/special activation.
+- **Vector / keyword search candidates:** The existing native vector interceptor runs at its normal position when enabled. A native candidate scan collects matched lore, then Jev evaluates only eligible candidates from non-excluded books. This mode performs one extra local candidate scan, not a second vector search. Existing per-book vector threshold settings can still split native vector requests. Entries missing from the native candidates cannot be recovered by Jev. Native recursion, group inclusion and budget rules can affect which candidates are found and ultimately activated.
+- With Jev disabled, ordinary native activation is unchanged. No saved vector data, lore or activation settings are rewritten.
 
-If Jev is unavailable (for example, missing profile, invalid response, provider error, or timeout), STLO leaves the native World Info rules in place. The generation can continue with ordinary keyword and always-on activation; it does not issue a second vector recall request as a fallback. No extra Jev calls are made for repeated scans in the same generation. Dry-run prompt previews do not invoke Jev.
+Jev requests normally run once per generation when candidates exist. If a request fails (including missing connection, invalid response or timeout), the reply waits for a **Retry Jev / Cancel reply** choice. Retrying resends only Jev, not the native candidate search; closing the popup cancels the reply. An unrecoverable local preparation failure cancels the reply. No automatic retry or silent keyword fallback. No candidates is a valid zero-selection result, not an API failure. Dry-run prompt previews do not call Jev.
+
+Advanced settings adjust the number of recent messages, message and lore excerpt lengths, and the Strict / Balanced / Generous or custom selection prompt. Balanced retains the original criteria. Changes can increase request input and cost even when the number of Jev calls is unchanged. A lightweight latest-recall report (also accessible from Chat Top Bar when present) shows status, candidate and selected counts, budget exclusions and timings. It updates only on generation events; no new DOM observer, polling or repeated UI redraw.
 
 ### Input size, subscription usage, and privacy
 
-**The Jev token budget is an injection limit, not an API input-token limit.** Every eligible entry in the active scope is assessed in one request. Large collections therefore increase the request size even when only a few entries are ultimately injected. The NanoGPT endpoint currently documents a 64K request limit and a 32K per-question limit for this model; an oversized request or exhausted allowance can fail and fall back to ordinary World Info.
+**The Jev token budget is an injection limit, not an API input-token limit.** Every eligible entry in the chosen candidate scope is assessed in one request when candidates exist. Large collections therefore increase the request size even when only a few entries are ultimately injected. The NanoGPT endpoint currently documents a 64K request limit and a 32K per-question limit for this model; an oversized request or exhausted allowance can fail and require a user decision before the reply continues.
 
 The request sends the recent chat excerpts and candidate lore excerpts to NanoGPT for processing by Jev. Enable it only when you are comfortable sending that content. There is an additional API request and possible latency on eligible RP generations; subscription coverage and allowance depend on the provider and account. Check your [NanoGPT subscription and billing settings](https://nano-gpt.com/support) rather than assuming unlimited or free usage.
 
@@ -269,7 +275,9 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 | 예산 초과 시 항목을 무작위로 제외 | 이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다. |
 | 벡터 유사도 임계값 | 제브를 쓰지 않고 기존 벡터 검색을 사용할 때 책별로 검색 기준을 달리합니다. 비우면 전역값. |
 | 이 캐릭터와의 채팅은 제브로 항목 선택 | 현재 장면에 필요한 로어를 제브가 고르게 합니다. 1:1은 캐릭터별, 그룹 등은 책별 설정입니다. |
+| 이 로어북은 제브 판정에서 제외 / 우선 배정 예산 | 책별로 기존 발동 방식을 유지하거나 관련 항목의 예산을 우선 배정합니다. |
 | 제브 총예산 / 나노GPT 연결 프로필 | 제브를 사용할 때만 설정합니다. 두 값은 공통 설정입니다. |
+| 제브 판정 대상 / 고급 설정 | 전체 항목 또는 기존 검색 후보, 인식 범위와 판정 프롬프트를 설정합니다. 공통 설정입니다. |
 | 그룹 채팅 설정 | 말하는 캐릭터에 따라 우선순위와 활성 여부를 다르게 합니다. 1:1만 하면 건드릴 필요 없습니다. |
 
 ### 평소에는 이렇게 씁니다
@@ -302,7 +310,7 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 
 ### 판정 대상과 주입
 
-- 최근 시스템 메시지를 제외한 최대 6개 메시지(각 최대 1,400자)와 활성 로어북의 대상 항목별 책 이름·제목·키워드·본문 발췌(최대 약 960자, 긴 글은 앞뒤 부분)를 한 요청으로 전달합니다.
+- 기본값은 시스템 메시지를 제외한 최근 최대 6개 메시지(각 최대 1,400자)와 활성 로어북의 대상 항목별 책 이름·제목·키워드·본문 발췌(최대 약 960자, 긴 글은 앞뒤 부분)를 한 요청으로 전달합니다.
 - 제브는 항목마다 넣을지 말지 판정합니다. 선택된 항목은 발췌가 아닌 원래 전체 본문을 주입 대상으로 삼습니다.
 - 초록불과 벡터 표시가 된 일반 항목 모두 판정할 수 있습니다. 비활성 항목은 제외합니다. 상시 주입, Outlet, 관리형 사이드 프롬프트, 활성화 데코레이터, Sticky·쿨다운·지연·재귀 전용·캐릭터 필터·트리거 제한 항목 등 별도 규칙이 있는 항목은 기존 처리를 유지합니다.
 - 저장된 로어북을 수정하거나, 활성화되지 않은 모든 로어북을 임의로 검색하거나, 기억을 자동 생성하지 않습니다.
@@ -315,17 +323,21 @@ Enable **Only activate for specific characters** to limit the book to turns by a
 | STLO 로어북별 예산 | 각 책의 최대 사용량 |
 | 제브 총예산 (기본 10,000토큰) | 제브 적용 책들의 공통 상한. 그 책들의 상시 항목부터 계산 |
 
-예를 들어 메모리북 개별 예산이 3,000토큰이고 파란불 기억이 2,000토큰이라면, 제브 총예산을 10,000으로 설정해도 그 책에서 제브가 추가 선택할 수 있는 기억은 최대 1,000토큰입니다. 제브가 선택한 항목은 판정 점수가 높은 순서대로 예산에 맞춰 넣고, 원래의 프롬프트 삽입 위치와 순서 설정은 유지합니다. 일반 항목과 예산 무시 항목의 기존 처리도 유지되며 상시 항목 역시 예산에 따라 빠질 수 있습니다.
+예를 들어 메모리북 개별 예산이 3,000토큰이고 파란불 기억이 2,000토큰이라면, 제브 총예산을 10,000으로 설정해도 그 책에서 제브가 추가 선택할 수 있는 기억은 최대 1,000토큰입니다. 책별 우선 배정 예산(기본 0)은 제브가 선택한 관련 항목에 먼저 사용합니다. 상시 항목을 포함하며 쓰지 못한 몫은 공통 예산으로 반환합니다. 배정이 겹치면 책 중요도를 따릅니다. 세 가지 상한과 항목 단위 주입 조건은 유지됩니다. 우선 배정 이후 남은 예산은 판정 점수순으로 채우고, 원래의 프롬프트 삽입 위치와 순서 설정은 유지합니다. 일반 항목과 예산 무시 항목의 기존 처리도 유지되며 상시 항목 역시 예산에 따라 빠질 수 있습니다.
 
-### 제브와 기존 벡터 검색은 동시에 실행하지 않습니다
+### 제브 판정 대상과 제외 설정
 
-제브를 사용하는 답변에서는 로어북뿐 아니라 기존 채팅·데이터뱅크/파일 벡터 검색도 건너뜁니다. 저장된 벡터 데이터나 설정을 지우는 것은 아닙니다. 제브를 끈 답변에서는 기존 키워드·벡터 검색과 로어북별 벡터 임계값 기능을 사용합니다.
+- **전체 로어북 항목(기본값):** 현재 활성화된 로어북의 적격 항목을 제브가 직접 평가합니다. 로어북뿐 아니라 채팅·데이터뱅크/파일 벡터 검색도 생략합니다. 제브 제외 책은 기존 키워드·상시 주입·특수 발동 규칙을 따릅니다.
+- **벡터·키워드 검색 후보:** 기존 벡터 검색을 설정대로 한 번 실행하고, 실리태번의 후보 스캔에서 찾은 적격 항목을 제브가 평가합니다. 선택 모드에 한해 로컬 후보 스캔이 한 번 추가되지만 벡터 검색을 반복하지는 않습니다. 기존 책별 벡터 임계값 설정에 따라 벡터 요청 자체가 나뉠 수 있습니다. 검색에서 빠진 항목은 복구할 수 없으며 재귀·그룹·예산 규칙이 후보 및 최종 활성화에 영향을 줍니다.
+- 제브를 끄면 기존 검색 방식을 그대로 사용합니다. 저장된 벡터나 로어 및 발동 설정은 변경하지 않습니다.
 
-연결 프로필 누락, API 오류, 응답 형식 오류, 제한 시간 초과 등으로 제브를 사용하지 못하면 기본 월드 정보 규칙에 맡깁니다. 기존 키워드·상시 주입으로 진행하며, 같은 답변에 벡터 검색을 추가로 요청하는 방식은 아닙니다. 한 번의 답변 생성 중 판정 요청을 반복하지 않고, 프롬프트 미리보기용 dry-run에서도 제브를 호출하지 않습니다.
+후보가 있으면 답변당 제브를 한 번 호출합니다. 연결 프로필 누락, API 오류, 잘못된 응답 또는 시간 초과 시 **제브 재시도 / 답변 취소**를 선택할 때까지 답변 생성을 멈춥니다. 재시도는 제브 요청만 반복하며 후보 검색을 다시 하지 않습니다. 팝업을 닫으면 취소되고, 복구할 수 없는 로컬 준비 실패도 답변을 취소합니다. 자동 재시도나 조용한 키워드 대체는 하지 않습니다. 후보가 없는 정상 결과는 오류가 아닙니다. 일반 프롬프트 미리보기용 dry-run은 제브를 호출하지 않습니다.
+
+**제브 고급 설정**에서 최근 대화 개수·메시지당 글자 수·로어 발췌 길이와 엄격/균형/관대 프리셋 또는 사용자 지정 판정 프롬프트를 설정합니다. 균형은 기존 판정 기준을 유지합니다. 입력량을 늘리면 호출 횟수가 같아도 비용이나 시간이 늘 수 있습니다. 최근 제브 실행 정보는 고급 설정과 챗탑바(설치된 경우)에서 확인할 수 있습니다. 후보·판정·예산 제외·활성화 개수와 소요 시간을 표시하며, 생성 이벤트에만 반응합니다. 새 DOM 옵저버·폴링·반복 재렌더링은 사용하지 않습니다.
 
 ### 제브 API 비용과 입력량
 
-**제브 총예산은 RP 답변에 주입되는 토큰 한도입니다. 제브에 보내는 입력 토큰 한도가 아닙니다.** 현재 범위의 판정 대상 항목을 한 요청으로 보내므로 로어북이 클수록 입력 토큰이 늘어납니다. 나노GPT 모델 안내 기준 요청 전체 64K, 질문별 32K 제한이 있으므로 너무 큰 요청은 실패할 수 있습니다.
+**제브 총예산은 RP 답변에 주입되는 토큰 한도입니다. 제브에 보내는 입력 토큰 한도가 아닙니다.** 선택한 판정 범위의 적격 항목을 한 요청으로 보내므로 로어북이 클수록 입력 토큰이 늘어납니다. 나노GPT 모델 안내 기준 요청 전체 64K, 질문별 32K 제한이 있으므로 너무 큰 요청은 실패할 수 있습니다.
 
 제브를 켜면 최근 대화와 로어 발췌가 외부 API인 나노GPT를 통해 제브 모델에 전달됩니다. 이 점을 고려해서 사용하세요. 별도의 판정 API 요청으로 시간이 추가될 수 있으며, 구독 포함 여부와 사용량 한도는 [나노GPT 구독·결제 정책](https://nano-gpt.com/support)을 확인하세요. 구독이라고 무조건 무제한·무료인 것은 아닙니다.
 

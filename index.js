@@ -2,15 +2,16 @@ import { event_types, eventSource } from '../../../events.js';
 import { getTokenCountAsync } from '../../../tokenizers.js';
 import { getStringHash, getCharaFilename } from '../../../utils.js';
 import { extension_settings, getContext } from '../../../extensions.js';
-import { characters, this_chid, getCurrentChatId, getMaxContextSize, getRequestHeaders, saveSettingsDebounced } from '../../../../script.js';
-import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names, selected_world_info, METADATA_KEY } from '../../../world-info.js';
+import { characters, this_chid, getCurrentChatId, getMaxContextSize, getRequestHeaders, saveSettingsDebounced, stopGeneration, getCharacterCardFields } from '../../../../script.js';
+import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names, selected_world_info, METADATA_KEY, getSortedEntries, checkWorldInfo, world_info_include_names } from '../../../world-info.js';
 import { power_user } from '../../../power-user.js';
+import { NOTE_MODULE_NAME } from '../../../authors-note.js';
 import { POPUP_TYPE, Popup } from '../../../popup.js';
 import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../../../i18n.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, normalizeJevReserve, JEV_PRESETS, isJevCandidate } from './jevRecall.mjs';
 
 const EXTENSION_NAME = 'stlo';
 const SELECTORS = {
@@ -36,7 +37,9 @@ const DEFAULT_LOREBOOK_SETTINGS = {
     randomTrim: false,
     vectorThreshold: null,
     vectorThresholdEnabled: false, // opt-in: old saved thresholds must not silently reactivate paid calls
-    jevRecall: false
+    jevRecall: false,
+    jevExclude: false,
+    jevReserve: 0
 };
 
 // Global switch for prioritizing always-on World Info entries across lorebooks.
@@ -57,6 +60,7 @@ let eventListeners = [];
 let jevGeneration = null;
 let nativeVectorPasses = 0;
 let guardedVectorInterceptor = null;
+let lastJevReport = null;
 
 function getCachedLorebook(world) {
     // Read cached metadata without cloning the entries in StructuredCloneMap.get().
@@ -83,7 +87,8 @@ async function hasActiveJevLorebook(context) {
     for (const world of worlds) {
         if (!world) continue;
         if (worldInfoCache.has(world)) {
-            if (getCachedLorebook(world)?.[EXTENSION_NAME]?.jevRecall === true) return true;
+            const book = getCachedLorebook(world)?.[EXTENSION_NAME];
+            if (book?.jevRecall === true && book.jevExclude !== true) return true;
         } else if (world_names.includes(world)) {
             uncached.push(world);
         }
@@ -91,58 +96,209 @@ async function hasActiveJevLorebook(context) {
     // On a cold cache, reuse the normal World Info loader so the scan can read
     // those same cached books without a second set of requests.
     const books = await Promise.allSettled(uncached.map(world => loadWorldInfo(world)));
-    return books.some(book => book.status === 'fulfilled' && book.value?.[EXTENSION_NAME]?.jevRecall === true);
+    return books.some(book => book.status === 'fulfilled' && book.value?.[EXTENSION_NAME]?.jevRecall === true && book.value[EXTENSION_NAME].jevExclude !== true);
 }
 
 function hasEnabledVectorRecall() {
+    if (extension_settings.disabledExtensions?.includes('vectors')) return false;
     const vectors = extension_settings.vectors;
-    return vectors?.enabled_world_info || vectors?.enabled_chats || vectors?.enabled_files;
+    return Boolean(vectors?.enabled_world_info || vectors?.enabled_chats || vectors?.enabled_files);
+}
+
+function isCurrentJev(run) {
+    return run === jevGeneration && !run.controller.signal.aborted && run.chatId === getCurrentChatId();
+}
+
+function getJevOptions() {
+    return normalizeJevOptions(extension_settings[EXTENSION_NAME]?.jevOptions ?? {});
+}
+
+// A bounded, ephemeral report; never retain prompts, credentials or lore text.
+function updateJevReport(run, changes = {}) {
+    if (!run || run !== jevGeneration || run.chatId !== getCurrentChatId()) return;
+    const previousPhase = run.report?.phase;
+    run.report = { ...run.report, ...changes, elapsedMs: Math.round(performance.now() - run.startedAt) };
+    lastJevReport = { chatId: run.chatId, ...run.report };
+    try {
+        if (previousPhase !== run.report.phase) syncJevTopBar();
+    } catch (error) { stloDebug('Jev report UI:', error); }
+}
+function currentJevReport() {
+    return lastJevReport?.chatId === getCurrentChatId() ? lastJevReport : null;
+}
+function jevStatusLabel(phase) {
+    const names = {
+        preparing: ['Preparing candidates', 'stlo.jev.status.preparing'],
+        running: ['Jev is deciding', 'stlo.jev.status.running'],
+        retry: ['Waiting for retry or cancel', 'stlo.jev.status.retry'],
+        ready: ['Selection ready', 'stlo.jev.status.ready'],
+        done: ['Recall complete', 'stlo.jev.status.done'],
+        cancelled: ['Reply cancelled', 'stlo.jev.status.cancelled'],
+        empty: ['No eligible candidates', 'stlo.jev.status.empty'],
+    };
+    const pair = names[phase] ?? ['No recall report yet', 'stlo.jev.status.none'];
+    return translate(...pair);
+}
+function openJevReport() {
+    const report = currentJevReport();
+    const panel = document.createElement('div');
+    const heading = document.createElement('h3');
+    heading.textContent = translate('Latest Jev recall', 'stlo.jev.report');
+    panel.append(heading);
+    const fields = report ? [
+        [translate('Status', 'stlo.jev.status'), jevStatusLabel(report.phase)],
+        [translate('Candidates', 'stlo.jev.candidates'), report.candidates],
+        [translate('Model selected', 'stlo.jev.selected'), report.selected],
+        [translate('Within budget', 'stlo.jev.accepted'), report.accepted],
+        [translate('Actually activated', 'stlo.jev.injected'), report.injected],
+        [translate('Book budget rejected', 'stlo.jev.rejectedBook'), report.rejectedBook],
+        [translate('Jev budget rejected', 'stlo.jev.rejectedJev'), report.rejectedJev],
+        [translate('World Info budget rejected', 'stlo.jev.rejectedWorld'), report.rejectedWorld],
+        [translate('Jev requests', 'stlo.jev.requests'), report.requests],
+        [translate('Request characters (not tokens)', 'stlo.jev.inputChars'), report.inputChars],
+        [translate('Request time (ms)', 'stlo.jev.requestMs'), report.requestMs],
+        [translate('Elapsed time (ms)', 'stlo.jev.elapsedMs'), report.elapsedMs],
+    ] : [[translate('Status', 'stlo.jev.status'), jevStatusLabel()]];
+    for (const [name, value] of fields) {
+        if (value === undefined) continue;
+        const line = document.createElement('div');
+        line.textContent = name + ': ' + value;
+        panel.append(line);
+    }
+    if (report?.error) {
+        const line = document.createElement('p');
+        line.textContent = report.error;
+        panel.append(line);
+    }
+    return new Popup(panel, POPUP_TYPE.TEXT, '', { okButton: translate('Close', 'stlo.jev.close'), leftAlign: true }).show();
+}
+function syncJevTopBar() {
+    const bar = document.getElementById('extensionTopBar');
+    if (!bar) return;
+    let button = document.getElementById('stlo-jev-topbar');
+    const report = currentJevReport();
+    if (!report) {
+        button?.remove();
+        return;
+    }
+    if (!button) {
+        button = document.createElement('i');
+        button.id = 'stlo-jev-topbar';
+        button.className = 'fa-solid fa-brain fa-fw right_menu_button';
+        button.tabIndex = 0;
+        button.setAttribute('role', 'button');
+        button.addEventListener('click', () => { void openJevReport(); });
+        button.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                void openJevReport();
+            }
+        });
+        bar.append(button);
+    }
+    const label = 'Jev · ' + jevStatusLabel(report.phase);
+    if (button.title !== label) button.title = label;
+    if (button.getAttribute('aria-label') !== label) button.setAttribute('aria-label', label);
+    if (button.dataset.status !== report.phase) button.dataset.status = report.phase;
+}
+
+function clearVectorPrompts(context) {
+    delete context.extensionPrompts?.['3_vectors'];
+    delete context.extensionPrompts?.['4_vectors_data_bank'];
 }
 
 function guardNativeVectorInterceptor() {
     const interceptor = globalThis.vectors_rearrangeChat;
-    if (typeof interceptor !== 'function' || interceptor === guardedVectorInterceptor) return;
-    guardedVectorInterceptor = async function (...args) {
+    if (typeof interceptor !== 'function') return false;
+    if (interceptor === guardedVectorInterceptor) return true;
+    guardedVectorInterceptor = async function (chat, contextSize, abort, type) {
         const run = jevGeneration;
-        if (run && run.chatId === getCurrentChatId() && hasEnabledVectorRecall()) {
-            const context = getContext();
-            const useJev = run.characterRecall ?? await hasActiveJevLorebook(context);
-            if (run !== jevGeneration || run.chatId !== getCurrentChatId()) return;
-            // Pick one recall path for the whole generation. A book that fails
-            // to load here may become available later during the reply scan.
-            run.vectorRecall = !useJev;
-            if (useJev) {
-                // Normally cleared by the native interceptor, including after
-                // a previous reply used chat or Data Bank vector recall.
-                delete context.extensionPrompts?.['3_vectors'];
-                delete context.extensionPrompts?.['4_vectors_data_bank'];
-                return;
-            }
+        if (run?.enabled && isCurrentJev(run) && run.options.mode === 'all') {
+            clearVectorPrompts(getContext());
+            return;
         }
         nativeVectorPasses++;
         try {
-            return await interceptor.apply(this, args);
+            await interceptor.call(this, chat, contextSize, abort, type);
+        } catch (error) {
+            if (run?.awaitingVector && isCurrentJev(run)) {
+                await abortJevPreparation(run, abort, error);
+                return;
+            }
+            throw error;
         } finally {
             nativeVectorPasses--;
         }
+        // Native vector storage runs at its original loading order. Reuse its
+        // results; never invoke the native interceptor ourselves or twice.
+        if (run?.awaitingVector && isCurrentJev(run)) {
+            run.awaitingVector = false;
+            await prepareJevGeneration(run, chat, contextSize, abort, type);
+        }
     };
     globalThis.vectors_rearrangeChat = guardedVectorInterceptor;
+    return true;
 }
 
 function stopJevGeneration() {
     jevGeneration?.controller.abort();
     jevGeneration = null;
 }
-
+function finishJevGeneration() {
+    const run = jevGeneration;
+    if (run?.selection && run.report.phase === 'ready') recordJevActivated([]);
+    stopJevGeneration();
+}
+function onJevStopped() {
+    if (jevGeneration?.enabled && jevGeneration.report?.phase !== 'cancelled') {
+        updateJevReport(jevGeneration, { phase: 'cancelled' });
+    }
+    stopJevGeneration();
+}
 function startJevGeneration(type, _options, dryRun) {
+    if (dryRun || !['normal', 'continue', 'regenerate', 'swipe'].includes(type)) return;
     stopJevGeneration();
     const chatId = getCurrentChatId();
-    if (!dryRun && chatId && ['normal', 'continue', 'regenerate', 'swipe'].includes(type)) {
+    if (chatId) {
         jevGeneration = {
             chatId, controller: new AbortController(),
             characterRecall: getCharacterJevRecall(getJevCharacterAvatar()),
+            options: getJevOptions(),
+            forced: new Map(), startedAt: performance.now(),
+            report: { requests: 0, requestMs: 0 },
         };
-        if (HAS_WORLDINFO_SCAN_DONE && hasEnabledVectorRecall()) guardNativeVectorInterceptor();
+    }
+}
+function rememberForcedEntries(entries) {
+    const run = jevGeneration;
+    if (!run?.enabled || run.options.mode !== 'filtered' || run.replaying || !isCurrentJev(run) || !Array.isArray(entries)) return;
+    for (const entry of entries) {
+        if (entry?.world && entry.uid != null) run.forced.set(jevEntryKey(entry), structuredClone(entry));
+    }
+}
+
+// Runs before the native RP request, using ST's supported abort callback.
+async function stloJevInterceptor(chat, contextSize, abort, type) {
+    const run = jevGeneration;
+    if (!run || !HAS_WORLDINFO_SCAN_DONE || !isCurrentJev(run) || !['normal', 'continue', 'regenerate', 'swipe'].includes(type)) return;
+    try {
+        run.enabled = run.characterRecall ?? await hasActiveJevLorebook(getContext());
+        if (!isCurrentJev(run)) { abort(true); return; }
+        if (!run.enabled) {
+            lastJevReport = null;
+            syncJevTopBar();
+            return;
+        }
+        updateJevReport(run, { phase: 'preparing', mode: run.options.mode });
+        const nativeAvailable = hasEnabledVectorRecall() && guardNativeVectorInterceptor();
+        if (run.options.mode === 'all') clearVectorPrompts(getContext());
+        if (run.options.mode === 'filtered' && nativeAvailable) {
+            run.awaitingVector = true;
+            return;
+        }
+        await prepareJevGeneration(run, chat, contextSize, abort, type);
+    } catch (error) {
+        await abortJevPreparation(run, abort, error);
     }
 }
 
@@ -309,6 +465,8 @@ function setupEventHandlers() {
     const chatChangedHandler = () => {
         EXTENSION_STATE.currentSpeakingCharacter = null;  // Clear character override state on chat change
         stopJevGeneration();
+        lastJevReport = null;
+        syncJevTopBar();
     };
 
     // Group chat character override handler
@@ -326,8 +484,12 @@ function setupEventHandlers() {
     eventSource.on(event_types.CHAT_CHANGED, chatChangedHandler);
     eventSource.on(event_types.GROUP_MEMBER_DRAFTED, groupMemberDraftedHandler);
     eventSource.on(event_types.GENERATION_STARTED, startJevGeneration);
-    eventSource.on(event_types.GENERATION_STOPPED, stopJevGeneration);
-    eventSource.on(event_types.GENERATION_ENDED, stopJevGeneration);
+    eventSource.on(event_types.GENERATION_STOPPED, onJevStopped);
+    eventSource.on(event_types.GENERATION_ENDED, finishJevGeneration);
+    eventSource.on(event_types.WORLDINFO_FORCE_ACTIVATE, rememberForcedEntries);
+    eventSource.on(event_types.WORLD_INFO_ACTIVATED, recordJevActivated);
+    eventSource.on(event_types.GENERATE_AFTER_DATA, guardUnpreparedJevReply);
+    globalThis.stlo_jevInterceptor = stloJevInterceptor;
 
     // Track for cleanup
     eventListeners.push(
@@ -335,8 +497,11 @@ function setupEventHandlers() {
         { source: eventSource, event: event_types.CHAT_CHANGED, handler: chatChangedHandler },
         { source: eventSource, event: event_types.GROUP_MEMBER_DRAFTED, handler: groupMemberDraftedHandler },
         { source: eventSource, event: event_types.GENERATION_STARTED, handler: startJevGeneration },
-        { source: eventSource, event: event_types.GENERATION_STOPPED, handler: stopJevGeneration },
-        { source: eventSource, event: event_types.GENERATION_ENDED, handler: stopJevGeneration }
+        { source: eventSource, event: event_types.GENERATION_STOPPED, handler: onJevStopped },
+        { source: eventSource, event: event_types.GENERATION_ENDED, handler: finishJevGeneration },
+        { source: eventSource, event: event_types.WORLDINFO_FORCE_ACTIVATE, handler: rememberForcedEntries },
+        { source: eventSource, event: event_types.WORLD_INFO_ACTIVATED, handler: recordJevActivated },
+        { source: eventSource, event: event_types.GENERATE_AFTER_DATA, handler: guardUnpreparedJevReply }
     );
 }
 
@@ -375,6 +540,18 @@ function installStloModalStyles() {
         .stlo-info-popup[hidden] { display: none !important; }
         .stlo-info-popup small { display: block; margin: 0; font-size: 14px; line-height: 1.5; color: inherit; }
         .stlo-info-popup small + small { margin-top: 6px; }
+        .stlo-modal-ui .stlo-jev-advanced { width: 100%; box-sizing: border-box; margin: 2px 0; }
+        .stlo-modal-ui .stlo-jev-advanced > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+        .stlo-modal-ui .stlo-jev-advanced-body { display: flex; flex-direction: column; gap: 7px; padding: 7px 0 0 6px; }
+        .stlo-modal-ui .stlo-jev-field { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; width: 100%; }
+        .stlo-modal-ui .stlo-jev-field > select { flex: 1 1 130px; min-width: 0; max-width: 100%; }
+        .stlo-modal-ui .stlo-jev-field > input[type="number"] { width: 100px !important; max-width: 100%; }
+        .stlo-modal-ui #stlo-jev-prompt { width: 100%; min-height: 9em; resize: vertical; box-sizing: border-box; }
+        .stlo-modal-ui .stlo-jev-radio { display: flex; align-items: flex-start; gap: 6px; font-weight: normal; }
+        .stlo-modal-ui .stlo-jev-radio input { flex: 0 0 auto; }
+        .stlo-modal-ui .stlo-jev-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+        #stlo-jev-topbar[data-status="running"], #stlo-jev-topbar[data-status="preparing"] { opacity: .65; }
+        #stlo-jev-topbar[data-status="retry"], #stlo-jev-topbar[data-status="cancelled"] { color: var(--SmartThemeQuoteColor, inherit); }
         .stlo-modal-ui .stlo-order-controls { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 3px 0 0; padding: 7px 0 0 12px; width: 100%; box-sizing: border-box; }
         .stlo-modal-ui .stlo-order-controls[hidden] { display: none !important; }
         .stlo-modal-ui .stlo-inline-number { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 7px; }
@@ -656,8 +833,15 @@ async function handleWorldInfoEntriesLoaded(eventData) {
         // Delegate consolidation, sorting, and budget to dedicated functions
         await applyPriorityOrdering(eventData);
         // Vector Storage uses this same event to synchronize persistent hashes.
+        // Capture entry text and settings once during the optional native
+        // candidate scan. No separate second lorebook load.
+        const run = jevGeneration;
+        if (run?.preview && isCurrentJev(run) && !run.preview.entries) {
+            run.preview.entries = structuredClone(eventData.globalLore);
+            run.preview.settings = new Map(EXTENSION_STATE.scanWorldSettings);
+        }
         // Shape only the actual reply scan; keep the vector pass's full book.
-        if (HAS_WORLDINFO_SCAN_DONE && nativeVectorPasses === 0) await applyJevSelection(eventData.globalLore);
+        if (HAS_WORLDINFO_SCAN_DONE && nativeVectorPasses === 0) applyJevSelection(eventData.globalLore);
         // In newer branches (with WORLDINFO_SCAN_DONE), we trim per-loop and skip pre-scan entirely.
         if (!HAS_WORLDINFO_SCAN_DONE) {
             await enforceBudgetPreScan(eventData);
@@ -667,43 +851,224 @@ async function handleWorldInfoEntriesLoaded(eventData) {
     }
 }
 
-async function applyJevSelection(entries) {
+function applyJevSelection(entries) {
     const run = jevGeneration;
-    if (!run || run.vectorRecall || run.characterRecall === false || run.chatId !== getCurrentChatId()) return;
-    run.selection = null;
-    const settings = EXTENSION_STATE.scanWorldSettings;
-    const worlds = new Set([...settings].filter(([, book]) => run.characterRecall === true || book.jevRecall === true).map(([world]) => world));
-    if (!worlds.size) return;
-    const prepared = prepareJevRecall(entries, worlds, getContext().chat ?? []);
-    if (!prepared) return;
+    if (!run?.selection || run.preparing || run.preview || !isCurrentJev(run)) return;
+    applyJevRecall(entries, run.selection.worlds, run.selection.accepted);
+}
+
+function getJevConnection() {
     const profileId = extension_settings[EXTENSION_NAME]?.jevProfileId;
     const profile = extension_settings.connectionManager?.profiles?.find(candidate => candidate?.id === profileId);
-    const connection = getNanoJevConnection(profile);
-    if (!connection) return;
-    const signature = JSON.stringify([connection.id, connection.customAuth, prepared.body]);
-    // A new scan in this generation can reuse an identical selection.
-    // If the input changed, leave that scan to the native World Info rules.
-    if (run.pending && signature !== run.signature) return;
-    if (!run.pending) {
-        run.signature = signature;
-        const signal = AbortSignal.any([run.controller.signal, AbortSignal.timeout(12000)]);
-        run.pending = requestJevRecall(prepared, connection, getRequestHeaders(), signal).catch(error => {
-            if (!run.controller.signal.aborted) console.warn('[STLO] Jev fell back to World Info:', error);
-            return null;
-        });
-    }
-    const ranked = await run.pending;
-    if (!ranked || run !== jevGeneration || run.signature !== signature) return;
-    const budget = normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget);
-    const worldInfoBudget = calculateTotalWIBudget();
-    const bookBudgets = new Map(await Promise.all([...worlds].map(async world =>
-        [world, await calculateLorebookBudget(settings.get(world), worldInfoBudget)])));
-    const accepted = await fitJevRecall(entries, worlds, ranked, {
-        budget, worldInfoBudget: worldInfoBudget || Infinity, bookBudgets, countTokens: getTokenCountAsync,
+    return getNanoJevConnection(profile);
+}
+function jevFailureReason(error) {
+    if (error?.name === 'TimeoutError') return translate('Request timed out.', 'stlo.jev.timeout');
+    const message = String(error?.message ?? '');
+    // Only show known safe, locally constructed messages and status codes.
+    if (/^Jev is unavailable \(\d{3}\)\.$/.test(message)) return message;
+    if (message === 'No recent dialogue for Jev.') return translate(message, 'stlo.jev.noDialogue');
+    if (message === 'Select a NanoGPT subscription connection profile.') return translate(message, 'stlo.jev.missingProfile');
+    if (message === 'Jev did not return a decision for every candidate.' || message === 'NanoGPT did not return readable Jev decisions.' || message === 'NanoGPT did not complete the Jev request.') return translate('Invalid or incomplete Jev response.', 'stlo.jev.invalidResponse');
+    return translate('Recall could not be completed.', 'stlo.jev.failureReason');
+}
+async function askJevRetry(run, error, retryAvailable = true) {
+    if (!isCurrentJev(run)) return false;
+    const reason = jevFailureReason(error);
+    updateJevReport(run, { phase: 'retry', error: reason });
+    const panel = document.createElement('div');
+    const title = document.createElement('h3');
+    title.textContent = translate('Jev memory recall failed', 'stlo.jev.failureTitle');
+    const detail = document.createElement('p');
+    detail.textContent = reason;
+    const notice = document.createElement('p');
+    notice.textContent = retryAvailable
+        ? translate('Retry sends one additional Jev request. The RP reply has not been generated.', 'stlo.jev.retryNotice')
+        : translate('The reply has not been generated. Cancel and try again after checking your settings.', 'stlo.jev.cancelNotice');
+    panel.append(title, detail, notice);
+    const popup = new Popup(panel, POPUP_TYPE.CONFIRM, '', {
+        okButton: retryAvailable ? translate('Retry Jev', 'stlo.jev.retryButton') : false,
+        cancelButton: translate('Cancel reply', 'stlo.jev.cancelButton'),
+        defaultResult: 0,
     });
-    if (run !== jevGeneration || run.signature !== signature || run.chatId !== getCurrentChatId()) return;
-    run.selection = { accepted, worlds, budget };
-    applyJevRecall(entries, worlds, accepted);
+    const cancel = () => { void popup.completeCancelled(); };
+    run.controller.signal.addEventListener('abort', cancel, { once: true });
+    try {
+        const result = await popup.show();
+        return retryAvailable && result === 1 && isCurrentJev(run);
+    } finally {
+        run.controller.signal.removeEventListener('abort', cancel);
+    }
+}
+function cancelJevReply(run, abort) {
+    if (isCurrentJev(run)) {
+        updateJevReport(run, { phase: 'cancelled' });
+        // Prevent later interceptors and the main model; stop also clears ST's UI.
+        abort(true);
+        stopGeneration();
+    } else {
+        abort(true);
+    }
+}
+async function abortJevPreparation(run, abort, error) {
+    if (!isCurrentJev(run)) { abort(true); return; }
+    console.warn('[STLO] Jev preparation failed:', error?.name ?? 'Error');
+    try {
+        await askJevRetry(run, error, false);
+    } finally {
+        cancelJevReply(run, abort);
+    }
+}
+async function decideJevWithRetry(run, prepared) {
+    while (isCurrentJev(run)) {
+        const connection = getJevConnection();
+        try {
+            if (!connection) throw Error('Select a NanoGPT subscription connection profile.');
+            updateJevReport(run, { phase: 'running', error: null, requests: run.report.requests + 1 });
+            const start = performance.now();
+            try {
+                const signal = AbortSignal.any([run.controller.signal, AbortSignal.timeout(12000)]);
+                return await requestJevRecall(prepared, connection, getRequestHeaders(), signal);
+            } finally {
+                updateJevReport(run, { requestMs: run.report.requestMs + Math.round(performance.now() - start) });
+            }
+        } catch (error) {
+            if (!isCurrentJev(run) || !await askJevRetry(run, error)) return null;
+        }
+    }
+    return null;
+}
+
+// The optional filtered mode uses a native dry scan after the existing vector
+// interceptor. The scan event exposes matched candidates before its budget
+// loop, even when some are not ultimately activated. No extra vector query.
+async function collectNativeJevCandidates(run, chat, contextSize, type) {
+    const context = getContext();
+    const prompts = context.extensionPrompts;
+    const oldNote = prompts?.[NOTE_MODULE_NAME] ? structuredClone(prompts[NOTE_MODULE_NAME]) : undefined;
+    const hadNote = Boolean(prompts && Object.hasOwn(prompts, NOTE_MODULE_NAME));
+    const meta = context.chatMetadata;
+    const hadTimed = Boolean(meta && Object.hasOwn(meta, 'timedWorldInfo'));
+    const oldTimed = hadTimed ? structuredClone(meta.timedWorldInfo) : undefined;
+    const preview = { entries: null, settings: null, candidates: new Set() };
+    run.preview = preview;
+    try {
+        const card = getCharacterCardFields();
+        const scanData = {
+            trigger: type, personaDescription: card.persona, characterDescription: card.description,
+            characterPersonality: card.personality, characterDepthPrompt: card.charDepthPrompt,
+            scenario: card.scenario, creatorNotes: card.creatorNotes,
+        };
+        const messages = (chat ?? []).map(message => world_info_include_names ? message.name + ': ' + message.mes : message.mes).reverse();
+        await checkWorldInfo(messages, contextSize, true, scanData);
+        if (!preview.entries || !preview.settings) throw Error('Native candidate scan did not complete.');
+        return preview;
+    } finally {
+        run.preview = null;
+        // Native dry scans still reset external activations and may touch the
+        // Author's Note. Restore those transient values, never persisted books.
+        if (isCurrentJev(run)) {
+            if (prompts) {
+                if (hadNote) prompts[NOTE_MODULE_NAME] = oldNote;
+                else delete prompts[NOTE_MODULE_NAME];
+            }
+            if (meta) {
+                if (hadTimed) meta.timedWorldInfo = oldTimed;
+                else delete meta.timedWorldInfo;
+            }
+            // Restore consumed external hits only after successful preparation.
+
+        }
+    }
+}
+
+async function restoreNativeVectorHits(run) {
+    if (run.options.mode !== 'filtered' || !run.forced.size || !isCurrentJev(run)) return;
+    run.replaying = true;
+    try {
+        await eventSource.emit(event_types.WORLDINFO_FORCE_ACTIVATE, [...run.forced.values()]);
+    } finally {
+        run.replaying = false;
+        run.forced.clear();
+    }
+}
+
+async function prepareJevGeneration(run, chat, contextSize, abort, type) {
+    if (!isCurrentJev(run)) { abort(true); return; }
+    if (run.preparing || run.selection) return;
+    run.preparing = true;
+    try {
+        const preview = run.options.mode === 'filtered'
+            ? await collectNativeJevCandidates(run, chat, contextSize, type)
+            : null;
+        const entries = preview?.entries ?? await getSortedEntries();
+        if (!isCurrentJev(run)) { abort(true); return; }
+        const settings = preview?.settings ?? new Map(EXTENSION_STATE.scanWorldSettings);
+        const active = new Set(entries.map(entry => entry.world));
+        const worlds = new Set([...getJevWorlds(settings, run.characterRecall)].filter(world => active.has(world)));
+        const budget = normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget);
+        const candidateKeys = preview?.candidates ?? null;
+        if (!isCurrentJev(run)) { abort(true); return; }
+        const messages = chat ?? getContext().chat ?? [];
+        const hasCandidate = entries.some(entry => isJevCandidate(entry, worlds) && (!candidateKeys || candidateKeys.has(jevEntryKey(entry))));
+        if (hasCandidate && !messages.some(message => !message?.is_system && typeof message?.mes === 'string' && message.mes.trim())) {
+            throw Error('No recent dialogue for Jev.');
+        }
+        const prepared = prepareJevRecall(entries, worlds, messages, run.options, candidateKeys);
+        updateJevReport(run, { candidates: prepared?.candidates.size ?? 0, inputChars: prepared ? JSON.stringify(prepared.body).length : 0 });
+        if (!prepared) {
+            // Empty candidates are a successful zero-selection, not a failure.
+            run.selection = { accepted: new Map(), worlds, budget };
+            await restoreNativeVectorHits(run);
+            updateJevReport(run, { phase: 'empty', selected: 0, accepted: 0, injected: 0 });
+            return;
+        }
+        const ranked = await decideJevWithRetry(run, prepared);
+        if (ranked === null || !isCurrentJev(run)) { cancelJevReply(run, abort); return; }
+        const worldInfoBudget = calculateTotalWIBudget(contextSize);
+        const bookBudgets = new Map(await Promise.all([...worlds].map(async world =>
+            [world, await calculateLorebookBudget(settings.get(world), worldInfoBudget)])));
+        const reserveBudgets = new Map([...worlds].map(world => [world, normalizeJevReserve(settings.get(world)?.jevReserve)]));
+        const bookPriorities = new Map([...worlds].map(world => {
+            const book = settings.get(world);
+            const override = book?.characterOverrides?.[EXTENSION_STATE.currentSpeakingCharacter];
+            return [world, override?.priority ?? book?.priority ?? PRIORITY_LEVELS.DEFAULT];
+        }));
+        const diagnostics = new Map();
+        const accepted = await fitJevRecall(entries, worlds, ranked, {
+            budget, worldInfoBudget: worldInfoBudget || Infinity, bookBudgets, countTokens: getTokenCountAsync,
+            reserveBudgets, bookPriorities, diagnostics,
+        });
+        if (!isCurrentJev(run)) { abort(true); return; }
+        run.selection = { accepted, worlds, budget };
+        await restoreNativeVectorHits(run);
+        const reasons = [...diagnostics.values()];
+        updateJevReport(run, { phase: 'ready', selected: ranked.length, accepted: accepted.size,
+            rejectedBook: reasons.filter(reason => reason === 'book-budget').length,
+            rejectedJev: reasons.filter(reason => reason === 'jev-budget').length,
+            rejectedWorld: reasons.filter(reason => reason === 'world-budget').length,
+        });
+    } catch (error) {
+        run.selection = null;
+        await abortJevPreparation(run, abort, error);
+    } finally {
+        run.preparing = false;
+    }
+}
+
+function guardUnpreparedJevReply(_data, dryRun) {
+    const run = jevGeneration;
+    if (dryRun || !run?.enabled || run.selection || !isCurrentJev(run)) return;
+    updateJevReport(run, { phase: 'cancelled', error: translate('Recall preparation did not complete.', 'stlo.jev.vectorMissing') });
+    stopGeneration();
+    toastr.error(translate('Recall preparation did not complete. The reply was cancelled.', 'stlo.jev.prepareCancelled'));
+}
+function recordJevActivated(entries) {
+    const run = jevGeneration;
+    if (!run?.selection || !isCurrentJev(run) || run.preview || !Array.isArray(entries)) return;
+    const keys = new Set(entries.map(jevEntryKey));
+    const injected = [...run.selection.accepted.keys()].filter(key => keys.has(key)).length;
+    updateJevReport(run, { phase: 'done', injected });
 }
 
 /**
@@ -873,6 +1238,10 @@ function registerStloSlashCommand() {
 /**
  * Open the lorebook settings modal
  */
+function infoHelp(key, fallback) {
+    return `<details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="${key}">${fallback}</small></div></details>`;
+}
+
 async function openLorebookSettings(worldName = null) {
     // Use try-finally to ensure modal state is always reset
     try {
@@ -901,6 +1270,7 @@ async function openLorebookSettings(worldName = null) {
         const context = getContext();
         const characterAvatar = getJevCharacterAvatar(context);
         const savedCharacterJevRecall = getCharacterJevRecall(characterAvatar);
+        const jevOptions = getJevOptions();
         const initialJevRecall = savedCharacterJevRecall ??
             (characterAvatar && HAS_WORLDINFO_SCAN_DONE ? await hasActiveJevLorebook(context) : currentSettings.jevRecall === true);
 
@@ -965,7 +1335,7 @@ async function openLorebookSettings(worldName = null) {
                         <input type="number" id="lorebook-order-adjustment" class="text_pole textarea_compact"
                                value="${currentSettings.orderAdjustment}" min="-10000" max="10000" step="1"
                                placeholder="0" style="width: 100px;">
-                        <small style="color: #888;" data-i18n="stlo.modal.order.range">-10k to +10k</small>
+                        <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.range">-10k to +10k</small></div></details>
                     </div>
 
                     <div class="stlo-toggle-block">
@@ -1004,28 +1374,22 @@ async function openLorebookSettings(worldName = null) {
                            ? currentSettings.vectorThreshold : ''}">
             </div>
 
-            <div class="world_entry_form_control stlo-section" ${HAS_WORLDINFO_SCAN_DONE ? '' : 'hidden'}>
-                <label class="checkbox_label stlo-checkrow" for="stlo-jev-recall">
-                    <input type="checkbox" id="stlo-jev-recall" ${initialJevRecall ? 'checked' : ''}>
-                    <span class="checkmark"></span>
-                    <span data-i18n="${characterAvatar ? 'stlo.jev.enable' : 'stlo.jev.enableBook'}">${characterAvatar
-                        ? 'Use Jev to select entries in chats with this character' : 'Use Jev for this lorebook'}</span>
-                </label>
-                <label class="stlo-inline-number" for="stlo-jev-budget">
-                    <span data-i18n="stlo.jev.budget">Total Jev budget (tokens)</span>
-                    <input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1"
-                        value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}" style="width: 100px;">
-                </label>
-                <label class="stlo-inline-number" for="stlo-jev-profile">
-                    <span data-i18n="stlo.jev.profile">NanoGPT connection profile</span>
-                    <select id="stlo-jev-profile" class="text_pole textarea_compact">
-                        <option value="" data-i18n="stlo.jev.chooseProfile">Select a profile</option>
-                    </select>
-                </label>
-                <small data-i18n="stlo.jev.keyHelp">Only NanoGPT connection keys are supported. Use a key with Billing set to Subscription only to block balance charges.</small>
-                <small data-i18n="stlo.jev.help">Jev counts always-on entries first and respects book limits. Replies skip vector search when Jev is enabled. Keyword search is used if Jev is unavailable.</small>
-                <small data-i18n="${characterAvatar ? 'stlo.jev.inputHelpForCharacter' : 'stlo.jev.inputHelp'}">Every Jev request sends all eligible entries from the active lorebooks using Jev. More entries use more input tokens. The recall budget limits only the lore included in the reply prompt.</small>
-            </div>
+                <div class="world_entry_form_control stlo-section" ${HAS_WORLDINFO_SCAN_DONE ? "" : "hidden"}>
+                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${initialJevRecall ? "checked" : ""}><span class="checkmark"></span><span data-i18n="${characterAvatar ? "stlo.jev.enable" : "stlo.jev.enableBook"}">${characterAvatar ? "Use Jev to select entries in chats with this character" : "Use Jev for this lorebook"}</span></label>${infoHelp('stlo.jev.recallHelp', 'Jev counts always-on entries first and respects all budgets. On failure, retry or cancel the reply.')}</div>
+                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
+                <div class="stlo-jev-field"><label for="stlo-jev-reserve" data-i18n="stlo.jev.reserve">Preferred budget for this book (tokens)</label>${infoHelp('stlo.jev.reserveHelp', 'Reserve part of the existing budget for relevant entries of this book. Always-on entries count toward it. Unused space is shared. Higher book priority breaks ties if reservations exceed the total. Zero disables reservation.')}<input type="number" id="stlo-jev-reserve" class="text_pole textarea_compact" min="0" max="10000000" step="1" value="${normalizeJevReserve(currentSettings.jevReserve)}"></div>
+                <div class="stlo-jev-field"><label for="stlo-jev-budget" data-i18n="stlo.jev.budget">Total Jev budget (tokens)</label>${infoHelp('stlo.jev.budgetHelp', 'Shared injection ceiling, not an API input-token limit. World Info and individual book limits still apply.')}<input type="number" id="stlo-jev-budget" class="text_pole textarea_compact" min="1" step="1" value="${normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget)}"></div>
+                <div class="stlo-jev-field"><label for="stlo-jev-profile" data-i18n="stlo.jev.profile">NanoGPT connection profile</label>${infoHelp('stlo.jev.keyHelp', 'Only NanoGPT connection keys are supported. Use a key with Billing set to Subscription only to block balance charges.')}<select id="stlo-jev-profile" class="text_pole textarea_compact"><option value="" data-i18n="stlo.jev.chooseProfile">Select a profile</option></select></div>
+                <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All eligible entries: no native vector recall. Filtered: use configured vector and keyword search first, then assess only its candidates. One Jev request when candidates exist, except manual retry. Filtered mode cannot recover missing candidates.')}</div>
+                <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="all" ${jevOptions.mode === "all" ? "checked" : ""}><span data-i18n="stlo.jev.modeAll">All eligible lorebook entries (default)</span></label>
+                <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="filtered" ${jevOptions.mode === "filtered" ? "checked" : ""}><span data-i18n="stlo.jev.modeFiltered">Vector / keyword search candidates</span></label>
+                <details class="stlo-jev-advanced"><summary data-i18n="stlo.jev.advanced">Advanced Jev settings</summary><div class="stlo-jev-advanced-body">
+                <div class="stlo-jev-field"><label for="stlo-jev-recent" data-i18n="stlo.jev.recent">Recent messages</label>${infoHelp('stlo.jev.recentHelp', 'Number of recent visible messages Jev reads; default 6. More messages increase input size.')}<input type="number" id="stlo-jev-recent" class="text_pole textarea_compact" min="1" max="100" step="1" value="${jevOptions.recent}"></div>
+                <div class="stlo-jev-field"><label for="stlo-jev-message-length" data-i18n="stlo.jev.messageLength">Maximum characters per message</label>${infoHelp('stlo.jev.messageLengthHelp', 'Default 1,400; longer messages use their end.')}<input type="number" id="stlo-jev-message-length" class="text_pole textarea_compact" min="100" max="20000" step="1" value="${jevOptions.messageLength}"></div>
+                <div class="stlo-jev-field"><label for="stlo-jev-lore-length" data-i18n="stlo.jev.loreLength">Maximum characters per lore excerpt</label>${infoHelp('stlo.jev.loreLengthHelp', 'Default 960. Long lore is represented by its beginning and end; selected lore is injected in full. Larger inputs can exceed provider limits or cost more.')}<input type="number" id="stlo-jev-lore-length" class="text_pole textarea_compact" min="100" max="20000" step="1" value="${jevOptions.loreLength}"></div>
+                <div class="stlo-jev-field"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Selection preset</label>${infoHelp('stlo.jev.presetHelp', 'Strict favors direct relevance; balanced is the original prompt; generous considers useful indirect context. Same request count and budget.')}<select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option><option value="custom" data-i18n="stlo.jev.custom">Custom</option></select></div>
+                <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.prompt">Selection prompt</h4>${infoHelp('stlo.jev.promptHelp', 'Edit decision criteria, not the structured response format. The settings are shared across characters.')}</div><textarea id="stlo-jev-prompt" class="text_pole" rows="7"></textarea>
+                <div class="stlo-jev-actions"><button type="button" class="menu_button" id="stlo-jev-reset" data-i18n="stlo.jev.reset">Restore defaults</button><button type="button" class="menu_button" id="stlo-jev-report" data-i18n="stlo.jev.report">Latest Jev recall</button></div></div></details></div>
             <!-- Group chat controls share one section, without dividers between toggles. -->
             <div class="world_entry_form_control stlo-section stlo-group-section">
                 <div class="stlo-toggle-block">
@@ -1053,13 +1417,7 @@ async function openLorebookSettings(worldName = null) {
                     <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
                 </div>
                 <div class="inline-drawer-content">
-                    <div class="info-block warning MarginBot10">
-                        <small data-i18n="stlo.modal.groupOverrides.info">If a character is selected in here, the priority settings here will override the lorebook's default setting only during that character's speaking turns in a group chat.</small>
-                    </div>
-                    <div class="info-block MarginBot10">
-                        <h4><span data-i18n="stlo.modal.groupOverrides.defaultPriority.title">Default Priority:</span> <span id="default-priority-display" data-i18n="stlo.modal.groupOverrides.defaultPriority.value">3 - Normal</span></h4>
-                        <small data-i18n="stlo.modal.groupOverrides.defaultPriority.help">Characters not specifically listed will use the priority level set above. Single-character chats always use the default.</small>
-                    </div>
+                    <div class="stlo-field-heading"><h4><span data-i18n="stlo.modal.groupOverrides.defaultPriority.title">Default Priority:</span> <span id="default-priority-display" data-i18n="stlo.modal.groupOverrides.defaultPriority.value">3 - Normal</span></h4><details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.groupOverrides.info">If a character is selected in here, the priority settings here will override the lorebook's default setting only during that character's speaking turns in a group chat.</small><small data-i18n="stlo.modal.groupOverrides.defaultPriority.help">Characters not specifically listed will use the priority level set above. Single-character chats always use the default.</small></div></details></div>
                     <div id="advanced-priority-sections">
                         <!-- Priority sections will be inserted here -->
                     </div>
@@ -1104,6 +1462,16 @@ async function openLorebookSettings(worldName = null) {
                         jevRecall: jevRecall?.checked === true,
                         jevBudget: normalizeJevBudget(jevBudget?.value),
                         jevProfileId: jevProfile?.value ?? '',
+                        jevExclude: document.getElementById('stlo-jev-exclude')?.checked === true,
+                        jevReserve: document.getElementById('stlo-jev-reserve')?.value ?? '0',
+                        jevOptions: {
+                            mode: document.querySelector('input[name="stlo-jev-mode"]:checked')?.value,
+                            recent: document.getElementById('stlo-jev-recent')?.value,
+                            messageLength: document.getElementById('stlo-jev-message-length')?.value,
+                            loreLength: document.getElementById('stlo-jev-lore-length')?.value,
+                            preset: document.getElementById('stlo-jev-preset')?.value,
+                            prompt: document.getElementById('stlo-jev-prompt')?.value,
+                        },
                         timestamp: Date.now()
                     };
                 }
@@ -1185,11 +1553,24 @@ async function openLorebookSettings(worldName = null) {
                     validatedThreshold = parsed;
                 }
 
+                const reserve = Number(formState.jevReserve);
+                const opts = formState.jevOptions;
+                const numeric = [[opts.recent, 1, 100], [opts.messageLength, 100, 20000], [opts.loreLength, 100, 20000]];
+                if (!Number.isSafeInteger(reserve) || reserve < 0 || reserve > 10000000 ||
+                    numeric.some(([value, min, max]) => !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max) ||
+                    (opts.preset === 'custom' && !String(opts.prompt ?? '').trim())) {
+                    toastr.error(translate('Check the Jev numeric settings and custom prompt.', 'stlo.jev.validation'));
+                    return null;
+                }
+                const normalizedOptions = normalizeJevOptions({ ...opts, prompt: opts.preset === 'custom' ? opts.prompt : '' });
                 const validatedForm = {
                     protectAlwaysOn: formState.protectAlwaysOn,
                     jevRecall: formState.jevRecall,
                     jevBudget: formState.jevBudget,
                     jevProfileId: formState.jevProfileId,
+                    jevExclude: formState.jevExclude,
+                    jevReserve: normalizeJevReserve(reserve),
+                    jevOptions: normalizedOptions,
                     vectorThreshold: validatedThreshold,
                     vectorThresholdEnabled: rawThreshold !== '',
                     priority: validatedPriority,
@@ -1272,7 +1653,7 @@ async function openLorebookSettings(worldName = null) {
         // Save the settings if we got them
         if (result) {
             try {
-                const { protectAlwaysOn, jevRecall, jevBudget, jevProfileId, ...lorebookSettings } = result;
+                const { protectAlwaysOn, jevRecall, jevBudget, jevProfileId, jevOptions, ...lorebookSettings } = result;
                 if (!characterAvatar) lorebookSettings.jevRecall = jevRecall;
                 const saved = await setLorebookSettings(currentLorebook, lorebookSettings);
 
@@ -1280,6 +1661,7 @@ async function openLorebookSettings(worldName = null) {
                     extension_settings[EXTENSION_NAME] ??= {};
                     extension_settings[EXTENSION_NAME].jevBudget = jevBudget;
                     extension_settings[EXTENSION_NAME].jevProfileId = jevProfileId;
+                    extension_settings[EXTENSION_NAME].jevOptions = jevOptions;
                     // Saving an inherited checked box adopts character-wide recall.
                     const inheritedLegacyRecall = savedCharacterJevRecall === undefined && initialJevRecall;
                     if (characterAvatar && (jevRecall !== initialJevRecall || inheritedLegacyRecall)) {
@@ -1417,6 +1799,36 @@ function setupModalBehavior(modalEventListeners = [], currentSettings = {}) {
         if (jevProfile.selectedIndex < 0) jevProfile.selectedIndex = 0;
     }
 
+    const preset = document.getElementById('stlo-jev-preset');
+    const prompt = document.getElementById('stlo-jev-prompt');
+    const reset = document.getElementById('stlo-jev-reset');
+    const report = document.getElementById('stlo-jev-report');
+    if (preset && prompt && reset && report) {
+        const options = getJevOptions();
+        let customDraft = options.prompt;
+        preset.value = customDraft ? 'custom' : options.preset;
+        prompt.value = customDraft || JEV_PRESETS[options.preset];
+        const onPreset = () => {
+            if (preset.value === 'custom') prompt.value = customDraft || prompt.value;
+            else prompt.value = JEV_PRESETS[preset.value] ?? JEV_PRESETS.balanced;
+        };
+        const onPrompt = () => { customDraft = prompt.value; preset.value = 'custom'; };
+        const onReset = () => {
+            const defaults = normalizeJevOptions();
+            document.getElementById('stlo-jev-recent').value = String(defaults.recent);
+            document.getElementById('stlo-jev-message-length').value = String(defaults.messageLength);
+            document.getElementById('stlo-jev-lore-length').value = String(defaults.loreLength);
+            preset.value = 'balanced';
+            customDraft = '';
+            onPreset();
+        };
+        const onReport = () => { void openJevReport(); };
+        for (const [element, event, handler] of [[preset, 'change', onPreset], [prompt, 'input', onPrompt], [reset, 'click', onReset], [report, 'click', onReport]]) {
+            element.addEventListener(event, handler);
+            modalEventListeners.push({ element, event, handler });
+        }
+    }
+
     // Set up order adjustment behavior for main settings
     const orderAdjustmentEnabled = document.getElementById('lorebook-order-adjustment-enabled');
     const orderAdjustmentContainer = document.getElementById('lorebook-order-adjustment-container');
@@ -1546,7 +1958,7 @@ function createBudgetControls(scope, currentSettings = {}) {
             <div id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}" class="stlo-budget-value" style="${mode === 'default' ? 'display:none;' : ''}">
                 <input type="number" id="${SELECTORS.LOREBOOK_BUDGET_VALUE}" class="text_pole textarea_compact"
                        value="${value || 0}" placeholder="0" style="width: 120px;">
-                <small id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint"></small>
+                <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small id="${SELECTORS.LOREBOOK_BUDGET_VALUE_CONTAINER}-hint"></small></div></details>
                 <div class="stlo-toggle-block">
                     <label class="checkbox_label stlo-checkrow" for="${SELECTORS.LOREBOOK_RANDOM_TRIM}">
                         <input type="checkbox" id="${SELECTORS.LOREBOOK_RANDOM_TRIM}" ${currentSettings.randomTrim ? 'checked' : ''}>
@@ -1634,7 +2046,7 @@ function generateAdvancedContent() {
     const createPrioritySection = (priority) => `
         <div class="priority-section world_entry_form_control MarginBot10" data-priority="${priority.level}">
             <h4>${priority.level} - ${getPriorityName(priority.level)} ${translate('Priority', 'stlo.priority.label')}</h4>
-            <small>${getPriorityDescription(priority.level)}</small>
+            <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small>${getPriorityDescription(priority.level)}</small></div></details>
 
             <div class="flex1 range-block MarginTop10">
                 <div class="range-block-title">
@@ -1659,7 +2071,7 @@ function generateAdvancedContent() {
                     <span class="checkmark"></span>
                     <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
                 </label>
-                <small data-i18n="stlo.modal.order.help">Fine-tune processing order within this priority level</small>
+                <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.help">Fine-tune processing order within this priority level</small></div></details>
 
                 <div class="override-order-adjustment-container" data-priority="${priority.level}"
                      style="display: none;">
@@ -1668,9 +2080,9 @@ function generateAdvancedContent() {
                         <input type="number" class="text_pole textarea_compact override-order-adjustment"
                                data-priority="${priority.level}" min="-10000" max="10000" step="1"
                                value="0" placeholder="0" style="width: 100px;">
-                        <small style="color: #888;" data-i18n="stlo.modal.order.range">-10k to +10k</small>
+                        <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small style="color: #888;" data-i18n="stlo.modal.order.range">-10k to +10k</small></div></details>
                     </div>
-                    <small data-i18n="stlo.modal.order.explain">Higher values process first. Example: +250 for slight boost, -500 for lower priority.</small>
+                    <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.explain">Higher values process first. Example: +250 for slight boost, -500 for lower priority.</small></div></details>
                 </div>
             </div>
         </div>
@@ -2202,9 +2614,9 @@ function resetBudgetState() {
 }
 
 // Compute total World Info budget (tokens) from base ST config
-function calculateTotalWIBudget() {
+function calculateTotalWIBudget(contextSize = null) {
     try {
-        const usableContext = Number(typeof getMaxContextSize === 'function' ? getMaxContextSize() : 0);
+        const usableContext = Number(contextSize ?? (typeof getMaxContextSize === 'function' ? getMaxContextSize() : 0));
         if (!Number.isFinite(usableContext) || usableContext <= 0) {
             return 0; // no trimming without a valid prevailing context
         }
@@ -2304,8 +2716,18 @@ function registerPerLoopBudgetTrimmer() {
     try {
         const onScanDone = async (args) => {
             try {
+                const run = jevGeneration;
+                if (run?.preview && isCurrentJev(run)) {
+                    for (const entry of args?.new?.all ?? []) {
+                        if (entry?.world && entry.uid != null) run.preview.candidates.add(jevEntryKey(entry));
+                    }
+                    return;
+                }
                 const entries = args?.activated?.entries;
-                if (!(entries instanceof Map) || entries.size === 0) return;
+                if (!(entries instanceof Map) || entries.size === 0) {
+                    if (run?.selection && args?.state?.next === 0) recordJevActivated([]);
+                    return;
+                }
 
                 const protect = getProtectAlwaysOn();
                 const jev = jevGeneration?.selection;
@@ -2446,6 +2868,7 @@ function registerPerLoopBudgetTrimmer() {
                 // Leave all text untouched rather than deleting a kept entry
                 // or unrelated system instruction that has matching content.
                 if (dropped) stloDebug('Trimmed WI entries structurally:', dropped);
+                if (run?.selection && args?.state?.next === 0) recordJevActivated([...entries.values()]);
             } catch (e) {
                 console.warn('[STLO] per-loop budget trimmer error:', e);
             }

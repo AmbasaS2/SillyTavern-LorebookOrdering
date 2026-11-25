@@ -206,3 +206,55 @@ test('A missing decision or unavailable provider fails without substituting inco
     assert.deepEqual(await requestJevRecall(request, connection, {}, undefined, async () =>
         response({ answers: { e1: { choice: 'skip' }, e2: { choice: 'skip' } } })), []);
 });
+
+test('Jev defaults, custom criteria and explicit candidate scope', async () => {
+    const { getJevWorlds, normalizeJevOptions, JEV_PRESETS, DEFAULT_JEV_PROMPT } = await import('./jevRecall.mjs');
+    const settings = new Map([
+        ['A', { jevRecall: true }],
+        ['B', { jevRecall: false }],
+        ['C', { jevRecall: true, jevExclude: true }],
+    ]);
+    assert.deepEqual([...getJevWorlds(settings, true)], ['A', 'B']);
+    assert.deepEqual([...getJevWorlds(settings, undefined)], ['A']);
+    assert.equal(getJevWorlds(settings, false).size, 0);
+    assert.deepEqual(normalizeJevOptions(), {mode:'all',recent:6,messageLength:1400,loreLength:960,preset:'balanced',prompt:''});
+    assert.deepEqual(normalizeJevOptions({recent:0,messageLength:20001,loreLength:NaN}), normalizeJevOptions());
+    assert.equal(JEV_PRESETS.balanced, DEFAULT_JEV_PROMPT);
+    const entries = [lore('A',1,'a'.repeat(1200)), lore('B',1,'b'), lore('C',1,'c')];
+    const keys = new Set([jevEntryKey(entries[0]),jevEntryKey(entries[2])]);
+    const messages = [{mes:'old'},{mes:'recent'.repeat(50)},{mes:'hidden',is_system:true}];
+    const prepared = prepareJevRecall(entries, getJevWorlds(settings,true), messages, {recent:1,messageLength:100,loreLength:100,preset:'generous',prompt:'Prefer relationship details.'}, keys);
+    assert.equal(prepared.candidates.size,1);
+    assert.equal(prepared.body.state.current.length,1);
+    assert.equal(prepared.body.state.current[0].text.length,100);
+    assert.ok(prepared.body.state.lore.e1.gist.length <= 100);
+    assert.match(prepared.body.state.assessment,/Prefer relationship details/);
+    assert.match(prepared.body.state.assessment,/include\/skip/);
+    assert.equal(prepareJevRecall(entries,getJevWorlds(settings,true),messages,{},new Set()),null);
+});
+
+test('preferred budgets share unused space, obey limits and only select Jev-approved entries', async () => {
+    const entries = [
+        lore('A',0,'aaaaa'), lore('A',1,'aaaaa'), lore('A',2,'aaaaa'),
+        lore('B',0,'bb',{constant:true}), lore('B',1,'bbb'), lore('B',2,'bbbb'),
+        lore('C',1,'ccc'),
+    ];
+    const ranked = [entries[0], entries[1], entries[2], entries[4], entries[5]].map(jevEntryKey);
+    const opts = { budget:15,worldInfoBudget:20,bookBudgets:new Map(),countTokens:async text=>text.length,
+        reserveBudgets:new Map([['B',7],['C',5]]),bookPriorities:new Map([['C',5],['B',4]]),diagnostics:new Map()};
+    const result=await fitJevRecall(entries,new Set(['A','B','C']),ranked,opts);
+    assert.deepEqual([...result.keys()],[entries[4],entries[0]].map(jevEntryKey));
+    assert.equal(result.has(jevEntryKey(entries[6])),false);
+    assert.equal(opts.diagnostics.get(jevEntryKey(entries[1])),'jev-budget');
+    const capped=await fitJevRecall(entries,new Set(['A','B','C']),ranked,{...opts,bookBudgets:new Map([['B',6]])});
+    assert.equal(capped.has(jevEntryKey(entries[4])),false);
+    assert.deepEqual([...capped.keys()],[entries[0],entries[1]].map(jevEntryKey));
+});
+
+test('conflicting preferred budgets use book priority without exceeding the shared ceiling', async () => {
+    const a=lore('A',1,'aaa'),b=lore('B',1,'bbb');
+    const result=await fitJevRecall([a,b],new Set(['A','B']),[a,b].map(jevEntryKey),{
+        budget:4,worldInfoBudget:100,bookBudgets:new Map(),countTokens:async text=>text.length,
+        reserveBudgets:new Map([['A',4],['B',4]]),bookPriorities:new Map([['A',1],['B',5]])});
+    assert.deepEqual([...result.keys()],[jevEntryKey(b)]);
+});
