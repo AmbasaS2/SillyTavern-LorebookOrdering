@@ -644,8 +644,9 @@ function installStloModalStyles() {
         .stlo-book-manager .stlo-book-editor .stlo-section > select, .stlo-book-manager .stlo-budget-options > select { width:100% !important; }
         .stlo-book-manager .stlo-book-advanced { width:100%; }
         .stlo-book-manager .stlo-book-advanced > summary { font-weight:600; cursor:pointer; padding:3px 0; }
-        .stlo-book-manager .stlo-book-advanced-body { display:flex; flex-direction:column; gap:8px; padding:7px 0 0; min-width:0; }
-        .stlo-book-manager .stlo-book-vector { display:flex; flex-direction:column; gap:4px; width:100%; min-width:0; }
+        .stlo-book-manager .stlo-book-advanced-body { display:flex; flex-direction:column; gap:4px; padding:7px 0 0; min-width:0; }
+        .stlo-book-manager .stlo-book-advanced-body > .stlo-toggle-block { margin:0; }
+        .stlo-book-manager .stlo-book-vector { display:flex; flex-direction:column; gap:4px; width:100%; min-width:0; margin-top:4px; }
         .stlo-book-manager .stlo-book-vector input { width:min(100%, 156px) !important; margin:0 !important; }
         .stlo-book-manager .stlo-manager-add.menu_button { display:inline-flex; align-items:center; justify-content:center; gap:6px; width:100% !important; min-width:0; padding:7px; margin:0 !important; white-space:nowrap; word-break:keep-all; }
         .stlo-book-manager .stlo-manager-status:empty, .stlo-book-manager .stlo-manager-empty[hidden] { display:none !important; }
@@ -1610,6 +1611,12 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                         </div>
                     </div>
                 </div>
+                        ${showBookJev ? `<div class="stlo-toggle-block">
+                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
+                            <div class="stlo-legacy-book" ${characterAvatar ? "hidden" : ""}>
+                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in group chats</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies when using this book in a group chat.')}</div>
+                            </div>
+                        </div>` : ''}
                     <div class="stlo-book-vector">
                 <div class="stlo-field-heading">
                     <h4>벡터 유사도 임계값</h4>
@@ -1624,13 +1631,6 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                            && typeof currentSettings.vectorThreshold === 'number'
                            ? currentSettings.vectorThreshold : ''}">
             </div>
-
-                        ${showBookJev ? `<div class="stlo-toggle-block">
-                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
-                            <div class="stlo-legacy-book" ${characterAvatar ? "hidden" : ""}>
-                            <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in group chats</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies when using this book in a group chat.')}</div>
-                            </div>
-                        </div>` : ''}
                     </div>
                 </details>
             </div>
