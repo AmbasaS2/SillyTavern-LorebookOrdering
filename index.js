@@ -213,7 +213,7 @@ async function loadStloLocale() {
     try {
         const current = String(getCurrentLocale() || 'en').toLowerCase();
         const base = current.split('-')[0];
-        const candidates = [current, base, 'en'];
+        const candidates = new Set([current, base, 'en']);
         const TIMEOUT_MS = 3000;
 
         // Small helper for fetch timeouts
@@ -227,36 +227,23 @@ async function loadStloLocale() {
             }
         };
 
-        console.info('[STLO i18n] current locale:', current, 'candidates:', candidates.join(', '));
         for (const code of candidates) {
             try {
                 const url = new URL(`./locales/${code}.json`, EXT_BASE_URL);
-                console.info('[STLO i18n] trying locale file:', url.href, `(timeout ${TIMEOUT_MS}ms)`);
                 const res = await fetchWithTimeout(url, TIMEOUT_MS);
                 if (res && res.ok) {
                     const data = await res.json();
                     addLocaleData(current, data);
-                    console.info('[STLO i18n] loaded locale data for:', code, 'merged into:', current);
-                    // Quick sanity check: this should print the localized value (e.g., Chinese) when locale is zh-cn
-                    const sample = translate('Configure STLO Priority & Budget', 'stlo.button.configure');
-                    console.info('[STLO i18n] sample stlo.button.configure =', sample);
                     break; // first available wins
-                } else {
-                    console.info('[STLO i18n] not found or not ok for:', code, 'status:', res?.status);
                 }
-            } catch (e) {
-                if (e && (e.name === 'AbortError' || e.code === 'ABORT_ERR')) {
-                    console.info('[STLO i18n] timeout while trying code:', code, '— moving to next candidate');
-                } else {
-                    console.info('[STLO i18n] error while trying code:', code, e);
-                }
-                // ignore and try next
+                stloDebug('Locale unavailable:', code, res?.status);
+            } catch (error) {
+                stloDebug('Locale request failed:', code, error);
             }
         }
         // Re-apply locale so existing DOM picks up newly injected keys
         try {
             applyLocale();
-            console.info('[STLO i18n] applyLocale() completed');
             // Expose a debug helper in DevTools: run window.stloI18nStatus()
             try {
                 // eslint-disable-next-line no-undef
@@ -267,7 +254,7 @@ async function loadStloLocale() {
                     return { currentLocale: cur, sample };
                 };
             } catch (e2) {
-                console.info('[STLO i18n] window not available to expose stloI18nStatus:', e2);
+                stloDebug('Unable to expose stloI18nStatus:', e2);
             }
         } catch (e) {
             console.warn('[STLO i18n] applyLocale() threw:', e);
