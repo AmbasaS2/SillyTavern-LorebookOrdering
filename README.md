@@ -15,7 +15,7 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 - Players who keep recent memories or essential settings always on and want to protect them from being crowded out.
 - Vector users who want different similarity thresholds for different books.
 
-Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection.
+Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection. With [WorldInfo Info](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1, actually activated Jev entries can also display a 🔮 source indicator. Neither extension requires the other.
 
 ## 📸 Settings Preview
 
@@ -298,6 +298,8 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 설정을 저장한 뒤에는 평소처럼 롤플하면 됩니다. 메모리북이 토큰을 너무 많이 먹으면 개별 예산을 줄이고, 중요한 파란불 기억이 빠지면 개별 예산과 전체 월드 정보 예산이 충분한지 먼저 확인하세요.
 
 ## ✨ Jev — 지금 장면에 필요한 로어를 골라 주입
+
+월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제로 발동한 Jev 로어에 🔮 표시가 붙습니다. 별도 검색이나 AI 호출은 없으며, 두 확장은 각각 단독 사용도 가능합니다.
 
 <p align="center">
   <a href="assets/readme/mobile/stlo-jev-guide-mobile.svg"><img src="assets/readme/mobile/stlo-jev-guide-mobile.svg" alt="Jev recall: current scene, relevant lore selection, token budgets, usual RP reply / Jev가 장면에 필요한 로어를 선택하는 과정" width="860" /></a>

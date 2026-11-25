@@ -15,7 +15,7 @@ const raw = [
 ];
 const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
-function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={}}={}) {
+function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false}={}) {
     const listeners=new Map();
     const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0};
     const events=new Proxy({}, {get:(_,key)=>key});
@@ -30,7 +30,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     const books=new Map([['A',{stlo:{}}],['B',{stlo:{}}],['C',{stlo:{jevExclude:true}}]]);
     const ctx={groupId:null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
     const force=new Map();
-    const batches=[], vectorKeys=[];
+    const batches=[], vectorKeys=[], receipts=[];
     let activated=[];
     eventSource.on(events.WORLDINFO_FORCE_ACTIVATE,entries=>{for(const e of entries)force.set(recall.jevEntryKey(e),e);});
     const elements=new Map();
@@ -79,6 +79,10 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         },
     };
     sandbox.globalThis=sandbox;
+    if (receiptMode) sandbox.STWII={recordStloJevRecall:(lists, keys)=>{
+        receipts.push({lists,keys:[...keys]});
+        if (receiptMode==='throw') throw Error('optional viewer failed');
+    }};
     sandbox.vectors_rearrangeChat=async()=>{
         if(!vectors)return;
         counters.vector++;
@@ -107,7 +111,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         let used=0, overflow=false;
         for(const e of entries) {
             if(e.disable||!(e.content.startsWith('@@activate')||e.constant||e.world==='C'||force.has(recall.jevEntryKey(e)))) continue;
-            const copy={...e,content:e.content.replace(/^@@activate\n/,'')};
+            const copy={...e,content:e.content.replace(/^@@activate\n/,''), decorators:e.content.startsWith('@@activate\n')?['@@activate']:[]};
             const cost=copy.content.length+1;
             if(!copy.ignoreBudget && (overflow||used+cost>wiBudget)) {overflow=true;continue;}
             used+=cost;
@@ -118,7 +122,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
 }
 
 test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
@@ -372,4 +376,30 @@ test('unconfigured protection and explicit off leave native constant admission u
         assert.deepEqual(sorted.map(e=>e.order),[900,100]);
         assert.ok(sorted.every(e=>!e.ignoreBudget&&!e.__stloReservedConstant));
     }
+});
+
+test('display receipts only identify applied entries in the real scan, not candidate or vector scans',async()=>{
+    for(const mode of ['all','filtered']){
+        const h=harness({mode,receiptMode:true});
+        const output=await h.generate();
+        assert.equal(h.receipts.length,1);
+        const [{lists,keys}]=h.receipts;
+        assert.deepEqual([...keys].sort(),output.filter(e=>e.content.startsWith('@@activate\n')).map(recall.jevEntryKey).sort());
+        assert.ok(lists.globalLore.length);
+        assert.equal(h.counters.jev,1);
+        assert.equal(h.counters.vector,1);
+        assert.equal(h.counters.preview,mode==='filtered'?1:0);
+        assert.equal(h.counters.abort,0);
+    }
+});
+test('disabled/dry-run/cancelled Jev does not publish receipts and receiver failures never affect injection',async()=>{
+    const off=harness({enabled:false,receiptMode:true}); await off.generate();
+    assert.equal(off.receipts.length,0);
+    const preview=harness({receiptMode:true}); await preview.generate({dryRun:true});
+    assert.equal(preview.receipts.length,0);
+    const cancelled=harness({receiptMode:true,failures:1,responses:[0]}); await cancelled.generate();
+    assert.equal(cancelled.receipts.length,0);
+    const baseline=harness(); const a=await baseline.generate();
+    const failed=harness({receiptMode:'throw'}); const b=await failed.generate();
+    assert.deepEqual(a,b); assert.equal(failed.report().injected,baseline.report().injected);
 });

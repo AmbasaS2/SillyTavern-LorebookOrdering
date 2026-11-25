@@ -368,7 +368,7 @@ export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoB
     return accepted;
 }
 
-export function applyJevRecall(entries, worlds, accepted) {
+export function applyJevRecall(entries, worlds, accepted, appliedKeys = null) {
     const sources = new Map();
     if (accepted.size) {
         for (const entry of entries) {
@@ -397,6 +397,7 @@ export function applyJevRecall(entries, worlds, accepted) {
                 copy.order = entry.order;
             }
             entries[write++] = copy;
+            appliedKeys?.add(jevEntryKey(chosen));
             sources.delete(key);
         }
     }

@@ -889,6 +889,8 @@ async function handleWorldInfoEntriesLoaded(eventData) {
             run.preview.settings = new Map(EXTENSION_STATE.scanWorldSettings);
         }
         if (HAS_WORLDINFO_SCAN_DONE && run?.selection?.worlds.size && !run.preparing && !run.preview && isCurrentJev(run)) {
+            const receipt = globalThis.STWII?.recordStloJevRecall;
+            const appliedKeys = typeof receipt === 'function' ? new Set() : null;
             const arrays = loreArrays(eventData);
             const [global, character, chat, persona] = arrays;
             const strategy = typeof world_info_character_strategy === 'undefined' ? 0 : Number(world_info_character_strategy);
@@ -897,19 +899,19 @@ async function handleWorldInfoEntriesLoaded(eventData) {
             if (strategy === modes.character_first || strategy === modes.global_first) {
                 for (const list of arrays) {
                     list.sort(byOrder);
-                    applyJevSelection(list);
+                    applyJevSelection(list, appliedKeys);
                 }
             } else {
                 // In evenly mode the core sorts both arrays together.
                 const globalKeys = new Set(global.map(jevEntryKey));
                 const combined = [...global, ...character].sort(byOrder);
-                applyJevSelection(combined);
+                applyJevSelection(combined, appliedKeys);
                 global.length = 0;
                 character.length = 0;
                 for (const entry of combined) (globalKeys.has(jevEntryKey(entry)) ? global : character).push(entry);
                 for (const list of [chat, persona]) {
                     list.sort(byOrder);
-                    applyJevSelection(list);
+                    applyJevSelection(list, appliedKeys);
                 }
             }
             for (const list of arrays) for (const entry of list) {
@@ -920,6 +922,11 @@ async function handleWorldInfoEntriesLoaded(eventData) {
                     entry.ignoreBudget = true;
                 }
             }
+            // Optional display receipt, bound to this scan payload. Never alter
+            // injection or fail a reply because a viewer is unavailable.
+            if (appliedKeys) {
+                try { receipt(eventData, appliedKeys); } catch { /* display only */ }
+            }
         }
         // Older hosts lack a structured budget hook. Do not pre-disable
         // unactivated lore simply because the default global budget is finite.
@@ -928,10 +935,10 @@ async function handleWorldInfoEntriesLoaded(eventData) {
     }
 }
 
-function applyJevSelection(entries) {
+function applyJevSelection(entries, appliedKeys = null) {
     const run = jevGeneration;
     if (!run?.selection || run.preparing || run.preview || !isCurrentJev(run)) return;
-    applyJevRecall(entries, run.selection.worlds, run.selection.accepted);
+    applyJevRecall(entries, run.selection.worlds, run.selection.accepted, appliedKeys);
 }
 
 function getJevConnection() {

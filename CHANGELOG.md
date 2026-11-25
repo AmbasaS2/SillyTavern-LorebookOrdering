@@ -2,6 +2,11 @@
 
 **← [Back to README](README.md)**
 
+## 2.2.4-ambasa.1 — optional WorldInfo Info Jev source display (2026-11-25)
+- Reapply only the display receipt to the current multi-source ranked recall implementation; report the copied, applied keys from the real scan to an optional viewer.
+- Preserve the current priority, cap, recursion, vector, retry and insertion-order paths; no additional observer, polling, scan, API call or persisted lore changes.
+- Node regression suite: 50 passing in isolation, plus paired receiver checks. Real installed ST/Termux/iOS not exercised. Rollback: restore previous extension code only.
+
 ## Ambasa fork — opt-in and budget stability (November 25, 2026)
 - Always-on budget protection is opt-in; existing explicit settings are retained. Without effective custom ordering, preserve native lorebook source precedence and insertion values. Reserve constant budget only on scan copies and restore temporary flags at final assembly.
 - Count only constants fitting applicable ceilings during Jev planning, including caps of other active books. Reserve actual Jev picks for the native scan and enforce all three applicable ceilings, including zero-pick runs and actual native special entries in managed books. Explicit native budget exemptions remain exempt from native/book caps, but not from the managed-book Jev cap. Outlet handling is unchanged.
