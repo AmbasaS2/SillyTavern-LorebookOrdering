@@ -111,7 +111,7 @@ export function mountJevPromptLibrary({ target, model, generosity, Popup, POPUP_
     const render = () => {
         choice.replaceChildren(...model.records().map(record => new Option(record.name, record.id)));
         choice.value = model.selected();
-        generosity.value = model.selected() === BUILTIN ? model.preset() : 'custom';
+        generosity.value = model.preset();
         editor.value = model.text();
         editor.scrollTop = 0;
         sync();

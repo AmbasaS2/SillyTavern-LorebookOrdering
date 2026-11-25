@@ -2,6 +2,12 @@
 
 **← [Back to README](README.md)**
 
+## Ambasa fork — simplified settings (November 25, 2026)
+- Restore global always-on protection to the selected lorebook budget dialog. Save it separately from book data; the picker only selects a book.
+- Align group priority and order-adjustment help icons with their labels.
+- Display the current character on one line; single-character Jev now has On/Off only and defaults to Off when unset. Explicit choices and group book flags are preserved.
+- Show three built-in selection styles only; custom prompts remain independently selectable in the prompt library. Display the actual reading-limit status without adding observers or polling.
+
 ## Ambasa fork — full-text Jev recall (November 25, 2026)
 - Full recent dialogue and candidate text by default; 20 recent messages, optional reading limits. Legacy default 6/1400/960 migrates to 20/0/0; non-default values are retained. Existing custom selection prompts are preserved, with old transport wording adapted at runtime.
 - Shared dialogue and ordinary always-on background; one independent question per candidate. Preflight estimates plan batches at 56K/28K; explicit provider size rejection splits further, normal errors require retry/cancel. No partial selection can reach RP.

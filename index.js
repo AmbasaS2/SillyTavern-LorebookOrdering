@@ -73,19 +73,12 @@ function getJevCharacterAvatar(context = getContext()) {
 
 function getCharacterJevRecall(avatar) {
     const byCharacter = extension_settings[EXTENSION_NAME]?.jevByCharacter;
-    return avatar && byCharacter && Object.hasOwn(byCharacter, avatar) ? byCharacter[avatar] : undefined;
+    return avatar ? !!(byCharacter && Object.hasOwn(byCharacter, avatar) && byCharacter[avatar] === true) : undefined;
 }
 
 function setCharacterJevRecall(settings, avatar, choice) {
-    if (!avatar || !['inherit', 'on', 'off'].includes(choice)) return;
-    const values = { ...(settings.jevByCharacter ?? {}) };
-    if (choice === 'inherit') {
-        if (!Object.hasOwn(values, avatar)) return;
-        delete values[avatar];
-    } else {
-        values[avatar] = choice === 'on';
-    }
-    settings.jevByCharacter = values;
+    if (!avatar || !['on', 'off'].includes(choice)) return;
+    settings.jevByCharacter = { ...(settings.jevByCharacter ?? {}), [avatar]: choice === 'on' };
 }
 
 async function hasActiveJevLorebook(context) {
@@ -565,6 +558,10 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-jev-advanced > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
         .stlo-modal-ui .stlo-jev-advanced-body { display: flex; flex-direction: column; gap: 7px; padding: 7px 0 0 6px; width:100%; box-sizing:border-box; min-width:0; }
         .stlo-modal-ui .stlo-scope-name { font-weight: 600; overflow-wrap: anywhere; }
+        .stlo-modal-ui .stlo-character-line { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; min-width:0; max-width:100%; }
+        .stlo-modal-ui .stlo-character-line > span { font-size:.9em; font-weight:400; }
+        .stlo-modal-ui .stlo-character-line > strong { font-size:1.05em; font-weight:700; overflow-wrap:anywhere; min-width:0; }
+        .stlo-modal-ui .stlo-reading-summary > small { display:inline; margin-inline-start:7px; font-weight:400; }
         .stlo-modal-ui .stlo-legacy-book { width: 100%; margin: 2px 0 0; }
         .stlo-modal-ui .stlo-legacy-book[hidden] { display: none !important; }
         .stlo-modal-ui .stlo-jev-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 156px); align-items: center; gap: 6px; width: 100%; }
@@ -712,30 +709,11 @@ async function openLorebookBudgetFromMenu() {
     showAll.addEventListener('change', updateOptions);
     updateOptions();
     form.append(label, select, allLabel);
-    const protection = document.createElement('div');
-    protection.style.cssText = 'border-top:1px solid var(--SmartThemeBorderColor);padding-top:8px;margin-top:8px;width:100%;text-align:left;';
-    const protectionLabel = document.createElement('label');
-    protectionLabel.className = 'checkbox_label';
-    const protect = document.createElement('input');
-    protect.type = 'checkbox';
-    protect.checked = getProtectAlwaysOn();
-    const mark = document.createElement('span');
-    mark.className = 'checkmark';
-    const protectText = document.createElement('span');
-    protectText.textContent = translate('Protect always-on entries first', 'stlo.budget.protect');
-    protectionLabel.append(protect, mark, protectText);
-    const help = document.createElement('small');
-    help.textContent = translate('Shared by all books. Saved when you confirm.', 'stlo.budget.protectHelp');
-    help.style.display = 'block';
-    protection.append(protectionLabel, help);
-    form.append(protection);
-
     const selected = await new Promise(resolve => {
         const popup = new Popup(form, POPUP_TYPE.CONFIRM, '', {
             okButton: '설정 열기',
             cancelButton: translate('Cancel', 'stlo.modal.cancel'),
             onClosing: closingPopup => {
-                if (closingPopup.result === 1 && protect.checked !== getProtectAlwaysOn()) setProtectAlwaysOn(protect.checked);
                 resolve(closingPopup.result === 1 ? select.value : null);
                 return true;
             },
@@ -1358,7 +1336,7 @@ async function openJevSettings() {
         const avatar = getJevCharacterAvatar();
         const characterName = avatar ? characters?.[this_chid]?.name || avatar : '';
         const saved = getCharacterJevRecall(avatar);
-        const choice = saved === true ? 'on' : saved === false ? 'off' : 'inherit';
+        const choice = saved === true ? 'on' : 'off';
         const jevOptions = getJevOptions();
         const tr = (fallback, key) => translate(fallback, 'stlo.jev.' + key);
         const promptModel = createJevPromptLibrary(jevOptions, extension_settings[EXTENSION_NAME]?.jevPromptLibrary, {
@@ -1372,15 +1350,16 @@ async function openJevSettings() {
             <div class="stlo-modal-ui">
                 <div class="world_entry_form_control stlo-section">
                     <h3 data-i18n="stlo.jev.dialogTitle">Jev settings</h3>
-                    <h4 data-i18n="stlo.jev.characterTitle">Current character</h4>
                     ${HAS_WORLDINFO_SCAN_DONE && avatar ? `
-                        <small class="stlo-scope-name" id="stlo-jev-character-name"></small>
-                        <div class="stlo-field-heading"><label for="stlo-jev-character-choice" data-i18n="stlo.jev.characterActivation">Jev selection</label>${infoHelp('stlo.jev.characterActivationHelp', 'Applies to all chats with this character. Inherit preserves legacy per-book behavior; explicit on selects all active books except excluded ones.')}</div>
+                        <div class="stlo-character-line">
+                            <span data-i18n="stlo.jev.characterTitle">Current character</span>
+                            <strong id="stlo-jev-character-name"></strong>
+                        </div>
+                        <div class="stlo-field-heading"><label for="stlo-jev-character-choice" data-i18n="stlo.jev.characterActivation">Jev selection</label>${infoHelp('stlo.jev.characterActivationHelp', 'Applies to every chat with this character and all active linked lorebooks, except books excluded from Jev.')}</div>
                         <select id="stlo-jev-character-choice" class="text_pole textarea_compact">
-                            <option value="inherit" ${choice === 'inherit' ? 'selected' : ''} data-i18n="stlo.jev.inherit">Follow existing lorebook settings</option>
                             <option value="on" ${choice === 'on' ? 'selected' : ''} data-i18n="stlo.jev.on">On</option>
                             <option value="off" ${choice === 'off' ? 'selected' : ''} data-i18n="stlo.jev.off">Off</option>
-                        </select>` : HAS_WORLDINFO_SCAN_DONE ? `<small data-i18n="stlo.jev.noCharacter">Open a single-character chat to change its Jev setting. Group chats continue to use the existing per-book setting.</small>` : `<small data-i18n="stlo.jev.unsupported">Jev requires World Info scan support.</small>`}
+                        </select>` : HAS_WORLDINFO_SCAN_DONE ? `<small data-i18n="stlo.jev.noCharacter">Open a one-to-one chat to set character-level Jev. Group chats use the book settings.</small>` : `<small data-i18n="stlo.jev.unsupported">Jev requires World Info scan support.</small>`}
                 </div>
                 ${HAS_WORLDINFO_SCAN_DONE ? `
                 <div class="world_entry_form_control stlo-section">
@@ -1397,13 +1376,13 @@ async function openJevSettings() {
                 <details class="stlo-jev-advanced"><summary data-i18n="stlo.jev.advanced">Advanced Jev settings</summary><div class="stlo-jev-advanced-body">
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-recent" data-i18n="stlo.jev.recent">Recent messages</label>${infoHelp('stlo.jev.recentHelp', 'Jev reads this many recent messages in full by default. Default: 20.')}</div><input type="number" id="stlo-jev-recent" class="text_pole textarea_compact" min="1" max="100" step="1" value="${jevOptions.recent}"></div>
                 <details class="stlo-jev-advanced stlo-jev-reading-limits" ${jevOptions.messageLength || jevOptions.loreLength ? 'open' : ''}>
-                    <summary data-i18n="stlo.jev.readingLimits">Reading limits (optional)</summary>
+                    <summary class="stlo-reading-summary"><span data-i18n="stlo.jev.readingLimits">Reading limits</span><small id="stlo-jev-reading-status"></small></summary>
                     <div class="stlo-jev-advanced-body">
                         <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-message-length" data-i18n="stlo.jev.messageLength">Message character limit</label>${infoHelp('stlo.jev.messageLengthHelp', '0 reads the full message. A positive limit keeps the end.')}</div><input type="number" id="stlo-jev-message-length" class="text_pole textarea_compact" min="0" max="20000" step="1" value="${jevOptions.messageLength}"></div>
                         <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-lore-length" data-i18n="stlo.jev.loreLength">Lore character limit</label>${infoHelp('stlo.jev.loreLengthHelp', '0 reads the full entry. A positive limit keeps the beginning and end.')}</div><input type="number" id="stlo-jev-lore-length" class="text_pole textarea_compact" min="0" max="20000" step="1" value="${jevOptions.loreLength}"></div>
                     </div>
                 </details>
-                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Selection preset</label>${infoHelp('stlo.jev.presetHelp', 'Strict favors direct relevance; balanced is the original prompt; generous considers useful indirect context. Same request count and budget.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option><option value="custom" disabled data-i18n="stlo.jev.custom">Custom</option></select></div>
+                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Default selection style</label>${infoHelp('stlo.jev.presetHelp', 'Strict: direct relevance. Balanced: default. Generous: indirect relevance too. Changing this selects the built-in prompt.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select></div>
                 <div class="stlo-jev-prompt-library" id="stlo-jev-prompt-library">
                     <header class="stlo-jev-prompt-heading">
                         <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.prompt">Selection prompt</h4>${infoHelp('stlo.jev.promptHelp', 'Edit decision criteria, not the structured response format. The settings are shared across characters.')}</div>
@@ -1537,12 +1516,27 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
     }
     const ui = mountJevPromptLibrary({ target, model: promptModel, generosity: preset, Popup, POPUP_TYPE, tr,
         warn: message => toastr.warning(message), isOpen });
+    const messageLimit = document.getElementById('stlo-jev-message-length');
+    const loreLimit = document.getElementById('stlo-jev-lore-length');
+    const readingStatus = document.getElementById('stlo-jev-reading-status');
+    const syncReadingStatus = () => {
+        if (!readingStatus) return;
+        const limited = Number(messageLimit?.value) > 0 || Number(loreLimit?.value) > 0;
+        readingStatus.textContent = limited ? tr('Limit enabled', 'readingLimited') : tr('Full text', 'readingFull');
+    };
+    for (const input of [messageLimit, loreLimit]) {
+        if (!input) continue;
+        input.addEventListener('input', syncReadingStatus);
+        modalEventListeners.push({ element: input, event: 'input', handler: syncReadingStatus });
+    }
+    syncReadingStatus();
     const onReset = () => {
         if (ui.isBusy()) return;
         const defaults = normalizeJevOptions();
         document.getElementById('stlo-jev-recent').value = String(defaults.recent);
         document.getElementById('stlo-jev-message-length').value = String(defaults.messageLength);
         document.getElementById('stlo-jev-lore-length').value = String(defaults.loreLength);
+        syncReadingStatus();
         promptModel.chooseBuiltin('balanced');
         ui.render();
     };
@@ -1586,8 +1580,8 @@ async function openLorebookSettings(worldName = null) {
         const currentSettings = await getLorebookSettings(currentLorebook);
         const characterAvatar = getJevCharacterAvatar();
         const characterRecall = getCharacterJevRecall(characterAvatar);
-        const showBookJev = HAS_WORLDINFO_SCAN_DONE && (!characterAvatar ||
-            (characterRecall ?? await hasActiveJevLorebook(getContext())));
+        const showBookJev = HAS_WORLDINFO_SCAN_DONE && (!characterAvatar || characterRecall === true);
+        const protectInitially = getProtectAlwaysOn();
 
         // Create modal HTML - single vertical scrolling content
         const modalHtml = `
@@ -1659,6 +1653,14 @@ async function openLorebookSettings(worldName = null) {
 
             <div class="world_entry_form_control stlo-section">
                 ${createBudgetControls('lorebook', currentSettings)}
+                <div class="stlo-option-line">
+                    <label class="checkbox_label stlo-checkrow" for="stlo_protect_always_on">
+                        <input type="checkbox" id="stlo_protect_always_on" ${protectInitially ? 'checked' : ''}>
+                        <span class="checkmark"></span>
+                        <span data-i18n="stlo.budget.protect">Protect always-on entries first</span>
+                    </label>
+                    ${infoHelp('stlo.budget.protectHelp', 'Applies to all lorebooks, not just this book.')}
+                </div>
             </div>
 
             <div class="world_entry_form_control stlo-section">
@@ -1680,7 +1682,7 @@ async function openLorebookSettings(worldName = null) {
                 <h4 data-i18n="stlo.jev.bookTitle">Jev · this lorebook</h4>
                 <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-exclude"><input type="checkbox" id="stlo-jev-exclude" ${currentSettings.jevExclude === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.exclude">Exclude this lorebook from Jev</span></label>${infoHelp('stlo.jev.excludeHelp', 'This book keeps native activation. All-entries mode skips vector retrieval; keywords and always-on rules still apply. Filtered mode also uses configured vector retrieval.')}</div>
                 <div class="stlo-legacy-book" ${characterAvatar ? "hidden" : ""}>
-                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in legacy/group mode</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies in group chats or for characters without an explicit Jev setting. Explicit character settings take precedence.')}</div>
+                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-recall"><input type="checkbox" id="stlo-jev-recall" ${currentSettings.jevRecall === true ? "checked" : ""}><span class="checkmark"></span><span data-i18n="stlo.jev.legacyBook">Use Jev for this book in group chats</span></label>${infoHelp('stlo.jev.legacyBookHelp', 'Applies when using this book in a group chat.')}</div>
                 </div>
             </div>` : ''}
             <!-- Group chat controls share one section, without dividers between toggles. -->
@@ -1747,6 +1749,7 @@ async function openLorebookSettings(worldName = null) {
                         orderAdjustmentGroupOnly: orderAdjustmentGroupOnly.checked,
                         onlyWhenSpeaking: onlyWhenSpeaking.checked,
                         randomTrim: Boolean(randomTrimEl?.checked),
+                        protectAlwaysOn: document.getElementById('stlo_protect_always_on')?.checked ?? protectInitially,
                         vectorThreshold: vectorThresholdInput?.value ?? '',
                         jevRecall: jevRecall?.checked === true,
                         jevExclude: document.getElementById('stlo-jev-exclude')?.checked === true,
@@ -1832,6 +1835,7 @@ async function openLorebookSettings(worldName = null) {
                 }
 
                 const validatedForm = {
+                    protectAlwaysOn: formState.protectAlwaysOn,
                     jevRecall: formState.jevRecall,
                     jevExclude: formState.jevExclude,
                     vectorThreshold: validatedThreshold,
@@ -1918,12 +1922,14 @@ async function openLorebookSettings(worldName = null) {
         // Save the settings if we got them
         if (result) {
             try {
-                // Do not write character or global settings from a book form.
-                if (characterAvatar || !showBookJev) delete result.jevRecall;
-                if (!showBookJev) delete result.jevExclude;
-                const saved = await setLorebookSettings(currentLorebook, result);
+                // Keep the common toggle in extension settings, never in a book.
+                const { protectAlwaysOn, ...bookSettings } = result;
+                if (characterAvatar || !showBookJev) delete bookSettings.jevRecall;
+                if (!showBookJev) delete bookSettings.jevExclude;
+                const saved = await setLorebookSettings(currentLorebook, bookSettings);
 
                 if (saved) {
+                    if (protectAlwaysOn !== protectInitially) setProtectAlwaysOn(protectAlwaysOn);
                     toastr.success(tKey('stlo.settings.saved', 'STLO settings saved for ${0}', currentLorebook));
                 } else {
                     toastr.error(tKey('stlo.settings.saveFailed', 'Failed to save settings for ${0}. Check console for details.', currentLorebook), 'Save Error');
@@ -2258,8 +2264,10 @@ function generateAdvancedContent() {
 
     const createPrioritySection = (priority) => `
         <div class="priority-section world_entry_form_control MarginBot10" data-priority="${priority.level}">
-            <h4>${priority.level} - ${getPriorityName(priority.level)} ${translate('Priority', 'stlo.priority.label')}</h4>
-            <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small>${getPriorityDescription(priority.level)}</small></div></details>
+            <div class="stlo-field-heading">
+                <h4>${priority.level} - ${getPriorityName(priority.level)} ${translate('Priority', 'stlo.priority.label')}</h4>
+                <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small>${getPriorityDescription(priority.level)}</small></div></details>
+            </div>
 
             <div class="flex1 range-block MarginTop10">
                 <div class="range-block-title">
@@ -2278,24 +2286,28 @@ function generateAdvancedContent() {
             </div>
 
             <div class="flex1 MarginTop10">
-                <label class="checkbox_label" for="override-order-adjustment-enabled-${priority.level}">
-                    <input type="checkbox" id="override-order-adjustment-enabled-${priority.level}"
-                           class="override-order-adjustment-enabled" data-priority="${priority.level}">
-                    <span class="checkmark"></span>
-                    <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
-                </label>
-                <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.help">Fine-tune processing order within this priority level</small></div></details>
+                <div class="stlo-option-line">
+                    <label class="checkbox_label stlo-checkrow" for="override-order-adjustment-enabled-${priority.level}">
+                        <input type="checkbox" id="override-order-adjustment-enabled-${priority.level}"
+                               class="override-order-adjustment-enabled" data-priority="${priority.level}">
+                        <span class="checkmark"></span>
+                        <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
+                    </label>
+                    <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.help">Fine-tune processing order within this priority level</small></div></details>
+                </div>
 
                 <div class="override-order-adjustment-container" data-priority="${priority.level}"
                      style="display: none;">
-                    <h5 data-i18n="stlo.modal.order.title">Order Adjustment</h5>
+                    <div class="stlo-field-heading">
+                        <h5 data-i18n="stlo.modal.order.title">Order Adjustment</h5>
+                        <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.explain">Higher values process first. Example: +250 for slight boost, -500 for lower priority.</small></div></details>
+                    </div>
                     <div class="stlo-inline-number">
                         <input type="number" class="text_pole textarea_compact override-order-adjustment"
                                data-priority="${priority.level}" min="-10000" max="10000" step="1"
                                value="0" placeholder="0" style="width: 100px;">
                         <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small style="color: #888;" data-i18n="stlo.modal.order.range">-10k to +10k</small></div></details>
                     </div>
-                    <details class="stlo-info"><summary aria-label="Help">i</summary><div class="stlo-info-body"><small data-i18n="stlo.modal.order.explain">Higher values process first. Example: +250 for slight boost, -500 for lower priority.</small></div></details>
                 </div>
             </div>
         </div>

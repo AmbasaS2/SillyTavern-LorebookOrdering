@@ -184,19 +184,27 @@ test('character Jev choice is independent of other characters and book settings'
     assert.equal(off.counters.jev,0);
 });
 
-test('inherit removes only the explicit character override and uses legacy book scope', async()=>{
-    const h=harness({enabled:true});
+test('unset single characters are off even if books have legacy opt-ins', async()=>{
+    const h=harness();
     h.books.get('A').stlo.jevRecall=true;
-    h.setChoice('other.png','off');
-    h.setChoice('avatar.png','inherit');
-    assert.equal(Object.hasOwn(h.settings.stlo.jevByCharacter,'avatar.png'),false);
-    assert.equal(h.settings.stlo.jevByCharacter['other.png'],false);
+    delete h.settings.stlo.jevByCharacter['avatar.png'];
+    h.setChoice('other.png','on');
+    await h.generate();
+    assert.equal(h.counters.jev,0);
+    assert.equal(h.counters.vector,1);
+    assert.equal(h.books.get('A').stlo.jevRecall,true);
+    assert.equal(h.settings.stlo.jevByCharacter['other.png'],true);
+});
+
+test('group chats retain book-level Jev opt-ins', async()=>{
+    const h=harness({enabled:false});
+    h.ctx.groupId='group';
+    h.books.get('A').stlo.jevRecall=true;
     const entries=await h.generate();
     assert.equal(h.counters.jev,1);
     assert.equal(entries.some(e=>e.world==='B'&&e.uid===1&&e.content.startsWith('@@activate')),false);
     assert.equal(h.books.get('A').stlo.jevRecall,true);
 });
-
 
 test('explicit provider size failure splits only the rejected batch and uses no retry popup',async()=>{
     const h=harness({sizeFailures:1});

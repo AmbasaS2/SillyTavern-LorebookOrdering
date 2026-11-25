@@ -49,13 +49,13 @@ Book-specific controls are in Lorebook Budget Management; character-level Jev an
 | Control | When to use it |
 |---|---|
 | Lorebook priority (1–5) | Give important books first consideration. Normal is 3. |
-| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Shared setting in the book picker, on by default. |
+| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Shared setting in the selected book’s budget editor, on by default. |
 | Order adjustment | Fine-tune ordering only when ordinary priority levels are not enough. |
 | Per-book budget | Set a maximum contribution for this book. With Jev, this is also its preferred share of the common budget. |
 | Random trim | Vary which already-active ordinary entries fit if the same ones always win. |
 | Vector similarity threshold (벡터 유사도 임계값) | For native vector retrieval without Jev, use a book-specific threshold or leave blank for the global setting. |
-| Jev selection | In Jev injection settings, choose On, Off, or follow existing lorebook settings for the current character. Group chats retain the book-specific setting. |
-| Exclude this lorebook from Jev | Keep a book on native activation. Shown when Jev is enabled for the current character, or when managing legacy/group settings. |
+| Jev selection | In Jev injection settings, choose On or Off for the current character. Group chats retain the book-specific setting. |
+| Exclude this lorebook from Jev | Keep a book on native activation. Shown when Jev is enabled for the current character, or when managing group settings. |
 | Total Jev budget / NanoGPT connection profile | Configure these only when using Jev. Both are shared extension settings. |
 | Jev candidate source / advanced settings | Choose all eligible entries or native search candidates; configure the reading scope and selection prompt. Shared settings. |
 | Group chat overrides | Change priority or activation by speaking character. Ignore for one-to-one RP. |
@@ -86,7 +86,7 @@ Jev is a decision model, not the model that writes the RP response. STLO sends s
 3. Open a one-to-one character chat, then **Extensions menu → Jev injection settings**. Set **Jev selection** to On. Select your saved **NanoGPT connection profile**, set **Total Jev budget (tokens)**, and save. No lorebook selection is required.
 4. Continue your RP normally. The extension requests `typesafe/jev-1.14` automatically; it does not replace your main API or require you to change the profile's saved chat model to Jev.
 
-In a one-to-one character chat, an explicit On setting applies to the character and covers eligible entries from all active, non-excluded lorebooks. Off disables Jev for that character. Follow existing lorebook settings retains the legacy book-based behavior; group chats continue to use that behavior, with the book-specific control in Lorebook Budget Management. The total Jev budget, connection profile and advanced options remain shared extension settings. The prompt library offers named presets, full editor, save, rename, save as, import/export and delete; changes are applied with the outer Save Settings button. Jev is optional and defaults to off for new configurations without legacy opt-ins. Older separate Jev reserve values are retained in the saved book but ignored; the existing book budget now controls both its cap and preferred share.
+In a one-to-one character chat, an explicit On setting applies to the character and covers eligible entries from all active, non-excluded lorebooks. Off disables Jev for that character. Group chats retain book-specific opt-ins, with the group control in Lorebook Budget Management. The total Jev budget, connection profile and advanced options remain shared extension settings. The prompt library offers named presets, full editor, save, rename, save as, import/export and delete; changes are applied with the outer Save Settings button. Jev defaults to off for characters without an explicit choice, even if a book has an old Jev opt-in. The book flag remains available for group chats. Older separate Jev reserve values are retained in the saved book but ignored; the existing book budget now controls both its cap and preferred share.
 
 ### What Jev sees and selects
 
@@ -263,12 +263,12 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 | 설정 | 언제, 어떻게 쓰나요? |
 |---|---|
 | 로어북 우선순위 (1–5) | 중요한 책을 먼저 처리하고 싶을 때 높입니다. 기본 3. |
-| 상시 주입 우선 보호 | 책 선택 화면의 공통 옵션입니다. 파란불 항목을 먼저 넣으며 기본 켜짐입니다. |
+| 상시 주입 우선 보호 | 선택한 로어북의 예산 설정에 있는 공통 옵션입니다. 파란불 항목을 먼저 넣으며 기본 켜짐입니다. |
 | 세부 순서 조정 | 같은 우선순위 내에서 좀 더 세밀하게 순서를 바꾸고 싶을 때만 사용합니다. |
 | 예산 | 해당 책의 최대 주입량입니다. Jev 사용 시 관련 로어에 이 예산을 우선 배정합니다. |
 | 예산 초과 시 항목을 무작위로 제외 | 이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다. |
 | 벡터 유사도 임계값 | Jev를 쓰지 않고 기존 벡터 검색을 사용할 때 책별로 검색 기준을 달리합니다. 비우면 전역값. |
-| Jev 판정 사용 | Jev 주입 설정에서 현재 캐릭터별로 사용 / 사용 안 함 / 기존 로어북 설정 따름을 선택합니다. 그룹 채팅은 기존 책별 설정을 유지합니다. |
+| Jev 판정 사용 | Jev 주입 설정에서 현재 캐릭터별로 사용 / 사용 안 함을 선택합니다. 그룹 채팅은 기존 책별 설정을 유지합니다. |
 | 이 로어북은 Jev 판정에서 제외 | 기존 발동 방식을 유지합니다. 현재 캐릭터가 Jev를 사용할 때 표시됩니다. 그룹·기존 설정 관리 예외는 유지됩니다. |
 | Jev 전체 주입 예산 / 나노GPT 연결 프로필 | Jev를 사용할 때만 설정합니다. 두 값은 공통 설정입니다. |
 | Jev 판정 대상 / 고급 설정 | 전체 항목 또는 기존 검색 후보, 인식 범위와 판정 프롬프트를 설정합니다. 공통 설정입니다. |
@@ -300,7 +300,7 @@ Jev는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모�
 3. 1:1 캐릭터 채팅을 열고 **확장 메뉴 → Jev 주입 설정**에서 **Jev 판정 사용**을 사용으로 지정합니다. **나노GPT 연결 프로필**과 **Jev 전체 주입 예산 (토큰)**을 지정한 뒤 설정을 저장합니다. 로어북을 선택할 필요는 없습니다.
 4. 평소처럼 RP를 이어갑니다. STLO가 판정용 모델 `typesafe/jev-1.14`를 자동 지정하므로 메인 RP API나 저장한 프로필의 일반 채팅 모델을 Jev로 바꿀 필요가 없습니다.
 
-1:1 채팅에서는 현재 캐릭터별로 켜고 끌 수 있습니다. 사용을 선택하면 그 캐릭터의 현재 채팅에서 활성화된 로어북 중 제외 설정이 없는 책의 적격 항목을 판정합니다. 사용 안 함을 선택하면 Jev를 끕니다. 기존 로어북 설정 따름은 이전 책별 활성화 방식을 유지합니다. 그룹 채팅은 로어북 예산 관리의 그룹·기존 로어북 기준 Jev 사용을 따릅니다. 총예산, 연결 프로필, 고급 설정은 확장 공통값입니다. 프롬프트는 이름을 붙여 여러 개 저장하고 전체 보기, 이름 변경, 복제, 가져오기·내보내기, 삭제할 수 있으며 외부 설정 저장 버튼으로 반영합니다. 이전 책별 설정이 없는 새 구성에서는 기본적으로 꺼져 있습니다. 기존 별도 Jev 확보 예산 값은 저장 데이터에 남겨 두되 사용하지 않으며, 기존 로어북 예산을 최대치 겸 우선 배정량으로 사용합니다.
+1:1 채팅에서는 현재 캐릭터별로 켜고 끌 수 있습니다. 사용을 선택하면 그 캐릭터의 현재 채팅에서 활성화된 로어북 중 제외 설정이 없는 책의 적격 항목을 판정합니다. 사용 안 함을 선택하면 Jev를 끕니다. 그룹 채팅은 로어북 예산 관리의 그룹 채팅용 책별 Jev 설정을 따릅니다. 총예산, 연결 프로필, 고급 설정은 확장 공통값입니다. 프롬프트는 이름을 붙여 여러 개 저장하고 전체 보기, 이름 변경, 복제, 가져오기·내보내기, 삭제할 수 있으며 외부 설정 저장 버튼으로 반영합니다. 캐릭터별로 사용을 지정하지 않았다면 기존 책별 설정과 관계없이 기본적으로 꺼져 있습니다. 책별 설정은 그룹 채팅용으로 유지됩니다. 기존 별도 Jev 확보 예산 값은 저장 데이터에 남겨 두되 사용하지 않으며, 기존 로어북 예산을 최대치 겸 우선 배정량으로 사용합니다.
 
 ### 판정 대상과 주입
 
