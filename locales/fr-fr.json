@@ -40,7 +40,7 @@
   "stlo.budget.hint.percentBudget": "% du budget Info Monde (1–100)",
   "stlo.budget.hint.percentContext": "% du contexte max (1–100)",
   "stlo.budget.hint.fixed": "tokens (>= 1)",
-  "stlo.modal.title": "📚 Ordonnancement des livres de lore ST",
+  "stlo.modal.title": "📚 Lorebook Ordering for Sloths",
   "stlo.modal.priority.title": "Priorité du livre de lore",
   "stlo.modal.priority.help": "Les nombres élevés (4-5) sont traités en premier. Les nombres bas (1-2) sont traités en dernier.",
   "stlo.modal.priority.option.5": "5 - Priorité la plus haute (Traité en premier)",
@@ -84,5 +84,12 @@
   "stlo.cmd.usage": "Utilisation : /stlo <nom du livre de lore>",
   "stlo.cmd.notfound": "Livre de lore introuvable : ${0}",
   "stlo.cmd.arg.name": "nom du livre de lore (insensible à la casse)",
-  "stlo.cmd.help": "Ouvrir la priorité et le budget STLO pour un livre de lore spécifique."
+  "stlo.cmd.help": "Ouvrir la priorité et le budget STLO pour un livre de lore spécifique.",
+  "stlo.menu.budget": "Gestion du budget des lorebooks",
+  "stlo.ui.showHelp": "Afficher l’aide",
+  "stlo.vector.threshold.title": "Seuil de similarité vectorielle",
+  "stlo.vector.threshold.help": "Saisissez une valeur de 0 à 1. Laissez vide pour le réglage global. Des seuils différents peuvent augmenter les requêtes, le temps et le coût.",
+  "stlo.vector.threshold.placeholder": "Vide : réglage global",
+  "stlo.budget.recursionHelp": "Lors d’une analyse récursive, une entrée exclue du prompt final peut avoir activé d’autres entrées.",
+  "stlo.manager.title": "Lorebook Ordering for Sloths"
 }

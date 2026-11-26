@@ -2,6 +2,9 @@
 
 **← [Back to README](README.md)**
 
+## 2.2.4-ambasa.4 — UI localization
+- Localize the remaining Korean-only menu and vector/budget help labels using the existing 11 locale files; resolve base locale aliases and keep English fallback. No saved settings or recall behavior changes.
+
 ## Branding update (2026-11-26)
 - Renamed the fork to Lorebook Ordering for Sloths (게으름뱅이를 위한 로어북 예산 관리기). Existing menu labels, settings, identifiers and install URL are unchanged.
 

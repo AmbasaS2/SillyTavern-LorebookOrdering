@@ -40,7 +40,7 @@
   "stlo.budget.hint.percentBudget": "% dari anggaran Info Dunia (1–100)",
   "stlo.budget.hint.percentContext": "% dari Konteks Maks (1–100)",
   "stlo.budget.hint.fixed": "token (>= 1)",
-  "stlo.modal.title": "📚 Pengurutan Lorebook ST",
+  "stlo.modal.title": "📚 Lorebook Ordering for Sloths",
   "stlo.modal.priority.title": "Prioritas Lorebook",
   "stlo.modal.priority.help": "Angka yang lebih tinggi (4-5) diproses terlebih dahulu. Angka yang lebih rendah (1-2) diproses terakhir.",
   "stlo.modal.priority.option.5": "5 - Prioritas Tertinggi (Diproses Pertama)",
@@ -81,9 +81,15 @@
   "stlo.priority.desc.2": "Pemrosesan prioritas rendah",
   "stlo.priority.desc.1": "Diproses terakhir",
   "stlo.priority.label": "Prioritas",
-
   "stlo.cmd.usage": "Penggunaan: /stlo <nama lorebook>",
   "stlo.cmd.notfound": "Lorebook tidak ditemukan: ${0}",
   "stlo.cmd.arg.name": "nama lorebook (tidak peka huruf besar/kecil)",
-  "stlo.cmd.help": "Buka Prioritas & Anggaran STLO untuk lorebook tertentu."
+  "stlo.cmd.help": "Buka Prioritas & Anggaran STLO untuk lorebook tertentu.",
+  "stlo.menu.budget": "Pengelolaan anggaran lorebook",
+  "stlo.ui.showHelp": "Tampilkan bantuan",
+  "stlo.vector.threshold.title": "Ambang kemiripan vektor",
+  "stlo.vector.threshold.help": "Masukkan nilai 0–1. Kosongkan untuk memakai pengaturan global. Ambang berbeda dapat menambah permintaan, waktu, dan biaya.",
+  "stlo.vector.threshold.placeholder": "Kosong: gunakan pengaturan global",
+  "stlo.budget.recursionHelp": "Dalam pemindaian rekursif, entri yang tidak disuntikkan pada akhirnya masih dapat mengaktifkan entri lain.",
+  "stlo.manager.title": "Lorebook Ordering for Sloths"
 }

@@ -40,7 +40,7 @@
   "stlo.budget.hint.percentBudget": "% del presupuesto de Información Mundial (1–100)",
   "stlo.budget.hint.percentContext": "% del contexto máximo (1–100)",
   "stlo.budget.hint.fixed": "tokens (>= 1)",
-  "stlo.modal.title": "📚 Ordenación de libros de lore de ST",
+  "stlo.modal.title": "📚 Lorebook Ordering for Sloths",
   "stlo.modal.priority.title": "Prioridad del libro de lore",
   "stlo.modal.priority.help": "Los números más altos (4-5) se procesan primero. Los números más bajos (1-2) se procesan al final.",
   "stlo.modal.priority.option.5": "5 - Prioridad más alta (se procesa primero)",
@@ -84,5 +84,12 @@
   "stlo.cmd.usage": "Uso: /stlo <nombre del libro de lore>",
   "stlo.cmd.notfound": "Libro de lore no encontrado: ${0}",
   "stlo.cmd.arg.name": "nombre del libro de lore (no sensible a mayúsculas/minúsculas)",
-  "stlo.cmd.help": "Abrir prioridad y presupuesto de STLO para un libro de lore específico."
+  "stlo.cmd.help": "Abrir prioridad y presupuesto de STLO para un libro de lore específico.",
+  "stlo.menu.budget": "Gestión del presupuesto de lorebooks",
+  "stlo.ui.showHelp": "Mostrar ayuda",
+  "stlo.vector.threshold.title": "Umbral de similitud vectorial",
+  "stlo.vector.threshold.help": "Introduce un valor entre 0 y 1. Déjalo vacío para usar el ajuste global. Distintos umbrales pueden aumentar las solicitudes, el tiempo y el coste.",
+  "stlo.vector.threshold.placeholder": "Vacío: usar ajuste global",
+  "stlo.budget.recursionHelp": "Con el escaneo recursivo, una entrada excluida del resultado final puede haber activado otras.",
+  "stlo.manager.title": "Lorebook Ordering for Sloths"
 }

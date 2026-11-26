@@ -224,5 +224,11 @@
   "stlo.manager.thresholdRange": "Enter a vector threshold between 0 and 1.",
   "stlo.manager.allAdded": "All available books are already listed.",
   "stlo.manager.linkedAdded": "All linked books are already listed. Enable Show all lorebooks for other books.",
-  "stlo.jev.invalidBudget": "Enter a positive whole-number injection budget."
+  "stlo.jev.invalidBudget": "Enter a positive whole-number injection budget.",
+  "stlo.menu.budget": "Lorebook Budget Management",
+  "stlo.ui.showHelp": "Show help",
+  "stlo.vector.threshold.title": "Vector similarity threshold",
+  "stlo.vector.threshold.help": "Enter a value from 0 to 1. Leave blank to use the global setting. Different thresholds can require additional requests, time and cost.",
+  "stlo.vector.threshold.placeholder": "Leave blank to use global setting",
+  "stlo.budget.recursionHelp": "With recursive scanning, lore excluded from the final prompt can still have activated other lore."
 }

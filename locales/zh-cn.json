@@ -40,7 +40,7 @@
   "stlo.budget.hint.percentBudget": "世界信息预算的百分比（1–100）",
   "stlo.budget.hint.percentContext": "最大上下文的百分比（1–100）",
   "stlo.budget.hint.fixed": "令牌 (>= 1)",
-  "stlo.modal.title": "📚 ST 知识库排序",
+  "stlo.modal.title": "📚 Lorebook Ordering for Sloths",
   "stlo.modal.priority.title": "知识库优先级",
   "stlo.modal.priority.help": "较高的数字 (4-5) 会优先处理。较低的数字 (1-2) 会最后处理。",
   "stlo.modal.priority.option.5": "5 - 最高优先级 (最先处理)",
@@ -75,16 +75,21 @@
   "stlo.priority.name.3": "普通",
   "stlo.priority.name.2": "低",
   "stlo.priority.name.1": "最低",
-
   "stlo.priority.desc.5": "最先处理",
   "stlo.priority.desc.4": "高优先级处理",
   "stlo.priority.desc.3": "标准优先级 (SillyTavern 默认)",
   "stlo.priority.desc.2": "较低优先级处理",
   "stlo.priority.desc.1": "最后处理",
   "stlo.priority.label": "优先级",
-
   "stlo.cmd.usage": "用法：/stlo <知识库名称>",
   "stlo.cmd.notfound": "未找到知识库：${0}",
   "stlo.cmd.arg.name": "知识库名称（不区分大小写）",
-  "stlo.cmd.help": "打开指定知识库的 STLO 优先级与预算设置。"
+  "stlo.cmd.help": "打开指定知识库的 STLO 优先级与预算设置。",
+  "stlo.menu.budget": "世界书预算管理",
+  "stlo.ui.showHelp": "显示说明",
+  "stlo.vector.threshold.title": "向量相似度阈值",
+  "stlo.vector.threshold.help": "输入0到1之间的值。留空使用全局设置。不同阈值可能增加请求次数、耗时和费用。",
+  "stlo.vector.threshold.placeholder": "留空使用全局设置",
+  "stlo.budget.recursionHelp": "使用递归扫描时，最终未注入的条目也可能已触发其他条目。",
+  "stlo.manager.title": "Lorebook Ordering for Sloths"
 }

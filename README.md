@@ -15,6 +15,9 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 
 These are independent menus. Jev is off for new characters. Lorebook Ordering recalls existing lore; it does not create memories.
 
+
+**Interface language:** Automatically follows SillyTavern's UI language (English fallback). Lorebook contents, prompts, and settings are not translated.
+
 ## 📥 Installation and First Steps
 
 1. Back up your lorebooks and settings. If you have upstream STLO installed, disable or remove it before enabling this fork. Do not run both at the same time.
@@ -40,7 +43,7 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 
 ## ⚡ Quick start
 
-**Current version: 2.2.4-ambasa.3.**
+**Current version: 2.2.4-ambasa.4.**
 
 > **Choose a book → set priority and budget → save → continue RP.**
 >
@@ -459,6 +462,9 @@ Some fork-specific controls currently use Korean-only UI labels.
 
 # 📚 게으름뱅이를 위한 로어북 예산 관리기
 
+**화면 언어:** 실리태번 화면 언어를 자동으로 따릅니다. 지원하지 않는 언어는 영어로 표시하며 로어북 내용·프롬프트·저장 설정은 그대로입니다.
+
+
 **Jev(Jev)로 현재 RP에 필요한 로어를 골라 주입하고, 로어북별 우선순위와 토큰 예산까지 관리하는 실리태번 확장입니다.**
 
 [aikohanasaki님의 ST Lorebook Ordering](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering) v2.2.4를 기반으로 만든 포크입니다. 원본에서 제공하는 우선순위, 예산, 세부 순서, 랜덤 트리밍, 그룹 채팅 기능을 그대로 사용하며, Jev를 이용한 로어 선택, 상시 주입 우선 보호, 책별 벡터 설정을 추가했습니다. 원작자님께 감사드립니다.
@@ -499,7 +505,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 2.2.4-ambasa.3.**
+**현재 버전: 2.2.4-ambasa.4.**
 
 > **책 선택 → 우선순위와 예산 설정 → 저장 → 다시 롤플!**
 >

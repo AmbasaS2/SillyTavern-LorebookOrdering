@@ -373,7 +373,9 @@ async function loadStloLocale() {
     try {
         const current = String(getCurrentLocale() || 'en').toLowerCase();
         const base = current.split('-')[0];
-        const candidates = new Set([current, base, 'en']);
+        const aliases = { ko: 'ko-kr', ja: 'ja-jp', zh: 'zh-cn', es: 'es-es', de: 'de-de', fr: 'fr-fr', id: 'id-id', ms: 'ms-my', ru: 'ru-ru' };
+        const variant = /^zh-(?:hant|hk|mo|tw)(?:-|$)/.test(current) ? 'zh-tw' : aliases[base];
+        const candidates = new Set([current, variant, base, 'en'].filter(Boolean));
         const TIMEOUT_MS = 3000;
 
         // Small helper for fetch timeouts
@@ -711,7 +713,7 @@ function addLorebookBudgetMenuItem() {
         container.appendChild(item);
         menu.appendChild(container);
     };
-    add('stlo_budget_menu_item', 'fa-scale-balanced', '로어북 예산 관리', openLorebookBudgetFromMenu);
+    add('stlo_budget_menu_item', 'fa-scale-balanced', translate('Lorebook Budget Management', 'stlo.menu.budget'), openLorebookBudgetFromMenu);
     add('stlo_jev_settings_menu_item', 'fa-scale-balanced', translate('Lorebook Jev Recall', 'stlo.jev.settingsTitle'), openJevSettings);
 }
 
@@ -1615,7 +1617,7 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                 <div class="stlo-field-heading">
                     <h4 data-i18n="stlo.modal.priority.title">Lorebook Priority</h4>
                     <details class="stlo-info">
-                        <summary aria-label="설명 보기">i</summary>
+                        <summary aria-label="Show help" data-i18n="[aria-label]stlo.ui.showHelp">i</summary>
                         <div class="stlo-info-body"><small data-i18n="stlo.modal.priority.help">Higher numbers (4-5) process first. Lower numbers (1-2) process last.</small></div>
                     </details>
                 </div>
@@ -1646,7 +1648,7 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                         <span data-i18n="stlo.modal.order.enableLabel">Enable Order Adjustment</span>
                     </label>
                     <details class="stlo-info stlo-info-end">
-                        <summary aria-label="설명 보기">i</summary>
+                        <summary aria-label="Show help" data-i18n="[aria-label]stlo.ui.showHelp">i</summary>
                         <div class="stlo-info-body"><small data-i18n="stlo.modal.order.help">Fine-tune processing order within this lorebook's priority level</small></div>
                     </details>
                     </div>
@@ -1656,7 +1658,7 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                     <div class="stlo-field-heading">
                         <h4 data-i18n="stlo.modal.order.title">Order Adjustment</h4>
                         <details class="stlo-info">
-                            <summary aria-label="설명 보기">i</summary>
+                            <summary aria-label="Show help" data-i18n="[aria-label]stlo.ui.showHelp">i</summary>
                             <div class="stlo-info-body"><small data-i18n="stlo.modal.order.explain">Higher values process first. Examples: +250 for slight boost, -500 for lower priority.</small></div>
                         </details>
                     </div>
@@ -1676,7 +1678,7 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                                 <span data-i18n="stlo.modal.order.groupOnly.label">Group Chats Only</span>
                             </label>
                             <details class="stlo-info stlo-info-end">
-                                <summary aria-label="설명 보기">i</summary>
+                                <summary aria-label="Show help" data-i18n="[aria-label]stlo.ui.showHelp">i</summary>
                                 <div class="stlo-info-body"><small data-i18n="stlo.modal.order.groupOnly.help">Only apply order adjustment during group chats (ignored in single character chats)</small></div>
                             </details>
                         </div>
@@ -1690,14 +1692,14 @@ function createBookEditor(root, currentSettings, characterAvatar, showBookJev, p
                         </div>` : ''}
                     <div class="stlo-book-vector">
                 <div class="stlo-field-heading">
-                    <h4>벡터 유사도 임계값</h4>
+                    <h4 data-i18n="stlo.vector.threshold.title">Vector similarity threshold</h4>
                     <details class="stlo-info">
-                        <summary aria-label="설명 보기">i</summary>
-                        <div class="stlo-info-body"><small>0~1 사이의 값을 입력합니다. 비워두면 전역 설정을 사용합니다. 다른 값으로 검색할 때는 요청이 추가되어 비용과 시간이 늘 수 있습니다.</small></div>
+                        <summary aria-label="Show help" data-i18n="[aria-label]stlo.ui.showHelp">i</summary>
+                        <div class="stlo-info-body"><small data-i18n="stlo.vector.threshold.help">Enter a value from 0 to 1. Leave blank to use the global setting. Different thresholds can require additional requests, time and cost.</small></div>
                     </details>
                 </div>
                 <input type="number" id="${SELECTORS.LOREBOOK_VECTOR_THRESHOLD}" class="text_pole textarea_compact"
-                       min="0" max="1" step="0.01" placeholder="미입력시 전역 설정 사용"
+                       min="0" max="1" step="0.01" placeholder="Leave blank to use global setting" data-i18n="[placeholder]stlo.vector.threshold.placeholder"
                        value="${currentSettings.vectorThresholdEnabled === true
                            && typeof currentSettings.vectorThreshold === 'number'
                            ? currentSettings.vectorThreshold : ''}">
@@ -2219,11 +2221,11 @@ function createBudgetControls(scope, currentSettings = {}) {
         <div class="stlo-field-heading">
             <h4 data-i18n="stlo.budget.title">Budget</h4>
             <details class="stlo-info">
-                <summary aria-label="설명 보기">i</summary>
+                <summary aria-label="Show help" data-i18n="[aria-label]stlo.ui.showHelp">i</summary>
                 <div class="stlo-info-body">
                     <small data-i18n="stlo.budget.unifiedHelp">Maximum this book can inject. With Jev, this amount is also prioritized for relevant entries.</small>
                     <small data-i18n="stlo.budget.unifiedTip">Unused capacity is shared. All overall budgets still apply.</small>
-                    <small>재귀 검색을 쓰면, 최종 주입에서 빠진 로어도 다른 로어를 불러오는 데 영향을 줄 수 있습니다.</small>
+                    <small data-i18n="stlo.budget.recursionHelp">With recursive scanning, lore excluded from the final prompt can still have activated other lore.</small>
                 </div>
             </details>
         </div>

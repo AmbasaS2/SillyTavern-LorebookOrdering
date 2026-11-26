@@ -40,7 +40,7 @@
   "stlo.budget.hint.percentBudget": "% бюджета мировой информации (1–100)",
   "stlo.budget.hint.percentContext": "% максимального контекста (1–100)",
   "stlo.budget.hint.fixed": "токены (>= 1)",
-  "stlo.modal.title": "📚 Упорядочивание лорбуков ST",
+  "stlo.modal.title": "📚 Lorebook Ordering for Sloths",
   "stlo.modal.priority.title": "Приоритет лорбука",
   "stlo.modal.priority.help": "Более высокие числа (4-5) обрабатываются первыми. Более низкие числа (1-2) обрабатываются последними.",
   "stlo.modal.priority.option.5": "5 - Наивысший приоритет (Обрабатывается первым)",
@@ -81,9 +81,15 @@
   "stlo.priority.desc.2": "Обработка с низким приоритетом",
   "stlo.priority.desc.1": "Обрабатывается последним",
   "stlo.priority.label": "Приоритет",
-
   "stlo.cmd.usage": "Использование: /stlo <название лорбука>",
   "stlo.cmd.notfound": "Лорбук не найден: ${0}",
   "stlo.cmd.arg.name": "название лорбука (без учета регистра)",
-  "stlo.cmd.help": "Открыть приоритет и бюджет STLO для указанного лорбука."
+  "stlo.cmd.help": "Открыть приоритет и бюджет STLO для указанного лорбука.",
+  "stlo.menu.budget": "Управление бюджетом книг знаний",
+  "stlo.ui.showHelp": "Показать справку",
+  "stlo.vector.threshold.title": "Порог векторного сходства",
+  "stlo.vector.threshold.help": "Введите значение от 0 до 1. Пустое поле использует глобальную настройку. Разные пороги могут увеличить число запросов, время и стоимость.",
+  "stlo.vector.threshold.placeholder": "Пусто: глобальная настройка",
+  "stlo.budget.recursionHelp": "При рекурсивном сканировании даже исключённая из итогового промпта запись могла активировать другие записи.",
+  "stlo.manager.title": "Lorebook Ordering for Sloths"
 }

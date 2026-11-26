@@ -40,7 +40,7 @@
   "stlo.budget.hint.percentBudget": "% des Welteninfo-Budgets (1–100)",
   "stlo.budget.hint.percentContext": "% des maximalen Kontexts (1–100)",
   "stlo.budget.hint.fixed": "Token (>= 1)",
-  "stlo.modal.title": "📚 ST Lorebook-Sortierung",
+  "stlo.modal.title": "📚 Lorebook Ordering for Sloths",
   "stlo.modal.priority.title": "Lorebook-Priorität",
   "stlo.modal.priority.help": "Höhere Zahlen (4-5) werden zuerst verarbeitet. Niedrigere Zahlen (1-2) werden zuletzt verarbeitet.",
   "stlo.modal.priority.option.5": "5 - Höchste Priorität (Wird zuerst verarbeitet)",
@@ -84,5 +84,12 @@
   "stlo.cmd.usage": "Verwendung: /stlo <Name des Lorebooks>",
   "stlo.cmd.notfound": "Lorebook nicht gefunden: ${0}",
   "stlo.cmd.arg.name": "Name des Lorebooks (Groß-/Kleinschreibung egal)",
-  "stlo.cmd.help": "Öffnet STLO-Priorität & Budget für ein bestimmtes Lorebook."
+  "stlo.cmd.help": "Öffnet STLO-Priorität & Budget für ein bestimmtes Lorebook.",
+  "stlo.menu.budget": "Lorebook-Budgetverwaltung",
+  "stlo.ui.showHelp": "Hilfe anzeigen",
+  "stlo.vector.threshold.title": "Vektorähnlichkeitsschwelle",
+  "stlo.vector.threshold.help": "Gib einen Wert zwischen 0 und 1 ein. Leer bedeutet globale Einstellung. Unterschiedliche Schwellenwerte können zusätzliche Anfragen, Zeit und Kosten verursachen.",
+  "stlo.vector.threshold.placeholder": "Leer: globale Einstellung",
+  "stlo.budget.recursionHelp": "Bei rekursiver Suche können auch ausgeschlossene Einträge andere Einträge aktiviert haben.",
+  "stlo.manager.title": "Lorebook Ordering for Sloths"
 }
