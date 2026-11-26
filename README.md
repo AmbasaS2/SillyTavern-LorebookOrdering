@@ -81,19 +81,38 @@ Book-specific controls are in Lorebook Budget Management; character-level Jev an
 
 The budget manager opens the current linked book (or the first available linked book). Use **Add lorebook** to select more attached books; **Show all lorebooks** reveals the rest. Each card collapses independently and shows priority and budget. Removing a card does not delete or unlink a book. Only changed settings are written; failed saves remain in the manager for retry. Global always-on protection is saved once for all books.
 
-| Control | When to use it |
-|---|---|
-| Lorebook priority (1–5) | Give important books first consideration. Normal is 3. |
-| Protect Always-On (상시 주입 우선 보호) | Consider constant entries first. Shared opt-in setting at the top of the budget manager, off by default. |
-| Order adjustment | Fine-tune ordering only when ordinary priority levels are not enough. |
-| Per-book budget | Set a maximum contribution for this book. With Jev, this is also its preferred share of the common budget. |
-| Random trim | Vary which already-active ordinary entries fit if the same ones always win. |
-| Vector similarity threshold (벡터 유사도 임계값) | For native vector retrieval without Jev, use a book-specific threshold or leave blank for the global setting. |
-| Jev selection | In Lorebook Jev Recall, check or uncheck Use Jev for the current character. Group chats retain the book-specific setting. |
-| Exclude this lorebook from Jev | Keep a book on native activation. Shown when Jev is enabled for the current character, or when managing group settings. |
-| Total Jev budget / NanoGPT connection profile | Configure these only when using Jev. Both are shared extension settings. |
-| Jev candidate source / advanced settings | Choose all eligible entries or native search candidates; configure the reading scope and selection prompt. Shared settings. |
-| Group chat overrides | Change priority or activation by speaking character. Ignore for one-to-one RP. |
+**Lorebook priority (1–5)**  
+Give important books first consideration. Normal is 3.
+
+**Protect Always-On (상시 주입 우선 보호)**  
+Consider constant entries first. Shared opt-in setting at the top of the budget manager, off by default.
+
+**Order adjustment**  
+Fine-tune ordering only when ordinary priority levels are not enough.
+
+**Per-book budget**  
+Set a maximum contribution for this book. With Jev, this is also its preferred share of the common budget.
+
+**Random trim**  
+Vary which already-active ordinary entries fit if the same ones always win.
+
+**Vector similarity threshold (벡터 유사도 임계값)**  
+For native vector retrieval without Jev, use a book-specific threshold or leave blank for the global setting.
+
+**Jev selection**  
+In Lorebook Jev Recall, check or uncheck Use Jev for the current character. Group chats retain the book-specific setting.
+
+**Exclude this lorebook from Jev**  
+Keep a book on native activation. Shown when Jev is enabled for the current character, or when managing group settings.
+
+**Total Jev budget / NanoGPT connection profile**  
+Configure these only when using Jev. Both are shared extension settings.
+
+**Jev candidate source / advanced settings**  
+Choose all eligible entries or native search candidates; configure the reading scope and selection prompt. Shared settings.
+
+**Group chat overrides**  
+Change priority or activation by speaking character. Ignore for one-to-one RP.
 
 ### My everyday workflow
 
@@ -106,12 +125,17 @@ Save once and continue roleplaying as usual. If a book uses too many tokens, red
 
 ## ⚙️ Priority and Order
 
-| Setting | Description |
-|---|---|
-| **Lorebook priority** | 1–5, with 3 as the default. Higher values are processed earlier. |
-| **Order adjustment** | Optional value from −10,000 to +10,000; positive values move entries earlier, negative values later. |
-| **Group chats only** | Apply the main order adjustment only during group chat turns. |
-| **Protect Always-On** | Global fork option, disabled until explicitly enabled. Gives constant entries budget priority over other entries, including Sticky cases. |
+**Lorebook priority**  
+1–5, with 3 as the default. Higher values are processed earlier.
+
+**Order adjustment**  
+Optional value from −10,000 to +10,000; positive values move entries earlier, negative values later.
+
+**Group chats only**  
+Apply the main order adjustment only during group chat turns.
+
+**Protect Always-On**  
+Global fork option, disabled until explicitly enabled. Gives constant entries budget priority over other entries, including Sticky cases.
 
 Priority and order adjustment are inherited from upstream. The processing order uses `priority × 10,000 + adjustment + entry order` (the entry order contribution is capped at 9,999). Large adjustments can cross priority bands; use small adjustments for fine-tuning. These controls affect World Info processing, not an entry's configured prompt insertion position or activation conditions.
 
@@ -131,12 +155,17 @@ Disable this option if you prefer the original priority behavior.
 
 All lorebooks share SillyTavern's global World Info budget. A per-book budget is an upper limit, not a reserved allocation.
 
-| Mode | Description |
-|---|---|
-| **Default / no separate cap** | Let the book share the global World Info budget without an extra STLO cap. |
-| **% of World Info budget** | Limit the book to 1–100% of the current World Info pool. |
-| **% of max context** | Limit it to 1–100% of the prevailing usable context size. |
-| **Fixed tokens** | Limit it to a specified positive integer number of tokens. |
+**Default / no separate cap**  
+Let the book share the global World Info budget without an extra STLO cap.
+
+**% of World Info budget**  
+Limit the book to 1–100% of the current World Info pool.
+
+**% of max context**  
+Limit it to 1–100% of the prevailing usable context size.
+
+**Fixed tokens**  
+Limit it to a specified positive integer number of tokens.
 
 For example, 25% of an 8,000-token World Info budget equals a 2,000-token per-book ceiling. A book may use less, and other books do not receive guaranteed reservations.
 
@@ -172,11 +201,14 @@ In a one-to-one character chat, an explicit On setting applies to the character 
 
 ### Three budget limits
 
-| Limit | What it controls |
-|---|---|
-| SillyTavern World Info budget | The shared World Info ceiling for the prompt. |
-| STLO per-lorebook budget | The maximum each book may contribute. |
-| Total Jev budget (default 10,000 tokens) | The shared injection ceiling across Jev-managed books (excluding outlets), counting their always-on entries first. |
+**SillyTavern World Info budget**  
+The shared World Info ceiling for the prompt.
+
+**STLO per-lorebook budget**  
+The maximum each book may contribute.
+
+**Total Jev budget (default 10,000 tokens)**  
+The shared injection ceiling across Jev-managed books (excluding outlets), counting their always-on entries first.
 
 These three limits are ceilings, not added together. An explicit per-book budget is both the book’s cap and its preferred allocation for relevant Jev-approved entries, including its always-on entries. Books with no individual cap share the remaining pool. Unused preferred space returns to the common pool. Book priority resolves competing reservations; all three ceilings still apply. Whole entries and native activation rules can leave some preferred space unused. For instance, a memory book capped at 3,000 tokens with 2,000 tokens of always-on entries has at most 1,000 tokens left for additional Jev picks, even if the total Jev budget is 10,000. Jev selects relevant entries in score order after preferred allocations, within the remaining limits; the original insertion positions/order are retained. Native special entries retain their activation rules, but their actual injected text counts toward the separate Jev ceiling. Explicit native budget exemptions remain exempt from World Info and per-book limits, not from the separate Jev ceiling in managed books. Oversized constants that cannot fit are not counted as reserved space. Native activation, recursion, and whole-entry admission can still leave some space unused.
 
@@ -224,16 +256,37 @@ Inside the same drawer, enable **Only use when an assigned character speaks** to
 
 ## 🔧 What This Fork Changes
 
-| Feature | Original STLO v2.2.4 | Current version |
-|---|---|---|
-| Jev scene-aware recall | Not included | Optional decision-model recall with shared and per-book budgets |
-| Priority, order, budget modes, random trim | Included | Retained |
-| Group-chat overrides and `/stlo` | Included | Retained |
-| Settings access | World Info editor button | Extensions-menu picker; character-linked filter and show-all |
-| Constant entries | Original order and budget behavior | Optional global always-on priority |
-| Vector similarity threshold | Native global vector setting | Optional per-lorebook threshold |
-| Settings layout | Upstream interface | Compact layout, expandable controls, clickable help |
-| Budget enforcement | Upstream implementation | Structured scan-time trimming and scan-local settings/token reuse |
+**Jev scene-aware recall**  
+**Original STLO v2.2.4**: Not included  
+**Current version**: Optional decision-model recall with shared and per-book budgets
+
+**Priority, order, budget modes, random trim**  
+**Original STLO v2.2.4**: Included  
+**Current version**: Retained
+
+**Group-chat overrides and `/stlo`**  
+**Original STLO v2.2.4**: Included  
+**Current version**: Retained
+
+**Settings access**  
+**Original STLO v2.2.4**: World Info editor button  
+**Current version**: Extensions-menu picker; character-linked filter and show-all
+
+**Constant entries**  
+**Original STLO v2.2.4**: Original order and budget behavior  
+**Current version**: Optional global always-on priority
+
+**Vector similarity threshold**  
+**Original STLO v2.2.4**: Native global vector setting  
+**Current version**: Optional per-lorebook threshold
+
+**Settings layout**  
+**Original STLO v2.2.4**: Upstream interface  
+**Current version**: Compact layout, expandable controls, clickable help
+
+**Budget enforcement**  
+**Original STLO v2.2.4**: Upstream implementation  
+**Current version**: Structured scan-time trimming and scan-local settings/token reuse
 
 [Compare the fork's code changes](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/compare/c593986c315c60292f8f4b888d1fdda65517ba6c...3ca62a5f98168cad03a6080104cb9f3a45345958) (upstream base to the documented fork code, excluding later documentation commits).
 
@@ -332,19 +385,38 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 로어북 예산 관리에서는 현재 캐릭터와 연결된 책을 기본으로 표시하고 **로어북 추가**로 다른 연결 책을 고를 수 있습니다. **모든 로어북 보기**를 켜면 다른 책도 추가할 수 있습니다. 카드마다 접기·펼치기와 우선순위·예산 요약을 지원합니다. X는 편집 목록에서만 제외하며 책이나 연결을 삭제하지 않습니다. 바꾼 설정만 저장하고, 저장 확인에 실패한 책은 다시 시도할 수 있습니다.
 
-| 설정 | 언제, 어떻게 쓰나요? |
-|---|---|
-| 로어북 우선순위 (1–5) | 중요한 책을 먼저 처리하고 싶을 때 높입니다. 기본 3. |
-| 상시 주입 우선 보호 | 로어북 예산 관리 최상단의 공통 옵션입니다. 파란불 항목의 예산을 우선 확보하며 기본 꺼짐입니다. |
-| 세부 순서 조정 | 같은 우선순위 내에서 좀 더 세밀하게 순서를 바꾸고 싶을 때만 사용합니다. |
-| 예산 | 해당 책의 최대 주입량입니다. Jev 사용 시 관련 로어에 이 예산을 우선 배정합니다. |
-| 예산 초과 시 항목을 무작위로 제외 | 이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다. |
-| 벡터 유사도 임계값 | Jev를 쓰지 않고 기존 벡터 검색을 사용할 때 책별로 검색 기준을 달리합니다. 비우면 전역값. |
-| Jev 판정 사용 | 로어북 Jev 호출에서 현재 캐릭터의 Jev 사용을 체크하거나 해제합니다. 그룹 채팅은 기존 책별 설정을 유지합니다. |
-| 이 로어북은 Jev 판정에서 제외 | 기존 발동 방식을 유지합니다. 현재 캐릭터가 Jev를 사용할 때 표시됩니다. 그룹·기존 설정 관리 예외는 유지됩니다. |
-| Jev 전체 주입 예산 / 나노GPT 연결 프로필 | Jev를 사용할 때만 설정합니다. 두 값은 공통 설정입니다. |
-| Jev 판정 대상 / 고급 설정 | 전체 항목 또는 기존 검색 후보, 인식 범위와 판정 프롬프트를 설정합니다. 공통 설정입니다. |
-| 그룹 채팅 설정 | 말하는 캐릭터에 따라 우선순위와 활성 여부를 다르게 합니다. 1:1만 하면 건드릴 필요 없습니다. |
+**로어북 우선순위 (1–5)**  
+중요한 책을 먼저 처리하고 싶을 때 높입니다. 기본 3.
+
+**상시 주입 우선 보호**  
+로어북 예산 관리 최상단의 공통 옵션입니다. 파란불 항목의 예산을 우선 확보하며 기본 꺼짐입니다.
+
+**세부 순서 조정**  
+같은 우선순위 내에서 좀 더 세밀하게 순서를 바꾸고 싶을 때만 사용합니다.
+
+**예산**  
+해당 책의 최대 주입량입니다. Jev 사용 시 관련 로어에 이 예산을 우선 배정합니다.
+
+**예산 초과 시 항목을 무작위로 제외**  
+이미 활성화된 항목 중 항상 비슷한 일반 항목만 들어갈 때 선택 순서를 섞습니다.
+
+**벡터 유사도 임계값**  
+Jev를 쓰지 않고 기존 벡터 검색을 사용할 때 책별로 검색 기준을 달리합니다. 비우면 전역값.
+
+**Jev 판정 사용**  
+로어북 Jev 호출에서 현재 캐릭터의 Jev 사용을 체크하거나 해제합니다. 그룹 채팅은 기존 책별 설정을 유지합니다.
+
+**이 로어북은 Jev 판정에서 제외**  
+기존 발동 방식을 유지합니다. 현재 캐릭터가 Jev를 사용할 때 표시됩니다. 그룹·기존 설정 관리 예외는 유지됩니다.
+
+**Jev 전체 주입 예산 / 나노GPT 연결 프로필**  
+Jev를 사용할 때만 설정합니다. 두 값은 공통 설정입니다.
+
+**Jev 판정 대상 / 고급 설정**  
+전체 항목 또는 기존 검색 후보, 인식 범위와 판정 프롬프트를 설정합니다. 공통 설정입니다.
+
+**그룹 채팅 설정**  
+말하는 캐릭터에 따라 우선순위와 활성 여부를 다르게 합니다. 1:1만 하면 건드릴 필요 없습니다.
 
 ### 평소에는 이렇게 씁니다
 
@@ -357,12 +429,17 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## ⚙️ 우선순위와 순서
 
-| 설정 | 설명 |
-|---|---|
-| **로어북 우선순위** | 1~5, 기본 3. 숫자가 클수록 먼저 처리합니다. |
-| **세부 순서 조정** | −10,000~+10,000. 양수는 앞당기고 음수는 늦춥니다. |
-| **그룹 채팅에만 적용** | 세부 순서 조정을 그룹 채팅에서만 적용합니다. |
-| **상시 주입 우선 보호** | 포크에서 추가한 전역 옵션. 직접 체크해야 적용됩니다. 상시 항목을 다른 항목보다 먼저 고려합니다. |
+**로어북 우선순위**  
+1~5, 기본 3. 숫자가 클수록 먼저 처리합니다.
+
+**세부 순서 조정**  
+−10,000~+10,000. 양수는 앞당기고 음수는 늦춥니다.
+
+**그룹 채팅에만 적용**  
+세부 순서 조정을 그룹 채팅에서만 적용합니다.
+
+**상시 주입 우선 보호**  
+포크에서 추가한 전역 옵션. 직접 체크해야 적용됩니다. 상시 항목을 다른 항목보다 먼저 고려합니다.
 
 별도 우선순위나 세부 순서 조정을 설정하지 않은 경우 실리태번의 기본 로어북 순서를 유지합니다. 원본의 처리 순서 계산은 `우선순위 × 10,000 + 세부 순서값 + 항목 순서`입니다(항목 순서값의 상한은 9,999). 큰 조정값은 다른 우선순위 단계에도 영향을 줄 수 있습니다. 우선순위는 월드 정보 처리 순서이며 항목의 프롬프트 삽입 위치나 활성화 조건을 바꾸지 않습니다.
 
@@ -380,12 +457,17 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 모든 로어북은 전체 월드 정보 예산을 공유합니다. 개별 예산은 미리 확보되는 공간이 아니라 해당 로어북의 최대 사용량입니다.
 
-| 예산 종류 | 설명 |
-|---|---|
-| **개별 제한 없음 (전체 예산 공유)** | 별도 STLO 제한을 추가하지 않습니다. |
-| **전체 월드 정보 예산의 비율 (%)** | 전체 월드 정보 예산의 1~100%를 최대치로 설정합니다. |
-| **최대 컨텍스트 크기의 비율 (%)** | 현재 사용 가능 컨텍스트의 1~100%를 최대치로 설정합니다. |
-| **직접 토큰 수 지정** | 양의 정수 토큰 수를 최대치로 지정합니다. |
+**개별 제한 없음 (전체 예산 공유)**  
+별도 STLO 제한을 추가하지 않습니다.
+
+**전체 월드 정보 예산의 비율 (%)**  
+전체 월드 정보 예산의 1~100%를 최대치로 설정합니다.
+
+**최대 컨텍스트 크기의 비율 (%)**  
+현재 사용 가능 컨텍스트의 1~100%를 최대치로 설정합니다.
+
+**직접 토큰 수 지정**  
+양의 정수 토큰 수를 최대치로 지정합니다.
 
 예를 들어 전체 월드 정보 예산이 8,000토큰이고 어떤 책을 25%로 설정했다면, 그 책은 최대 2,000토큰을 사용할 수 있습니다. 실제 주입량은 더 적을 수 있습니다.
 
@@ -423,11 +505,14 @@ Jev는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모�
 
 ### 예산은 세 가지를 함께 적용합니다
 
-| 설정 | 역할 |
-|---|---|
-| 실리태번 전체 월드 정보 예산 | 모든 로어북이 공유하는 전체 상한 |
-| STLO 로어북별 예산 | 각 책의 최대 사용량 |
-| Jev 전체 주입 예산 (기본 10,000토큰) | Jev 적용 책들의 실제 주입 상한(Outlet 제외). 그 책들의 상시 항목부터 계산 |
+**실리태번 전체 월드 정보 예산**  
+모든 로어북이 공유하는 전체 상한
+
+**STLO 로어북별 예산**  
+각 책의 최대 사용량
+
+**Jev 전체 주입 예산 (기본 10,000토큰)**  
+Jev 적용 책들의 실제 주입 상한(Outlet 제외). 그 책들의 상시 항목부터 계산
 
 예를 들어 메모리북 개별 예산이 3,000토큰이고 파란불 기억이 2,000토큰이라면, Jev 전체 주입 예산을 10,000으로 설정해도 그 책에서 Jev가 추가 선택할 수 있는 기억은 최대 1,000토큰입니다. 별도의 우선 배정 예산 없이 기존 로어북별 예산을 Jev가 선택한 관련 항목에 먼저 사용합니다. 상시 항목을 포함하며 쓰지 못한 몫은 공통 예산으로 반환합니다. 배정이 겹치면 책 중요도를 따릅니다. 세 가지 상한과 항목 단위 주입 조건은 유지됩니다. 우선 배정 이후 남은 예산은 판정 점수순으로 채우고, 원래의 프롬프트 삽입 위치와 순서 설정은 유지합니다. 특수 항목의 발동 규칙은 유지되며 실제 주입된 본문은 Jev 예산에 포함됩니다. 기존 예산 무시 항목은 월드 정보·책별 예산의 예외를 유지하지만 Jev 적용 책의 별도 총예산에는 포함됩니다. 예산에 들어갈 수 없는 상시 항목은 미리 확보하지 않습니다. 기존 발동·재귀 규칙과 항목 단위 주입으로 남는 공간이 있을 수 있습니다.
 
@@ -475,16 +560,37 @@ Jev를 사용하지 않을 때 기존 벡터화된 로어북을 검색하는 유
 
 ## 🔧 원본과 달라진 점
 
-| 기능 | 원본 STLO v2.2.4 | 포크 |
-|---|---|---|
-| Jev 로어 선택 | 미포함 | 현재 장면에 필요한 로어 판정 및 예산 내 주입 |
-| 우선순위·세부 순서·예산·랜덤 트리밍 | 지원 | 유지 |
-| 그룹 채팅 설정, /stlo | 지원 | 유지 |
-| 설정 접근 | 월드 정보 편집기 버튼 | 확장 메뉴, 현재 캐릭터 연결 책 필터 |
-| 상시 주입 | 기존 순서·예산 처리 | 전역 우선 보호 선택 추가 |
-| 벡터 유사도 임계값 | ST 전역 설정 | 로어북별 설정 선택 추가 |
-| 설정 UI | 기존 구성 | 좁은 화면에 맞춘 구성, 클릭형 도움말 |
-| 예산 트리밍 | 기존 구현 | 활성화 항목 구조에서 제외, 스캔 내 설정·토큰 계산 재사용 |
+**Jev 로어 선택**  
+**원본 STLO v2.2.4**: 미포함  
+**포크**: 현재 장면에 필요한 로어 판정 및 예산 내 주입
+
+**우선순위·세부 순서·예산·랜덤 트리밍**  
+**원본 STLO v2.2.4**: 지원  
+**포크**: 유지
+
+**그룹 채팅 설정, /stlo**  
+**원본 STLO v2.2.4**: 지원  
+**포크**: 유지
+
+**설정 접근**  
+**원본 STLO v2.2.4**: 월드 정보 편집기 버튼  
+**포크**: 확장 메뉴, 현재 캐릭터 연결 책 필터
+
+**상시 주입**  
+**원본 STLO v2.2.4**: 기존 순서·예산 처리  
+**포크**: 전역 우선 보호 선택 추가
+
+**벡터 유사도 임계값**  
+**원본 STLO v2.2.4**: ST 전역 설정  
+**포크**: 로어북별 설정 선택 추가
+
+**설정 UI**  
+**원본 STLO v2.2.4**: 기존 구성  
+**포크**: 좁은 화면에 맞춘 구성, 클릭형 도움말
+
+**예산 트리밍**  
+**원본 STLO v2.2.4**: 기존 구현  
+**포크**: 활성화 항목 구조에서 제외, 스캔 내 설정·토큰 계산 재사용
 
 [원본 기반 코드와 포크 코드 비교](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/compare/c593986c315c60292f8f4b888d1fdda65517ba6c...3ca62a5f98168cad03a6080104cb9f3a45345958)
 
