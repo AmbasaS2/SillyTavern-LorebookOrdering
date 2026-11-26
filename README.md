@@ -38,7 +38,7 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 <details>
 <summary>View the workflow</summary>
 
-<p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="520"></p>
+<p align="left"><img src="assets/readme/mobile/actual-extension-menu.jpg" alt="Extensions menu — actual interface" width="278" /></p>
 
 </details>
 
@@ -55,16 +55,15 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 
 ## 📖 How to use
 
+> Screenshots show the installed extension in an isolated SillyTavern 1.19.1 test instance with sample lorebooks. No external AI request or personal chat data was used.
+
 ### 1. Open Lorebook Budget Management
 
-<p align="center"><img src="assets/readme/mobile/stlo-settings-guide-mobile.svg" alt="Multi-book budget manager / 로어북 예산 관리" width="520" /></p>
+<p align="left"><img src="assets/readme/mobile/actual-budget-settings.jpg" alt="Actual lorebook budget manager with example books" width="400" /></p>
 
 <details>
 <summary>View the workflow</summary>
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-workflow-guide-mobile.svg"><img src="assets/readme/mobile/stlo-workflow-guide-mobile.svg" alt="STLO workflow: select a lorebook, set priority and budget, optionally use Jev or vector recall, save / 설정 흐름" width="520" /></a>
-</p>
 
 </details>
 
@@ -146,9 +145,7 @@ Disable this option if you prefer the original priority behavior.
 
 ### 3. Per-lorebook token budget
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-budget-guide-mobile.svg"><img src="assets/readme/mobile/stlo-budget-guide-mobile.svg" alt="Four inherited token budget modes and the fork's global always-on priority / 개별 예산과 상시 주입 우선 보호" width="520" /></a>
-</p>
+<p align="left"><img src="assets/readme/mobile/actual-book-budget.jpg" alt="Actual fixed-token budget card, 2,000 tokens" width="390" /></p>
 
 All lorebooks share SillyTavern's global World Info budget. A per-book budget is an upper limit, not a reserved allocation.
 
@@ -172,9 +169,6 @@ The fork trims structured activated entries before the final prompt is assembled
 
 ### 4. Optional Jev recall — scene-aware lore selection
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-jev-guide-mobile.svg"><img src="assets/readme/mobile/stlo-jev-guide-mobile.svg" alt="Jev recall: current scene, relevant lore selection, token budgets, usual RP reply / Jev가 장면에 필요한 로어를 선택하는 과정" width="520" /></a>
-</p>
 
 Jev recall is the main new retrieval feature of this fork. Instead of relying solely on keyword matches or embedding similarity, STLO asks [TypeSafe Jev 1.14](https://nano-gpt.com/models/decisions/typesafe/jev-1.14) to decide which eligible lore entries would actually help with the current roleplay scene. For example, an old promise, a shared joke, an unresolved disagreement, or a character-specific habit may be relevant even if the latest message does not repeat the same words.
 
@@ -182,12 +176,14 @@ Jev is a decision model, not the model that writes the RP response. STLO sends s
 
 #### Setup
 
-<p align="center"><img src="assets/readme/mobile/stlo-jev-settings-guide-mobile.svg" alt="Separate Jev settings / 로어북 Jev 호출" width="520" /></p>
+<p align="left"><img src="assets/readme/mobile/actual-jev-settings.jpg" alt="Actual Jev settings — no API key or profile connected" width="400" /></p>
 
 1. In NanoGPT, create or use an API key for your subscription. Set the key's **Billing → Subscription only** to prevent spending your account balance.
 2. In SillyTavern, save a **Chat Completion → Custom (OpenAI-compatible)** connection profile using the base URL `https://nano-gpt.com/api/subscription/v1` and that key. The profile must have a saved credential bound to this endpoint. The ordinary NanoGPT endpoint or a native NanoGPT connection profile is not selectable for Jev in this implementation.
 3. Open a one-to-one character chat, then **Extensions menu → Lorebook Jev Recall**. Check **Use Jev**. Select your saved **NanoGPT connection profile**, set **Total injection budget (tokens)**, and save. No lorebook selection is required.
 4. Continue your RP normally. The extension requests `typesafe/jev-1.14` automatically; it does not replace your main API or require you to change the profile's saved chat model to Jev.
+
+> 🦥 **Why NanoGPT only?** I was too lazy to install an extra server plugin, so I implemented Jev through NanoGPT’s subscription endpoint only. Now I’m (very lazily) waiting for SillyTavern to support Jev natively.
 
 In a one-to-one character chat, an explicit On setting applies to the character and covers eligible entries from all active, non-excluded lorebooks. Off disables Jev for that character. Group chats retain book-specific opt-ins, with the group control in Lorebook Budget Management. The total Jev budget, connection profile and advanced options remain shared extension settings. The prompt library offers named presets, full editor, save, rename, save as, import/export and delete; changes are applied with the outer Save Settings button. Jev defaults to off for characters without an explicit choice, even if a book has an old Jev opt-in. The book flag remains available for group chats. Older separate Jev reserve values are retained in the saved book but ignored; the existing book budget now controls both its cap and preferred share.
 
@@ -229,9 +225,7 @@ The request sends recent dialogue, ordinary always-on background and candidate l
 
 ### 5. Optional per-lorebook vector similarity threshold
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-vector-guide-mobile.svg"><img src="assets/readme/mobile/stlo-vector-guide-mobile.svg" alt="Optional vector similarity thresholds, query groups, one global result cap and token budget distinction / 벡터 검색 조건과 예산 구분" width="520" /></a>
-</p>
+<p align="left"><img src="assets/readme/mobile/actual-book-advanced.jpg" alt="Actual advanced book settings and vector threshold" width="390" /></p>
 
 When Jev is not used, this option applies to native World Info vector retrieval; it does not replace SillyTavern's Vector Storage configuration or enable vectorization for you.
 
@@ -366,16 +360,15 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## 📖 사용 설명서
 
-### 1. 로어북 예산 관리 메뉴 열기
+> 아래 화면은 실리태번 1.19.1 테스트 환경에서 실제 확장을 열어 예시 로어북으로 캡처했습니다. 외부 AI 호출이나 개인 대화 데이터는 사용하지 않았습니다.
 
-<p align="center"><img src="assets/readme/mobile/stlo-settings-guide-mobile.svg" alt="여러 로어북 카드 / Multi-book budget manager" width="520" /></p>
+### 1. 로어북 예산 관리기 메뉴 열기
+
+<p align="left"><img src="assets/readme/mobile/actual-budget-settings.jpg" alt="Actual lorebook budget manager with example books" width="400" /></p>
 
 <details>
 <summary>사용 흐름 그림으로 보기</summary>
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-workflow-guide-mobile.svg"><img src="assets/readme/mobile/stlo-workflow-guide-mobile.svg" alt="로어북 선택, 우선순위, 예산, 검색 조건과 설정 저장" width="520" /></a>
-</p>
 
 </details>
 
@@ -458,9 +451,7 @@ Sticky 항목도 고려하고, 실제 삽입 순서값은 변경하지 않습니
 
 ### 3. 로어북별 예산
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-budget-guide-mobile.svg"><img src="assets/readme/mobile/stlo-budget-guide-mobile.svg" alt="원본의 네 가지 토큰 예산과 포크의 상시 주입 우선 보호" width="520" /></a>
-</p>
+<p align="left"><img src="assets/readme/mobile/actual-book-budget.jpg" alt="Actual fixed-token budget card, 2,000 tokens" width="390" /></p>
 
 모든 로어북은 전체 월드 정보 예산을 공유합니다. 개별 예산은 미리 확보되는 공간이 아니라 해당 로어북의 최대 사용량입니다.
 
@@ -486,9 +477,6 @@ Sticky 항목도 고려하고, 실제 삽입 순서값은 변경하지 않습니
 
 월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제로 발동한 Jev 로어에 🔮 표시가 붙습니다. 별도 검색이나 AI 호출은 없으며, 두 확장은 각각 단독 사용도 가능합니다.
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-jev-guide-mobile.svg"><img src="assets/readme/mobile/stlo-jev-guide-mobile.svg" alt="Jev recall: current scene, relevant lore selection, token budgets, usual RP reply / Jev가 장면에 필요한 로어를 선택하는 과정" width="520" /></a>
-</p>
 
 포크의 핵심 추가 기능입니다. 키워드가 일치하거나 벡터 유사도가 높은 로어를 찾는 것에 그치지 않고, [TypeSafe Jev 1.14](https://nano-gpt.com/models/decisions/typesafe/jev-1.14)가 현재 RP에 실제로 도움이 될 로어인지 항목별로 판정합니다. 예전의 약속이나 둘만의 농담, 풀리지 않은 갈등, 캐릭터의 습관처럼 같은 단어가 나오지 않아도 지금 장면에 필요한 기억을 선택할 수 있도록 했습니다.
 
@@ -496,12 +484,14 @@ Jev는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모�
 
 #### 사용 설정
 
-<p align="center"><img src="assets/readme/mobile/stlo-jev-settings-guide-mobile.svg" alt="별도 Jev 호출 설정 / Jev Recall" width="520" /></p>
+<p align="left"><img src="assets/readme/mobile/actual-jev-settings.jpg" alt="Actual Jev settings — no API key or profile connected" width="400" /></p>
 
 1. 나노GPT에서 구독용 API 키를 준비합니다. 잔액 결제를 막으려면 해당 키의 **Billing → Subscription only**를 설정하세요.
 2. 실리태번 API 연결에서 **Chat Completion → Custom (OpenAI-compatible)**을 선택하고 주소를 `https://nano-gpt.com/api/subscription/v1`로 지정합니다. 해당 주소에 키가 저장된 연결 프로필을 만듭니다. 일반 나노GPT API 주소나 실리태번의 NanoGPT 전용 연결 방식은 현재 Jev 프로필 선택 대상이 아닙니다.
 3. 1:1 캐릭터 채팅을 열고 **확장 메뉴 → 로어북 Jev 호출**에서 **Jev 사용**을 체크합니다. **나노GPT 연결 프로필**과 **전체 주입 예산 (토큰)**을 지정한 뒤 설정을 저장합니다. 로어북을 선택할 필요는 없습니다.
 4. 평소처럼 RP를 이어갑니다. STLO가 판정용 모델 `typesafe/jev-1.14`를 자동 지정하므로 메인 RP API나 저장한 프로필의 일반 채팅 모델을 Jev로 바꿀 필요가 없습니다.
+
+> 🦥 **왜 나노GPT만 지원하나요?** 제가 별도 서버 플러그인까지 설치하기 귀찮아서 나노GPT 구독 경로로만 구현했습니다. 실리태번이 언젠가 Jev를 자체 지원해 주길 느긋하게 기다리는 중입니다. (게으름뱅이의 소원)
 
 1:1 채팅에서는 현재 캐릭터별로 켜고 끌 수 있습니다.  
 Jev 사용을 체크하면 그 캐릭터의 현재 채팅에서 활성화된 로어북 중 제외 설정이 없는 책의 적격 항목을 판정합니다.  
@@ -551,9 +541,7 @@ Jev를 켜면 최근 대화, 일반 상시 주입 배경, 로어 본문이 외�
 
 ### 5. 선택 기능: 로어북별 벡터 유사도 임계값
 
-<p align="center">
-  <a href="assets/readme/mobile/stlo-vector-guide-mobile.svg"><img src="assets/readme/mobile/stlo-vector-guide-mobile.svg" alt="개별 벡터 임계값, 전역 결과 한도, 토큰 예산과 검색 조건의 차이" width="520" /></a>
-</p>
+<p align="left"><img src="assets/readme/mobile/actual-book-advanced.jpg" alt="Actual advanced book settings and vector threshold" width="390" /></p>
 
 Jev를 사용하지 않을 때 기존 벡터화된 로어북을 검색하는 유사도 기준입니다. 실리태번의 벡터 저장소 설정 자체를 대체하거나 로어북을 자동으로 벡터화하지 않습니다.
 
