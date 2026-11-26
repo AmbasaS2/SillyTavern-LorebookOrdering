@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="610" viewBox="0 0 480 610" role="img">
+<title>실제 UI 기반 예산 관리 목업 / Budget manager mock-up</title>
+<style>text{font-family:'Noto Sans CJK KR', 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif;} .t{font-size:19px;font-weight:650;fill:#293440} .en{font-size:13px;fill:#687681}</style>
+<rect x="0" y="0" width="480" height="610" rx="13" fill="#f0f3f3"/>
+<rect x="12" y="12" width="456" height="586" rx="12" fill="#ffffff" stroke="#d9e0e5" stroke-width="1"/>
+<path d="M35 30v16m-7 0h14m-16 -12h18m-15 0l-4 8h8zm14 0l-4 8h8z" fill="none" stroke="#577f70" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="55" y="35" font-size="18" font-weight="650" fill="#293440" text-anchor="start">로어북 예산 관리기</text>
+<text x="55" y="53" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Lorebook Ordering: Curator</text>
+<path d="M440 33l10 10m0 -10l-10 10" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M24 66L456 66" fill="none" stroke="#d9e0e5" stroke-width="1" stroke-linecap="round"/>
+<rect x="28" y="82" width="19" height="19" rx="4" fill="#ffffff" stroke="#a5b1b9" stroke-width="1.4"/>
+<text x="57" y="98" font-size="16" font-weight="650" fill="#293440" text-anchor="start">상시 주입 우선 보호</text>
+<text x="57" y="116" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Protect always-on entries first</text>
+<rect x="28" y="131" width="19" height="19" rx="4" fill="#577f70" stroke="#577f70" stroke-width="1.4"/>
+<path d="M32.5 140.5l4 4 8-8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="57" y="147" font-size="16" font-weight="650" fill="#293440" text-anchor="start">모든 로어북 보기</text>
+<text x="57" y="165" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Show all lorebooks</text>
+<rect x="24" y="178" width="432" height="329" rx="8" fill="#f3f6f8" stroke="#d9e0e5" stroke-width="1"/>
+<path d="M37 197l4 4 4 -4" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="57" y="204" font-size="18" font-weight="650" fill="#293440" text-anchor="start">Memory</text>
+<rect x="303" y="186" width="137" height="25" rx="5" fill="#e5eee9"/>
+<text x="371.5" y="203" font-size="13" font-weight="650" fill="#577f70" text-anchor="middle">2,000 tokens</text>
+<path d="M430 225l10 10m0 -10l-10 10" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="38" y="251" font-size="15" font-weight="650" fill="#293440" text-anchor="start">로어북 우선순위</text>
+<text x="38" y="269" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Lorebook priority</text>
+<rect x="38" y="279" width="404" height="42" rx="6" fill="#f3f6f8" stroke="#d9e0e5" stroke-width="1"/>
+<text x="50" y="305" font-size="16" font-weight="400" fill="#293440" text-anchor="start">3 · 기본 / Normal</text>
+<path d="M423 297l4 4 4 -4" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="38" y="342" font-size="15" font-weight="650" fill="#293440" text-anchor="start">로어북 주입 예산</text>
+<text x="38" y="360" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Lorebook injection budget</text>
+<rect x="38" y="370" width="404" height="42" rx="6" fill="#f3f6f8" stroke="#d9e0e5" stroke-width="1"/>
+<text x="50" y="396" font-size="16" font-weight="400" fill="#293440" text-anchor="start">직접 토큰 수 지정 / Fixed tokens</text>
+<path d="M423 388l4 4 4 -4" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="38" y="421" width="166" height="35" rx="5" fill="#ffffff" stroke="#d9e0e5" stroke-width="1"/>
+<text x="50" y="444" font-size="17" font-weight="650" fill="#293440" text-anchor="start">2,000</text>
+<path d="M41 478l4 4 4 -4" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="62" y="479" font-size="15" font-weight="650" fill="#293440" text-anchor="start">고급 설정</text>
+<text x="62" y="497" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Advanced settings</text>
+<rect x="24" y="519" width="432" height="40" rx="6" fill="#f3f6f8" stroke="#d9e0e5" stroke-width="1"/>
+<text x="240.0" y="536" font-size="15" font-weight="650" fill="#293440" text-anchor="middle">＋ 로어북 추가</text>
+<text x="240.0" y="550" font-size="11" font-weight="400" fill="#687681" text-anchor="middle">Add lorebook</text>
+<rect x="252" y="555" width="204" height="40" rx="6" fill="#577f70" stroke="#577f70" stroke-width="1"/>
+<text x="354.0" y="572" font-size="15" font-weight="650" fill="#ffffff" text-anchor="middle">설정 저장</text>
+<text x="354.0" y="586" font-size="11" font-weight="400" fill="#e5eeee" text-anchor="middle">Save settings</text>
+</svg>

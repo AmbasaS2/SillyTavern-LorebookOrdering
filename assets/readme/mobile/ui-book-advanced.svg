@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="312" viewBox="0 0 480 312" role="img">
+<title>책별 고급 설정 / Advanced book settings</title>
+<style>text{font-family:'Noto Sans CJK KR', 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif;} .t{font-size:19px;font-weight:650;fill:#293440} .en{font-size:13px;fill:#687681}</style>
+<rect x="0" y="0" width="480" height="312" rx="13" fill="#f0f3f3"/>
+<rect x="12" y="12" width="456" height="288" rx="12" fill="#ffffff" stroke="#d9e0e5" stroke-width="1"/>
+<circle cx="35" cy="39" r="5" fill="none" stroke="#577f70" stroke-width="2"/>
+<path d="M35 45L35 48" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<path d="M41 39L44 39" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<path d="M35 33L35 30" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<path d="M29 39L26 39" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<path d="M39.242 43.242L41.363 45.363" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<path d="M30.758 43.242L28.637 45.363" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<path d="M39.242 34.758L41.363 32.637" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<path d="M30.758 34.758L28.637 32.637" fill="none" stroke="#577f70" stroke-width="2" stroke-linecap="round"/>
+<text x="55" y="35" font-size="18" font-weight="650" fill="#293440" text-anchor="start">고급 설정</text>
+<text x="55" y="53" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Advanced settings</text>
+<path d="M440 33l10 10m0 -10l-10 10" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M24 66L456 66" fill="none" stroke="#d9e0e5" stroke-width="1" stroke-linecap="round"/>
+<rect x="28" y="88" width="19" height="19" rx="4" fill="#ffffff" stroke="#a5b1b9" stroke-width="1.4"/>
+<text x="57" y="104" font-size="16" font-weight="650" fill="#293440" text-anchor="start">순서 조정 사용</text>
+<text x="57" y="122" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Enable Order Adjustment</text>
+<rect x="28" y="141" width="19" height="19" rx="4" fill="#577f70" stroke="#577f70" stroke-width="1.4"/>
+<path d="M32.5 150.5l4 4 8-8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="57" y="157" font-size="16" font-weight="650" fill="#293440" text-anchor="start">벡터 유사도 임계값</text>
+<text x="57" y="175" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Vector similarity threshold</text>
+<rect x="29" y="190" width="422" height="43" rx="6" fill="#f3f6f8" stroke="#d9e0e5" stroke-width="1"/>
+<text x="42" y="217" font-size="17" font-weight="650" fill="#293440" text-anchor="start">0.65</text>
+<path d="M26 249L454 249" fill="none" stroke="#d9e0e5" stroke-width="1" stroke-linecap="round"/>
+<path d="M32 266l4 4 4 -4" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="53" y="270" font-size="16" font-weight="650" fill="#293440" text-anchor="start">그룹 채팅 설정</text>
+<text x="53" y="288" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Group Chat Overrides</text>
+</svg>

@@ -18,7 +18,7 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
    ```
 
 3. Install and reload SillyTavern. Use a recent SillyTavern version with the `WORLDINFO_SCAN_DONE` event (e.g. the 1.18 series) for Jev and per-lorebook budget trimming.
-4. Open **Extensions menu → 로어북 예산 관리기 (Lorebook Ordering: Curator)**, edit one or more lorebooks in collapsible cards, then save them together. For character-level Jev activation and shared settings, open **Lorebook Jev Recall** directly from the extensions menu.
+4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, edit one or more lorebooks in collapsible cards, then save them together. For character-level Jev activation and shared settings, open **Lorebook Jev Recall** directly from the extensions menu.
 
 ## Who is this for?
 
@@ -33,19 +33,19 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 
 ## ⚡ Quick start
 
-**Current version: 2.2.4-ambasa.2.** World Info supplies facts and memories to your RP model. STLO manages each book's priority and maximum token contribution. Optional Jev chooses relevant entries based on the current scene. Ordinary budget management needs neither Jev nor Memory Books.
+**Current version: 2.2.4-ambasa.3.** World Info supplies facts and memories to your RP model. STLO manages each book's priority and maximum token contribution. Optional Jev chooses relevant entries based on the current scene. Ordinary budget management needs neither Jev nor Memory Books.
 
 <details>
 <summary>View the workflow</summary>
 
-<p align="left"><img src="assets/readme/mobile/actual-extension-menu.jpg" alt="Extensions menu — actual interface" width="278" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-extension-menu.svg" alt="확장 메뉴 / Extensions menu" width="320" /></p>
 
 </details>
 
 **A. Budget management (no Jev required)**
 
 1. Install only this fork and reload. Use SillyTavern 1.18 with the structured World Info scan event for budget trimming and Jev.
-2. Open Extensions → Lorebook Ordering: Curator. Add books; set priority (1–5), cap and optional Protect Always-On. Save.
+2. Open Extensions → 로어북 예산 관리 (Lorebook Budget Management). Add books; set priority (1–5), cap and optional Protect Always-On. Save.
 3. Generate a normal RP reply. If you use WorldInfo Info, open the floating book to check activated entries. If native keyword/vector recall works for you, stop here.
 
 **B. Optional scene-aware recall with Jev**
@@ -55,11 +55,11 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 
 ## 📖 How to use
 
-> Screenshots show the installed extension in an isolated SillyTavern 1.19.1 test instance with sample lorebooks. No external AI request or personal chat data was used.
+> The bilingual illustrations are simplified UI mock-ups based on the extension controls in SillyTavern, not screenshots. Values and lorebooks are illustrative examples.
 
 ### 1. Open Lorebook Budget Management
 
-<p align="left"><img src="assets/readme/mobile/actual-budget-settings.jpg" alt="Actual lorebook budget manager with example books" width="400" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-budget-manager.svg" alt="예산 관리 화면 / Budget manager" width="400" /></p>
 
 <details>
 <summary>View the workflow</summary>
@@ -145,7 +145,7 @@ Disable this option if you prefer the original priority behavior.
 
 ### 3. Per-lorebook token budget
 
-<p align="left"><img src="assets/readme/mobile/actual-book-budget.jpg" alt="Actual fixed-token budget card, 2,000 tokens" width="390" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-budget-modes.svg" alt="예산 방식 선택 / Budget mode selector" width="400" /></p>
 
 All lorebooks share SillyTavern's global World Info budget. A per-book budget is an upper limit, not a reserved allocation.
 
@@ -176,7 +176,7 @@ Jev is a decision model, not the model that writes the RP response. STLO sends s
 
 #### Setup
 
-<p align="left"><img src="assets/readme/mobile/actual-jev-settings.jpg" alt="Actual Jev settings — no API key or profile connected" width="400" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-jev-settings.svg" alt="Jev 설정 / Jev settings" width="400" /></p>
 
 1. In NanoGPT, create or use an API key for your subscription. Set the key's **Billing → Subscription only** to prevent spending your account balance.
 2. In SillyTavern, save a **Chat Completion → Custom (OpenAI-compatible)** connection profile using the base URL `https://nano-gpt.com/api/subscription/v1` and that key. The profile must have a saved credential bound to this endpoint. The ordinary NanoGPT endpoint or a native NanoGPT connection profile is not selectable for Jev in this implementation.
@@ -225,7 +225,7 @@ The request sends recent dialogue, ordinary always-on background and candidate l
 
 ### 5. Optional per-lorebook vector similarity threshold
 
-<p align="left"><img src="assets/readme/mobile/actual-book-advanced.jpg" alt="Actual advanced book settings and vector threshold" width="390" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-book-advanced.svg" alt="고급 설정 / Advanced book settings" width="400" /></p>
 
 When Jev is not used, this option applies to native World Info vector retrieval; it does not replace SillyTavern's Vector Storage configuration or enable vectorization for you.
 
@@ -330,7 +330,7 @@ Some fork-specific controls currently use Korean-only UI labels.
    ```
 
 3. 설치 후 새로고침합니다. Jev 및 로어북별 예산 트리밍은 `WORLDINFO_SCAN_DONE`을 지원하는 최근 버전(예: 1.18 계열)을 권장합니다.
-4. **확장 메뉴 → 로어북 예산 관리기**에서 필요한 로어북을 카드로 추가하고 예산·우선순위를 한 번에 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **로어북 Jev 호출**에서 바로 변경합니다.
+4. **확장 메뉴 → 로어북 예산 관리**에서 필요한 로어북을 카드로 추가하고 예산·우선순위를 한 번에 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **로어북 Jev 호출**에서 바로 변경합니다.
 
 ## 💗 이 확장 누가 쓰지?
 
@@ -345,12 +345,12 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 2.2.4-ambasa.2.** 로어북은 RP 모델에게 설정과 기억을 전달합니다. STLO는 책별 우선순위와 최대 주입량을 정하고, 선택 기능인 Jev로 장면에 필요한 항목을 고릅니다. 예산 관리만 쓰려면 메모리북이나 Jev 연결이 필요 없습니다.
+**현재 버전: 2.2.4-ambasa.3.** 로어북은 RP 모델에게 설정과 기억을 전달합니다. STLO는 책별 우선순위와 최대 주입량을 정하고, 선택 기능인 Jev로 장면에 필요한 항목을 고릅니다. 예산 관리만 쓰려면 메모리북이나 Jev 연결이 필요 없습니다.
 
 **A. 기본 예산 관리만 사용하기 (Jev 불필요)**
 
 1. 원본과 동시에 켜지 말고 설치·새로고침합니다. 예산 트리밍과 Jev는 구조화된 스캔 이벤트가 있는 실리태번 1.18 계열을 기준으로 합니다.
-2. 확장 메뉴 → 로어북 예산 관리기 → 책 추가 → 우선순위(1~5)·예산·선택적 상시 주입 우선 보호 → 저장.
+2. 확장 메뉴 → 로어북 예산 관리 → 책 추가 → 우선순위(1~5)·예산·선택적 상시 주입 우선 보호 → 저장.
 3. 평소처럼 롤플하세요. 월드인포인포를 함께 쓴다면 책 버튼으로 발동 로어를 확인합니다. 기본 키워드·벡터로 충분하면 여기까지!
 
 **B. 선택: Jev까지 사용하기**
@@ -360,11 +360,11 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## 📖 사용 설명서
 
-> 아래 화면은 실리태번 1.19.1 테스트 환경에서 실제 확장을 열어 예시 로어북으로 캡처했습니다. 외부 AI 호출이나 개인 대화 데이터는 사용하지 않았습니다.
+> 안내 이미지는 실제 실리태번 확장의 조작 화면을 바탕으로 정리한 한영 병기 UI 목업입니다. 설정값과 로어북은 이해를 돕기 위한 예시입니다.
 
 ### 1. 로어북 예산 관리기 메뉴 열기
 
-<p align="left"><img src="assets/readme/mobile/actual-budget-settings.jpg" alt="Actual lorebook budget manager with example books" width="400" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-budget-manager.svg" alt="예산 관리 화면 / Budget manager" width="400" /></p>
 
 <details>
 <summary>사용 흐름 그림으로 보기</summary>
@@ -451,7 +451,7 @@ Sticky 항목도 고려하고, 실제 삽입 순서값은 변경하지 않습니
 
 ### 3. 로어북별 예산
 
-<p align="left"><img src="assets/readme/mobile/actual-book-budget.jpg" alt="Actual fixed-token budget card, 2,000 tokens" width="390" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-budget-modes.svg" alt="예산 방식 선택 / Budget mode selector" width="400" /></p>
 
 모든 로어북은 전체 월드 정보 예산을 공유합니다. 개별 예산은 미리 확보되는 공간이 아니라 해당 로어북의 최대 사용량입니다.
 
@@ -484,7 +484,7 @@ Jev는 RP 답변을 작성하는 모델이 아니라 선택을 판정하는 모�
 
 #### 사용 설정
 
-<p align="left"><img src="assets/readme/mobile/actual-jev-settings.jpg" alt="Actual Jev settings — no API key or profile connected" width="400" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-jev-settings.svg" alt="Jev 설정 / Jev settings" width="400" /></p>
 
 1. 나노GPT에서 구독용 API 키를 준비합니다. 잔액 결제를 막으려면 해당 키의 **Billing → Subscription only**를 설정하세요.
 2. 실리태번 API 연결에서 **Chat Completion → Custom (OpenAI-compatible)**을 선택하고 주소를 `https://nano-gpt.com/api/subscription/v1`로 지정합니다. 해당 주소에 키가 저장된 연결 프로필을 만듭니다. 일반 나노GPT API 주소나 실리태번의 NanoGPT 전용 연결 방식은 현재 Jev 프로필 선택 대상이 아닙니다.
@@ -541,7 +541,7 @@ Jev를 켜면 최근 대화, 일반 상시 주입 배경, 로어 본문이 외�
 
 ### 5. 선택 기능: 로어북별 벡터 유사도 임계값
 
-<p align="left"><img src="assets/readme/mobile/actual-book-advanced.jpg" alt="Actual advanced book settings and vector threshold" width="390" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-book-advanced.svg" alt="고급 설정 / Advanced book settings" width="400" /></p>
 
 Jev를 사용하지 않을 때 기존 벡터화된 로어북을 검색하는 유사도 기준입니다. 실리태번의 벡터 저장소 설정 자체를 대체하거나 로어북을 자동으로 벡터화하지 않습니다.
 

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="244" viewBox="0 0 430 244" role="img">
+<title>확장 메뉴 / Extensions menu</title>
+<style>text{font-family:'Noto Sans CJK KR', 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif;} .t{font-size:19px;font-weight:650;fill:#293440} .en{font-size:13px;fill:#687681}</style>
+<rect x="0" y="0" width="430" height="244" rx="13" fill="#f0f3f3"/>
+<rect x="12" y="12" width="406" height="220" rx="12" fill="#ffffff" stroke="#d9e0e5" stroke-width="1"/>
+<path d="M28 33h14m-14 6h14m-14 6h14" fill="none" stroke="#577f70" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="55" y="35" font-size="18" font-weight="650" fill="#293440" text-anchor="start">확장 메뉴</text>
+<text x="55" y="53" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Extensions menu</text>
+<path d="M390 33l10 10m0 -10l-10 10" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M24 66L406 66" fill="none" stroke="#d9e0e5" stroke-width="1" stroke-linecap="round"/>
+<rect x="25" y="79" width="380" height="56" rx="7" fill="#eef5f1"/>
+<path d="M48 95v16m-7 0h14m-16 -12h18m-15 0l-4 8h8zm14 0l-4 8h8z" fill="none" stroke="#577f70" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="70" y="101" font-size="17" font-weight="650" fill="#293440" text-anchor="start">로어북 예산 관리</text>
+<text x="70" y="119" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Lorebook Budget Management</text>
+<rect x="25" y="144" width="380" height="56" rx="7" fill="#f3f6f8"/>
+<path d="M48 160v16m-7 0h14m-16 -12h18m-15 0l-4 8h8zm14 0l-4 8h8z" fill="none" stroke="#577f70" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="70" y="166" font-size="17" font-weight="650" fill="#293440" text-anchor="start">로어북 Jev 호출</text>
+<text x="70" y="184" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Lorebook Jev Recall</text>
+<text x="26" y="218" font-size="20" font-weight="400" fill="#577f70" text-anchor="start">+</text>
+<text x="50" y="218" font-size="14" font-weight="400" fill="#687681" text-anchor="start">다른 확장  ·  Other extensions</text>
+</svg>

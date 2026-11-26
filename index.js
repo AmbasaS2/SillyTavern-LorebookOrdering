@@ -711,7 +711,7 @@ function addLorebookBudgetMenuItem() {
         container.appendChild(item);
         menu.appendChild(container);
     };
-    add('stlo_budget_menu_item', 'fa-scale-balanced', translate('Lorebook Ordering: Curator', 'stlo.manager.title'), openLorebookBudgetFromMenu);
+    add('stlo_budget_menu_item', 'fa-scale-balanced', '로어북 예산 관리', openLorebookBudgetFromMenu);
     add('stlo_jev_settings_menu_item', 'fa-scale-balanced', translate('Lorebook Jev Recall', 'stlo.jev.settingsTitle'), openJevSettings);
 }
 
