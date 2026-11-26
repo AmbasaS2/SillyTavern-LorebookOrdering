@@ -711,7 +711,7 @@ function addLorebookBudgetMenuItem() {
         container.appendChild(item);
         menu.appendChild(container);
     };
-    add('stlo_budget_menu_item', 'fa-scale-balanced', '로어북 예산 관리', openLorebookBudgetFromMenu);
+    add('stlo_budget_menu_item', 'fa-scale-balanced', translate('Lorebook Ordering: Curator', 'stlo.manager.title'), openLorebookBudgetFromMenu);
     add('stlo_jev_settings_menu_item', 'fa-scale-balanced', translate('Lorebook Jev Recall', 'stlo.jev.settingsTitle'), openJevSettings);
 }
 
@@ -1828,7 +1828,7 @@ async function openLorebookSettings(worldName = null) {
         root.className = 'stlo-modal-ui stlo-book-manager';
         root.innerHTML = `
             <div class="stlo-section stlo-manager-top">
-                <div class="stlo-manager-heading"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><h3 data-i18n="stlo.manager.title">Lorebook Budget Management</h3></div>
+                <div class="stlo-manager-heading"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><h3 data-i18n="stlo.manager.title">Lorebook Ordering: Curator</h3></div>
                 <div class="stlo-option-line">
                     <label class="checkbox_label stlo-checkrow" for="stlo-manager-protect">
                         <input type="checkbox" id="stlo-manager-protect" ${protectInitially ? 'checked' : ''}>

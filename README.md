@@ -1,12 +1,12 @@
-# 📚 ST Lorebook Ordering (STLO)
+# 📚 Lorebook Ordering: Curator
 
 **Scene-aware lore recall with Jev, plus lorebook priorities, token budgets, always-on protection, and optional per-lorebook vector thresholds for SillyTavern.**
 
 This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), based on upstream v2.2.4. The original extension provides the core priority, budget, order adjustment, random trimming, and group-chat features. This fork retains those features and adds Jev-based lore selection, always-on protection, and book-specific vector settings. Many thanks to aikohanasaki for the original design and implementation.
 
-[English](#-installation-and-first-steps) · [한국어](#-stlo--로어북-예산-관리) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
+[English](#-installation-and-first-steps) · [한국어](#-로어북-예산-관리기) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
-**Start here:** If one book uses too many tokens, open **Lorebook Budget Management**. If your RP forgets relevant old events, open **Lorebook Jev Recall**. These are independent menus; Jev is optional and off for new characters. This extension recalls existing lore; it does not create memories.
+**Start here:** If one book uses too many tokens, open **Lorebook Ordering: Curator**. If your RP forgets relevant old events, open **Lorebook Jev Recall**. These are independent menus; Jev is optional and off for new characters. This extension recalls existing lore; it does not create memories.
 
 ## 📥 Installation and First Steps
 
@@ -18,7 +18,7 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
    ```
 
 3. Install and reload SillyTavern. Use a recent SillyTavern version with the `WORLDINFO_SCAN_DONE` event (e.g. the 1.18 series) for Jev and per-lorebook budget trimming.
-4. Open **Extensions menu → 로어북 예산 관리 (Lorebook Budget Management)**, edit one or more lorebooks in collapsible cards, then save them together. For character-level Jev activation and shared settings, open **Lorebook Jev Recall** directly from the extensions menu.
+4. Open **Extensions menu → 로어북 예산 관리기 (Lorebook Ordering: Curator)**, edit one or more lorebooks in collapsible cards, then save them together. For character-level Jev activation and shared settings, open **Lorebook Jev Recall** directly from the extensions menu.
 
 ## Who is this for?
 
@@ -29,11 +29,11 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 - Control lorebook priority, order and activation by speaking character in group chats.
 - Configure multiple books together, opt into Jev per character and exclude specific books, and inspect the latest recall report for selection, budget exclusions, token estimates and timing.
 
-Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection. With [WorldInfo Info](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1, actually activated Jev entries can also display a 🔮 source indicator. Neither extension requires the other.
+Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection. With [WorldInfo Info: Insight](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1, actually activated Jev entries can also display a 🔮 source indicator. Neither extension requires the other.
 
 ## ⚡ Quick start
 
-**Current version: 2.2.4-ambasa.1.** World Info supplies facts and memories to your RP model. STLO manages each book's priority and maximum token contribution. Optional Jev chooses relevant entries based on the current scene. Ordinary budget management needs neither Jev nor Memory Books.
+**Current version: 2.2.4-ambasa.2.** World Info supplies facts and memories to your RP model. STLO manages each book's priority and maximum token contribution. Optional Jev chooses relevant entries based on the current scene. Ordinary budget management needs neither Jev nor Memory Books.
 
 <details>
 <summary>View the workflow</summary>
@@ -45,7 +45,7 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 **A. Budget management (no Jev required)**
 
 1. Install only this fork and reload. Use SillyTavern 1.18 with the structured World Info scan event for budget trimming and Jev.
-2. Open Extensions → Lorebook Budget Management. Add books; set priority (1–5), cap and optional Protect Always-On. Save.
+2. Open Extensions → Lorebook Ordering: Curator. Add books; set priority (1–5), cap and optional Protect Always-On. Save.
 3. Generate a normal RP reply. If you use WorldInfo Info, open the floating book to check activated entries. If native keyword/vector recall works for you, stop here.
 
 **B. Optional scene-aware recall with Jev**
@@ -306,7 +306,7 @@ If an always-on entry disappears, first check whether its full text fits both th
 > [!TIP]
 > Memory Books creates and maintains memories; STLO recalls them like other eligible lore. WorldInfo Info can show confirmed Jev activation, and Lorebook Manager can read those entries. None is required. Jev never changes the RP model or the saved lore.
 
-[Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info / 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
+[Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info: Insight / 월드인포인포 인사이트](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
 
 The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
 
@@ -314,7 +314,9 @@ Some fork-specific controls currently use Korean-only UI labels.
 
 ---
 
-# 📚 STLO · 로어북 예산 관리
+<a id="-stlo--로어북-예산-관리"></a>
+
+# 📚 로어북 예산 관리기
 
 **Jev(Jev)로 현재 RP에 필요한 로어를 골라 주입하고, 로어북별 우선순위와 토큰 예산까지 관리하는 실리태번 확장입니다.**
 
@@ -334,7 +336,7 @@ Some fork-specific controls currently use Korean-only UI labels.
    ```
 
 3. 설치 후 새로고침합니다. Jev 및 로어북별 예산 트리밍은 `WORLDINFO_SCAN_DONE`을 지원하는 최근 버전(예: 1.18 계열)을 권장합니다.
-4. **확장 메뉴 → 로어북 예산 관리**에서 필요한 로어북을 카드로 추가하고 예산·우선순위를 한 번에 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **로어북 Jev 호출**에서 바로 변경합니다.
+4. **확장 메뉴 → 로어북 예산 관리기**에서 필요한 로어북을 카드로 추가하고 예산·우선순위를 한 번에 저장합니다. 캐릭터별 Jev 사용 여부와 공통 설정은 **로어북 Jev 호출**에서 바로 변경합니다.
 
 ## 💗 이 확장 누가 쓰지?
 
@@ -349,12 +351,12 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 2.2.4-ambasa.1.** 로어북은 RP 모델에게 설정과 기억을 전달합니다. STLO는 책별 우선순위와 최대 주입량을 정하고, 선택 기능인 Jev로 장면에 필요한 항목을 고릅니다. 예산 관리만 쓰려면 메모리북이나 Jev 연결이 필요 없습니다.
+**현재 버전: 2.2.4-ambasa.2.** 로어북은 RP 모델에게 설정과 기억을 전달합니다. STLO는 책별 우선순위와 최대 주입량을 정하고, 선택 기능인 Jev로 장면에 필요한 항목을 고릅니다. 예산 관리만 쓰려면 메모리북이나 Jev 연결이 필요 없습니다.
 
 **A. 기본 예산 관리만 사용하기 (Jev 불필요)**
 
 1. 원본과 동시에 켜지 말고 설치·새로고침합니다. 예산 트리밍과 Jev는 구조화된 스캔 이벤트가 있는 실리태번 1.18 계열을 기준으로 합니다.
-2. 확장 메뉴 → 로어북 예산 관리 → 책 추가 → 우선순위(1~5)·예산·선택적 상시 주입 우선 보호 → 저장.
+2. 확장 메뉴 → 로어북 예산 관리기 → 책 추가 → 우선순위(1~5)·예산·선택적 상시 주입 우선 보호 → 저장.
 3. 평소처럼 롤플하세요. 월드인포인포를 함께 쓴다면 책 버튼으로 발동 로어를 확인합니다. 기본 키워드·벡터로 충분하면 여기까지!
 
 **B. 선택: Jev까지 사용하기**
@@ -624,7 +626,7 @@ Jev를 사용하지 않을 때 기존 벡터화된 로어북을 검색하는 유
 > [!TIP]
 > 메모리북은 기억을 저장하고 STLO는 그 기억을 포함한 기존 로어를 호출합니다. 월드인포인포에서는 실제 Jev 발동을 확인하고 로어북 매니저에서는 내용을 읽을 수 있습니다. 모두 선택 사항이며 STLO는 원문과 RP 모델을 변경하지 않습니다.
 
-[Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info / 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
+[Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info: Insight / 월드인포인포 인사이트](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
 
 아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
