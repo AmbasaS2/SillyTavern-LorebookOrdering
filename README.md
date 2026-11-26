@@ -36,7 +36,7 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 **Current version: 2.2.4-ambasa.1.** World Info supplies facts and memories to your RP model. STLO manages each book's priority and maximum token contribution. Optional Jev chooses relevant entries based on the current scene. Ordinary budget management needs neither Jev nor Memory Books.
 
 <details>
-<summary>View the illustrated workflow</summary>
+<summary>View the workflow</summary>
 
 <p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
 
@@ -60,7 +60,7 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 <p align="center"><img src="assets/readme/mobile/stlo-settings-guide-mobile.svg" alt="Multi-book budget manager / 로어북 예산 관리" width="860" /></p>
 
 <details>
-<summary>View the illustrated workflow</summary>
+<summary>View the workflow</summary>
 
 <p align="center">
   <a href="assets/readme/mobile/stlo-workflow-guide-mobile.svg"><img src="assets/readme/mobile/stlo-workflow-guide-mobile.svg" alt="STLO workflow: select a lorebook, set priority and budget, optionally use Jev or vector recall, save / 설정 흐름" width="860" /></a>
@@ -310,7 +310,7 @@ If an always-on entry disappears, first check whether its full text fits both th
 
 The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
 
-The diagrams in this README are illustrated guides based on the fork's settings, not screenshots. The bilingual labels explain the controls; the current interface retains Korean-only labels for some fork-specific controls.
+Some fork-specific controls currently use Korean-only UI labels.
 
 ---
 
@@ -628,7 +628,7 @@ Jev를 사용하지 않을 때 기존 벡터화된 로어북을 검색하는 유
 
 아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
-이미지는 현재 코드에 맞춘 한영 병기 기능 안내입니다. 실제 화면 캡처가 아니며, 새로 추가한 메뉴·일부 설정의 실제 화면 표기는 현재 한국어로 고정되어 있습니다.
+새로 추가한 메뉴·일부 설정의 실제 화면 표기는 현재 한국어로 고정되어 있습니다.
 
 ## 🙏 Credits, Original Documentation & License
 
