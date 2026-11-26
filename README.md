@@ -1,10 +1,10 @@
-# 📚 Lorebook Ordering: Curator
+# 📚 Lorebook Ordering for Sloths
 
 **Scene-aware lore recall with Jev, plus lorebook priorities, token budgets, always-on protection, and optional per-lorebook vector thresholds for SillyTavern.**
 
 This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering), based on upstream v2.2.4. The original extension provides the core priority, budget, order adjustment, random trimming, and group-chat features. This fork retains those features and adds Jev-based lore selection, always-on protection, and book-specific vector settings. Many thanks to aikohanasaki for the original design and implementation.
 
-[English](#-installation-and-first-steps) · [한국어](#-로어북-예산-관리기) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
+[English](#-installation-and-first-steps) · [한국어](#-게으름뱅이를-위한-로어북-예산-관리기) · [Original STLO](https://github.com/aikohanasaki/SillyTavern-LorebookOrdering)
 
 **Start here — which menu should I use?**
 
@@ -13,7 +13,7 @@ This is a fork of [ST Lorebook Ordering by aikohanasaki](https://github.com/aiko
 | One book uses too many tokens | **Lorebook Budget Management** |
 | Relevant old events are not recalled | **Lorebook Jev Recall** (optional) |
 
-These are independent menus. Jev is off for new characters. Curator recalls existing lore; it does not create memories.
+These are independent menus. Jev is off for new characters. Lorebook Ordering recalls existing lore; it does not create memories.
 
 ## 📥 Installation and First Steps
 
@@ -36,7 +36,7 @@ These are independent menus. Jev is off for new characters. Curator recalls exis
 - Control lorebook priority, order and activation by speaking character in group chats.
 - Configure multiple books together, opt into Jev per character and exclude specific books, and inspect the latest recall report for selection, budget exclusions, token estimates and timing.
 
-Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection. With [WorldInfo Info: Insight](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1, actually activated Jev entries can also display a 🔮 source indicator. Neither extension requires the other.
+Jev is optional. You can use this fork solely for book-level priority, budgets and always-on protection. With [WorldInfo Info of Sloth](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo) v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1, actually activated Jev entries can also display a 🔮 source indicator. Neither extension requires the other.
 
 ## ⚡ Quick start
 
@@ -44,7 +44,7 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 
 > **Choose a book → set priority and budget → save → continue RP.**
 >
-> World Info supplies facts and memories to your RP model. Curator manages each book's priority and maximum contribution. Use Jev only if you want scene-aware recall; neither Jev nor Memory Books is required for budget management.
+> World Info supplies facts and memories to your RP model. Lorebook Ordering manages each book's priority and maximum contribution. Use Jev only if you want scene-aware recall; neither Jev nor Memory Books is required for budget management.
 
 <p align="left"><img src="assets/readme/mobile/ui-extension-menu.svg" alt="확장 메뉴 / Extensions menu" width="480" /></p>
 
@@ -165,7 +165,7 @@ All lorebooks share SillyTavern's global World Info budget. A per-book budget is
 
 #### How trimming works
 
-Curator trims structured activated entries before the final prompt is assembled, instead of removing matching strings from the prompt.
+Lorebook Ordering trims structured activated entries before the final prompt is assembled, instead of removing matching strings from the prompt.
 
 With recursion, a removed entry may already have triggered another entry. Final trimming does not undo every earlier activation effect.
 
@@ -179,7 +179,7 @@ A later line: “Why did you hide it from me again?”
 
 Even without matching words, [TypeSafe Jev 1.14](https://nano-gpt.com/models/decisions/typesafe/jev-1.14) can assess whether that promise, a shared joke, unresolved disagreement or character habit is relevant.
 
-Jev is a **decision model**, not your RP writing model. It selects eligible existing lore. Curator ranks approved entries by inclusion probability, applies budgets and passes the full selected entries to SillyTavern.
+Jev is a **decision model**, not your RP writing model. It selects eligible existing lore. Lorebook Ordering ranks approved entries by inclusion probability, applies budgets and passes the full selected entries to SillyTavern.
 
 - Your normal RP model stays unchanged.
 - No new memories, summaries or lore rewrites.
@@ -205,7 +205,7 @@ The ordinary NanoGPT endpoint or its native connection profile is not selectable
 3. Choose the saved NanoGPT profile and **Total injection budget (tokens)**.
 4. Save. No separate lorebook selection is needed.
 
-Continue RP normally. Curator automatically requests `typesafe/jev-1.14`. You do not have to change your main API or the saved profile's normal chat model.
+Continue RP normally. Lorebook Ordering automatically requests `typesafe/jev-1.14`. You do not have to change your main API or the saved profile's normal chat model.
 
 > 🦥 **Why NanoGPT only?** I was too lazy to install an extra server plugin, so I implemented Jev through NanoGPT’s subscription endpoint only. Now I’m (very lazily) waiting for SillyTavern to support Jev natively.
 
@@ -364,7 +364,7 @@ Disabling Jev leaves ordinary activation unchanged. No saved vector data, lore o
 
 #### Request limits and error handling
 
-The documented NanoGPT limits and Curator planning estimates:
+The documented NanoGPT limits and Lorebook Ordering planning estimates:
 
 | Limit | Provider documentation | Local planning target |
 | --- | --- | --- |
@@ -447,7 +447,7 @@ It updates on generation events only. No new DOM observer, polling or repeated U
 > [!TIP]
 > Memory Books creates and maintains memories; STLO recalls them like other eligible lore. WorldInfo Info can show confirmed Jev activation, and Lorebook Manager can read those entries. None is required. Jev never changes the RP model or the saved lore.
 
-[Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info: Insight / 월드인포인포 인사이트](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
+[Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info of Sloth / 나무늘보의 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
 
 The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
 
@@ -457,7 +457,7 @@ Some fork-specific controls currently use Korean-only UI labels.
 
 <a id="-stlo--로어북-예산-관리"></a>
 
-# 📚 로어북 예산 관리기
+# 📚 게으름뱅이를 위한 로어북 예산 관리기
 
 **Jev(Jev)로 현재 RP에 필요한 로어를 골라 주입하고, 로어북별 우선순위와 토큰 예산까지 관리하는 실리태번 확장입니다.**
 
@@ -921,7 +921,7 @@ Jev OFF: 기존 검색 방식 유지. 저장된 벡터·로어·발동 설정은
 > [!TIP]
 > 메모리북은 기억을 저장하고 STLO는 그 기억을 포함한 기존 로어를 호출합니다. 월드인포인포에서는 실제 Jev 발동을 확인하고 로어북 매니저에서는 내용을 읽을 수 있습니다. 모두 선택 사항이며 STLO는 원문과 RP 모델을 변경하지 않습니다.
 
-[Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info: Insight / 월드인포인포 인사이트](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
+[Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info of Sloth / 나무늘보의 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
 
 아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 

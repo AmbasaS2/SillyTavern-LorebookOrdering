@@ -202,7 +202,7 @@
   "stlo.modal.groupOverrides.emptyCard": "캐릭터를 선택하거나 빈 카드를 삭제해 주세요.",
   "stlo.modal.groupOverrides.duplicate": "캐릭터는 한 번만 지정할 수 있습니다.",
   "stlo.modal.groupOverrides.priority": "우선순위",
-  "stlo.manager.title": "로어북 예산 관리기",
+  "stlo.manager.title": "게으름뱅이를 위한 로어북 예산 관리기",
   "stlo.manager.all": "모든 로어북 보기",
   "stlo.manager.filterHelp": "추가할 수 있는 책의 목록만 바꿉니다. 캐릭터와의 연결은 변경하지 않습니다.",
   "stlo.manager.add": "로어북 추가",

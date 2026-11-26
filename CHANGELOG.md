@@ -2,6 +2,9 @@
 
 **← [Back to README](README.md)**
 
+## Branding update (2026-11-26)
+- Renamed the fork to Lorebook Ordering for Sloths (게으름뱅이를 위한 로어북 예산 관리기). Existing menu labels, settings, identifiers and install URL are unchanged.
+
 ## 2.2.4-ambasa.1 — optional WorldInfo Info Jev source display (2026-11-25)
 - Reapply only the display receipt to the current multi-source ranked recall implementation; report the copied, applied keys from the real scan to an optional viewer.
 - Preserve the current priority, cap, recursion, vector, retry and insertion-order paths; no additional observer, polling, scan, API call or persisted lore changes.
