@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "Sin informe aún",
   "stlo.jev.modeAll": "Todas las entradas elegibles (predeterminado)",
   "stlo.jev.modeFiltered": "Candidatos de búsqueda vectorial / claves",
-  "stlo.jev.close": "Cerrar"
+  "stlo.jev.close": "Cerrar",
+  "stlo.metrics.budgetReport": "Último informe de presupuesto de lorebook",
+  "stlo.metrics.budgetComplete": "Comprobación de presupuesto completa",
+  "stlo.metrics.budgetOnlyHelp": "Jev está desactivado. Solo se muestran las comprobaciones de presupuesto existentes.",
+  "stlo.metrics.allActivated": "Todas las entradas activadas",
+  "stlo.metrics.allScanExclusions": "Todas las exclusiones presupuestarias de STLO",
+  "stlo.metrics.scanDropped": "Retiradas por presupuesto de STLO"
 }

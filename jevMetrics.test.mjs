@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTokenLedger,extractJevUsage,createUsageTracker,summarizeBookBudgets,summarizeFunnel,summarizeInjection,historyRow} from './jevMetrics.mjs';
+import {createTokenLedger,extractJevUsage,createUsageTracker,summarizeBookBudgets,summarizeFunnel,summarizeScanTrims,summarizeInjection,historyRow} from './jevMetrics.mjs';
 
 test('provider usage retains zero vs missing, cache read/write are not added to input',()=>{
     const usage=extractJevUsage({prompt_tokens:123,completion_tokens:0,prompt_tokens_details:{cached_tokens:90},cache_creation_input_tokens:10});
@@ -31,7 +31,7 @@ test('ledger coalesces identical pending measurements and distinguishes exact te
     assert.equal(ledger.lookup(bad),null);
     assert.equal(await ledger.measure(bad,count),4);
     const stale={...base,text:'stale'};let valid=true;
-    await ledger.measure(stale,async()=>{valid=false;return 9;},()=>valid);
+    assert.equal(await ledger.measure(stale,async()=>{valid=false;return 9;},()=>valid),null);
     assert.equal(ledger.lookup(stale),null);
     ledger.clear();assert.equal(ledger.lookup(bad),null);
 });
@@ -62,4 +62,17 @@ test('injection evidence needs exact measured rendered text and complete account
     assert.equal(summarizeInjection([{...one,text:'changed'},{key:'b',status:'excluded'}],expected,ledger,tokenizer,true).tokens,null);
     assert.equal(summarizeInjection([one,{key:'b',status:'unknown'}],expected,ledger,tokenizer,true).tokens,null);
     assert.equal(JSON.stringify(historyRow({metricsId:1,prompt:'private',rpInjection:{tokens:4}})).includes('private'),false);
+});
+
+test('scan trimming includes native drops, excludes reactivated keys, and keeps zero-use dropped books',()=>{
+    const key=e=>JSON.stringify([e.world,e.uid]);
+    const active={world:'A',uid:1,content:'active'};
+    const trims=new Map([[key(active),'world'],[key({world:'A',uid:2}),'book'],[key({world:'B',uid:1}),'jev'],['malformed','book']]);
+    const counted=summarizeScanTrims(trims,new Set([key(active)]));
+    assert.equal(counted.total,2);
+    assert.equal(counted.byBook.get('A'),1);
+    const rows=summarizeBookBudgets([active],new Map([['A',20],['B',10]]),()=>8,key,()=>false,new Set(),new Set(),trims);
+    assert.equal(rows.find(x=>x.world==='A').scanDropped,1);
+    assert.equal(rows.find(x=>x.world==='B').scanDropped,1);
+    assert.equal(rows.find(x=>x.world==='B').remaining,10);
 });

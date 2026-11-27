@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "報告なし",
   "stlo.jev.modeAll": "全対象のロア項目（既定）",
   "stlo.jev.modeFiltered": "ベクトル・キー検索候補",
-  "stlo.jev.close": "閉じる"
+  "stlo.jev.close": "閉じる",
+  "stlo.metrics.budgetReport": "最新のロアブック予算レポート",
+  "stlo.metrics.budgetComplete": "予算確認完了",
+  "stlo.metrics.budgetOnlyHelp": "Jevは無効です。既存のロア予算確認のみを表示します。",
+  "stlo.metrics.allActivated": "発動した全ロア項目",
+  "stlo.metrics.allScanExclusions": "STLO全スキャン予算除外",
+  "stlo.metrics.scanDropped": "STLOスキャン予算による除外"
 }

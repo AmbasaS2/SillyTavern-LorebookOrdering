@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "暂无报告",
   "stlo.jev.modeAll": "所有合格世界书条目（默认）",
   "stlo.jev.modeFiltered": "向量／关键词搜索候选",
-  "stlo.jev.close": "关闭"
+  "stlo.jev.close": "关闭",
+  "stlo.metrics.budgetReport": "最近的世界书预算报告",
+  "stlo.metrics.budgetComplete": "预算检查完成",
+  "stlo.metrics.budgetOnlyHelp": "Jev已关闭。仅显示现有世界书预算检查。",
+  "stlo.metrics.allActivated": "全部已触发条目",
+  "stlo.metrics.allScanExclusions": "STLO扫描预算排除总数",
+  "stlo.metrics.scanDropped": "STLO扫描预算排除"
 }

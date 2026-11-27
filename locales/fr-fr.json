@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "Aucun rapport pour l’instant",
   "stlo.jev.modeAll": "Toutes les entrées admissibles (défaut)",
   "stlo.jev.modeFiltered": "Candidats vectoriels / mots-clés",
-  "stlo.jev.close": "Fermer"
+  "stlo.jev.close": "Fermer",
+  "stlo.metrics.budgetReport": "Dernier rapport de budget lorebook",
+  "stlo.metrics.budgetComplete": "Vérification du budget terminée",
+  "stlo.metrics.budgetOnlyHelp": "Jev est désactivé. Seules les vérifications de budget existantes sont affichées.",
+  "stlo.metrics.allActivated": "Toutes les entrées activées",
+  "stlo.metrics.allScanExclusions": "Toutes les exclusions budgétaires STLO",
+  "stlo.metrics.scanDropped": "Retirées par le budget du scan STLO"
 }

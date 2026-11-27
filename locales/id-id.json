@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "Belum ada laporan",
   "stlo.jev.modeAll": "Semua entri lorebook yang memenuhi syarat (default)",
   "stlo.jev.modeFiltered": "Kandidat pencarian vektor / kata kunci",
-  "stlo.jev.close": "Tutup"
+  "stlo.jev.close": "Tutup",
+  "stlo.metrics.budgetReport": "Laporan anggaran lorebook terakhir",
+  "stlo.metrics.budgetComplete": "Pemeriksaan anggaran selesai",
+  "stlo.metrics.budgetOnlyHelp": "Jev nonaktif. Hanya pemeriksaan anggaran lore yang ada yang dilaporkan.",
+  "stlo.metrics.allActivated": "Semua entri lore aktif",
+  "stlo.metrics.allScanExclusions": "Semua pengecualian anggaran scan STLO",
+  "stlo.metrics.scanDropped": "Dihapus oleh anggaran scan STLO"
 }

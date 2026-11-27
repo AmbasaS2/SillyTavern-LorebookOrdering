@@ -294,5 +294,11 @@
   "stlo.metrics.selectionDetails": "후보·예산 판정 상세",
   "stlo.metrics.partialDetails": "부분 주입 상세",
   "stlo.metrics.requestDetails": "요청·사용량·소요 시간",
-  "stlo.metrics.over": "예산 초과량"
+  "stlo.metrics.over": "예산 초과량",
+  "stlo.metrics.budgetReport": "최근 로어북 예산 보고서",
+  "stlo.metrics.budgetComplete": "예산 확인 완료",
+  "stlo.metrics.budgetOnlyHelp": "Jev 꺼짐 · 기존 로어 예산 확인 결과만 표시합니다.",
+  "stlo.metrics.allActivated": "전체 실제 발동 로어",
+  "stlo.metrics.allScanExclusions": "STLO 전체 스캔 예산 탈락",
+  "stlo.metrics.scanDropped": "STLO 스캔 예산 탈락"
 }

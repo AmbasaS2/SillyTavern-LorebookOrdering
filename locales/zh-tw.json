@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "尚無報告",
   "stlo.jev.modeAll": "所有合格世界書項目（預設）",
   "stlo.jev.modeFiltered": "向量／關鍵字搜尋候選",
-  "stlo.jev.close": "關閉"
+  "stlo.jev.close": "關閉",
+  "stlo.metrics.budgetReport": "最近的世界書預算報告",
+  "stlo.metrics.budgetComplete": "預算檢查完成",
+  "stlo.metrics.budgetOnlyHelp": "Jev已關閉。僅顯示現有世界書預算檢查。",
+  "stlo.metrics.allActivated": "全部已觸發項目",
+  "stlo.metrics.allScanExclusions": "STLO掃描預算排除總數",
+  "stlo.metrics.scanDropped": "STLO掃描預算排除"
 }

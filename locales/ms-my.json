@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "Belum ada laporan",
   "stlo.jev.modeAll": "Semua entri lorebook layak (lalai)",
   "stlo.jev.modeFiltered": "Calon carian vektor / kata kunci",
-  "stlo.jev.close": "Tutup"
+  "stlo.jev.close": "Tutup",
+  "stlo.metrics.budgetReport": "Laporan bajet lorebook terakhir",
+  "stlo.metrics.budgetComplete": "Semakan bajet selesai",
+  "stlo.metrics.budgetOnlyHelp": "Jev dimatikan. Hanya semakan bajet lore sedia ada dipaparkan.",
+  "stlo.metrics.allActivated": "Semua entri lore aktif",
+  "stlo.metrics.allScanExclusions": "Semua pengecualian bajet imbasan STLO",
+  "stlo.metrics.scanDropped": "Dibuang oleh bajet imbasan STLO"
 }

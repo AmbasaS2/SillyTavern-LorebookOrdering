@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "Пока нет отчёта",
   "stlo.jev.modeAll": "Все подходящие записи книги (по умолчанию)",
   "stlo.jev.modeFiltered": "Кандидаты векторного поиска / ключей",
-  "stlo.jev.close": "Закрыть"
+  "stlo.jev.close": "Закрыть",
+  "stlo.metrics.budgetReport": "Последний отчёт о бюджете лорбуков",
+  "stlo.metrics.budgetComplete": "Проверка бюджета завершена",
+  "stlo.metrics.budgetOnlyHelp": "Jev выключен. Отображаются только существующие проверки бюджета лора.",
+  "stlo.metrics.allActivated": "Все активированные записи лора",
+  "stlo.metrics.allScanExclusions": "Все бюджетные исключения STLO",
+  "stlo.metrics.scanDropped": "Удалено бюджетом сканирования STLO"
 }

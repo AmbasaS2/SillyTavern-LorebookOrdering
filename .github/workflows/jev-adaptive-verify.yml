@@ -1,7 +1,9 @@
 name: Verify adaptive Jev recall
 on:
   push:
-    branches: [dev/jev-adaptive-recall]
+    branches: [main, dev/jev-adaptive-recall, fix/stlo-metrics-lifecycle]
+  pull_request:
+    branches: [main]
 jobs:
   verify:
     runs-on: ubuntu-latest
