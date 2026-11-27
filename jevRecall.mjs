@@ -747,8 +747,15 @@ export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoB
         while (!countFailed && nextCount < toCount.length) {
             const entry = toCount[nextCount++];
             try {
-                const tokens = await countEntryTokens(entry);
-                if (!Number.isFinite(tokens) || tokens <= 0) throw Error('Could not count lore tokens.');
+                // Jev has already returned its decisions. Retry only this host
+                // tokenizer measurement once, never the paid Jev request.
+                let tokens;
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try { tokens = await countEntryTokens(entry); }
+                    catch (error) { if (attempt === 1) throw error; }
+                    if (Number.isFinite(tokens) && tokens > 0) break;
+                    if (attempt === 1) throw Error('Could not count lore tokens.');
+                }
                 counts.set(jevEntryKey(entry), tokens);
             } catch (error) {
                 countFailed = true;

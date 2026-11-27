@@ -653,3 +653,22 @@ test('Jev admission bounds concurrent tokenizer work and preserves relevance ord
     assert.ok(peak <= 3);
     assert.deepEqual([...selected.keys()], ranked.slice(0, 8));
 });
+
+test('transient tokenizer failure retries only the failed measurement and preserves ranked Jev choices', async()=>{
+    const entries=[lore('Memory',1,'alpha'),lore('Memory',2,'beta')];
+    const ranked=entries.map(jevEntryKey),calls=new Map();
+    const selection=await fitJevRecall(entries,new Set(['Memory']),ranked,{
+        budget:100,worldInfoBudget:100,bookBudgets:new Map(),countTokens:async text=>{
+            calls.set(text,(calls.get(text)||0)+1);
+            if(text==='alpha\n'&&calls.get(text)===1)return 0;
+            return 5;
+        }
+    });
+    assert.deepEqual([...selection.keys()],ranked);
+    assert.equal(calls.get('alpha\n'),2);assert.equal(calls.get('beta\n'),1);
+    let failures=0;
+    await assert.rejects(fitJevRecall([entries[0]],new Set(['Memory']),[ranked[0]],{
+        budget:100,worldInfoBudget:100,bookBudgets:new Map(),countTokens:async()=>{failures++;throw Error('tokenizer unavailable');}
+    }),/tokenizer unavailable/);
+    assert.equal(failures,2);
+});

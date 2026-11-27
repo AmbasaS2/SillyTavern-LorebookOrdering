@@ -887,7 +887,14 @@ function getEntryTokenCountCached(entry) {
     if (cached?.content === content) return cached.tokens;
 
     const cache = TOKEN_COUNT_CACHE;
-    const tokens = getTokenCountAsync(content + '\n').then(value => Number(value) || 0).catch(() => {
+    const tokens = getTokenCountAsync(content + '\n').then(value => {
+        const count = Number(value);
+        if (!Number.isFinite(count) || count < 0 || (count === 0 && content.trim())) {
+            if (cache.get(entry)?.tokens === tokens) cache.delete(entry);
+            return 0;
+        }
+        return count;
+    }).catch(() => {
         if (cache.get(entry)?.tokens === tokens) cache.delete(entry);
         return 0;
     });
