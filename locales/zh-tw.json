@@ -92,6 +92,7 @@
   "stlo.vector.threshold.placeholder": "留空使用全域設定",
   "stlo.budget.recursionHelp": "使用遞迴掃描時，最終未注入的條目也可能已觸發其他條目。",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "查看最近注入計算",
   "stlo.jev.modeAdaptive": "自適應（實驗）",
   "stlo.jev.adaptiveThreshold": "全量判定輸入門檻（估算權杖）",
   "stlo.jev.adaptiveHelp": "門檻以下判定全部合格項目。超出時，在原生世界書搜尋結果上補充長期記憶線索、短記憶、明確的長期/NPC紀錄、具體標題或關鍵字比對，以及來源位置可比較的近期記憶。向量搜尋不可用或無合格命中時進行全量判定。此為實驗功能，不保證完整召回。門檻是輸入估算值，不是注入預算。",

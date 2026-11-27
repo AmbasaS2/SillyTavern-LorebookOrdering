@@ -92,6 +92,7 @@
   "stlo.vector.threshold.placeholder": "Leer: globale Einstellung",
   "stlo.budget.recursionHelp": "Bei rekursiver Suche können auch ausgeschlossene Einträge andere Einträge aktiviert haben.",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "Letzte Einfügungsberechnung anzeigen",
   "stlo.jev.modeAdaptive": "Adaptiv (experimentell)",
   "stlo.jev.adaptiveThreshold": "Eingabeschwelle für Vollprüfung (geschätzte Token)",
   "stlo.jev.adaptiveHelp": "Unterhalb der Schwelle werden alle geeigneten Einträge geprüft. Darüber ergänzen Langzeit-Hinweise, kurze Erinnerungen, explizite Langzeit-/NPC-Einträge, konkrete Titel-/Schlüsselworttreffer und jüngere Einträge mit vergleichbarer Quellenposition die native World-Info-Suche. Ohne Vektorsuche oder geeignete Treffer erfolgt die Vollprüfung. Experimentell, keine Garantie für vollständigen Abruf. Die Schwelle schätzt die Eingabe, nicht das Injektionsbudget.",

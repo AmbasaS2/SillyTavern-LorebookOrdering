@@ -92,6 +92,7 @@
   "stlo.vector.threshold.placeholder": "Vide : réglage global",
   "stlo.budget.recursionHelp": "Lors d’une analyse récursive, une entrée exclue du prompt final peut avoir activé d’autres entrées.",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "Voir le dernier calcul d’insertion",
   "stlo.jev.modeAdaptive": "Adaptatif (expérimental)",
   "stlo.jev.adaptiveThreshold": "Seuil d’entrée du plan complet (jetons estimés)",
   "stlo.jev.adaptiveHelp": "Sous le seuil, toutes les entrées admissibles sont évaluées. Au-delà, les résultats natifs de World Info sont complétés par les indices durables, les souvenirs courts, les fiches explicites à long terme ou de PNJ, les correspondances concrètes de titres ou mots-clés et les souvenirs récents dont les positions sources sont comparables. Sans recherche vectorielle ou résultat admissible, tout est évalué. Expérimental, sans garantie de rappel complet. Le seuil estime l’entrée, pas le budget d’injection.",

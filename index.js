@@ -691,7 +691,7 @@ function syncJevTopBar() {
     if (!button) {
         button = document.createElement('i');
         button.id = 'stlo-jev-topbar';
-        button.className = 'fa-solid fa-brain fa-fw right_menu_button';
+        button.className = 'fa-solid fa-scale-balanced fa-fw right_menu_button';
         button.tabIndex = 0;
         button.setAttribute('role', 'button');
         button.addEventListener('click', () => { void openJevReport(); });
@@ -701,9 +701,14 @@ function syncJevTopBar() {
                 void openJevReport();
             }
         });
-        bar.append(button);
     }
-    const label = report.mode==='budget-only' ? translate('Latest lorebook budget report','stlo.metrics.budgetReport') : 'Jev · ' + jevStatusLabel(report.phase);
+    const jobs = document.getElementById('stmb-jobs-topbar');
+    const close = document.getElementById('extensionTopBarCloseChat');
+    const anchor = jobs?.parentElement === bar ? jobs.nextElementSibling : close?.parentElement === bar ? close : null;
+    if (anchor !== button && (button.parentElement !== bar || button.nextElementSibling !== anchor)) {
+        bar.insertBefore(button, anchor);
+    }
+    const label = translate('View latest injection calculation', 'stlo.manager.latestCalculation');
     if (button.title !== label) button.title = label;
     if (button.getAttribute('aria-label') !== label) button.setAttribute('aria-label', label);
     if (button.dataset.status !== report.phase) button.dataset.status = report.phase;
@@ -1218,9 +1223,12 @@ function installStloModalStyles() {
         .stlo-modal-ui .stlo-advanced-drawer .stlo-group-body > .stlo-toggle-block { margin-top:5px; }
         .stlo-book-manager { gap:10px; }
         .stlo-book-manager .stlo-manager-top { gap:6px; padding-bottom:9px; }
-        .stlo-book-manager .stlo-manager-heading { display:flex; align-items:center; gap:7px; padding-bottom:3px; }
+        .stlo-book-manager .stlo-manager-heading { display:flex; flex-wrap:wrap; align-items:center; gap:7px; padding-bottom:3px; }
         .stlo-book-manager .stlo-manager-heading h3 { margin:0; }
         .stlo-book-manager .stlo-manager-heading i { font-size:1.05em; }
+        .stlo-book-manager .stlo-manager-report.menu_button {
+            margin:0; margin-inline-start:auto; flex:0 0 auto; width:auto !important; white-space:nowrap; font-size:.85em;
+        }
         .stlo-book-manager .stlo-book-cards { display:flex; flex-direction:column; gap:9px; width:100%; min-width:0; }
         .stlo-book-manager .stlo-book-cards:empty { display:none; }
         .stlo-book-manager .stlo-book-card { position:relative; width:100%; min-width:0; box-sizing:border-box; border:1px solid var(--SmartThemeBorderColor, #8885); border-radius:8px; }
@@ -2127,7 +2135,7 @@ async function openJevSettings() {
                     <small class="stlo-jev-prompt-status" id="stlo-jev-prompt-status" role="status" aria-live="polite"></small>
                     <input type="file" id="stlo-jev-prompt-file" accept=".json,application/json" hidden>
                 </div>
-                <div class="stlo-jev-actions"><button type="button" class="menu_button" id="stlo-jev-reset" data-i18n="stlo.jev.reset">Restore defaults</button><button type="button" class="menu_button" id="stlo-jev-report" data-i18n="stlo.jev.report">Latest Jev recall</button></div></div></details>
+                <div class="stlo-jev-actions"><button type="button" class="menu_button" id="stlo-jev-reset" data-i18n="stlo.jev.reset">Restore defaults</button></div></div></details>
                 </div>` : ''}
             </div>`;
         const result = await new Promise(resolve => {
@@ -2235,8 +2243,7 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
     const preset = document.getElementById('stlo-jev-preset');
     const target = document.getElementById('stlo-jev-prompt-library');
     const reset = document.getElementById('stlo-jev-reset');
-    const report = document.getElementById('stlo-jev-report');
-    if (!preset || !target || !reset || !report) return null;
+    if (!preset || !target || !reset) return null;
     const labelDefaults = {
         promptExpand: 'View full prompt', promptExport: 'Export prompt', promptImport: 'Import prompt',
         promptDelete: 'Delete prompt', promptSave: 'Save', promptRename: 'Rename prompt', promptSaveAs: 'Save as new prompt',
@@ -2284,11 +2291,8 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
         promptModel.chooseBuiltin('balanced');
         ui.render();
     };
-    const onReport = () => { if (!ui.isBusy()) void openJevReport(); };
-    for (const [element, event, handler] of [[reset, 'click', onReset], [report, 'click', onReport]]) {
-        element.addEventListener(event, handler);
-        modalEventListeners.push({ element, event, handler });
-    }
+    reset.addEventListener('click', onReset);
+    modalEventListeners.push({ element: reset, event: 'click', handler: onReset });
     return ui;
 
 }
@@ -2518,7 +2522,11 @@ async function openLorebookSettings(worldName = null) {
         root.className = 'stlo-modal-ui stlo-book-manager';
         root.innerHTML = `
             <div class="stlo-section stlo-manager-top">
-                <div class="stlo-manager-heading"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><h3 data-i18n="stlo.manager.title">Lorebook Ordering for Sloths</h3></div>
+                <div class="stlo-manager-heading">
+                    <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                    <h3 data-i18n="stlo.manager.title">Lorebook Ordering for Sloths</h3>
+                    <button type="button" class="menu_button stlo-manager-report" data-i18n="stlo.manager.latestCalculation">View latest injection calculation</button>
+                </div>
                 <div class="stlo-option-line">
                     <label class="checkbox_label stlo-checkrow" for="stlo-manager-protect">
                         <input type="checkbox" id="stlo-manager-protect" ${protectInitially ? 'checked' : ''}>
@@ -2551,6 +2559,7 @@ async function openLorebookSettings(worldName = null) {
             element.addEventListener(event, handler);
             bag.push({ element, event, handler });
         };
+        listen(root.querySelector('.stlo-manager-report'), 'click', () => { void openJevReport(); });
         const updateChoices = () => {
             const taken = picked();
             const names = eligible().filter(name => !taken.has(name));

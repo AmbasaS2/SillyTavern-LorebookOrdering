@@ -92,6 +92,7 @@
   "stlo.vector.threshold.placeholder": "空欄なら全体設定を使用",
   "stlo.budget.recursionHelp": "再帰スキャンでは、最終的に注入されなかったロアも他のロアを発動させている場合があります。",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "最新の挿入計算を見る",
   "stlo.jev.modeAdaptive": "適応型（実験）",
   "stlo.jev.adaptiveThreshold": "全件判定の入力しきい値（推定トークン）",
   "stlo.jev.adaptiveHelp": "しきい値以下では全対象を判定します。超える場合は標準World Info検索に長期記憶の手掛かり、短い記憶、明示的な長期・NPC記録、具体的なタイトル・キーの一致、比較可能な出典位置を持つ最近の記憶を追加します。ベクトル検索が使えない、または該当候補がない場合は全件判定します。実験機能であり、完全な想起を保証しません。しきい値は入力の推定値で、注入予算ではありません。",

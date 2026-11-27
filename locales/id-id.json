@@ -92,6 +92,7 @@
   "stlo.vector.threshold.placeholder": "Kosong: gunakan pengaturan global",
   "stlo.budget.recursionHelp": "Dalam pemindaian rekursif, entri yang tidak disuntikkan pada akhirnya masih dapat mengaktifkan entri lain.",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "Lihat perhitungan penyisipan terbaru",
   "stlo.jev.modeAdaptive": "Adaptif (eksperimental)",
   "stlo.jev.adaptiveThreshold": "Ambang masukan rencana lengkap (perkiraan token)",
   "stlo.jev.adaptiveHelp": "Di bawah ambang, semua entri yang memenuhi syarat dinilai. Di atasnya, hasil World Info bawaan dilengkapi petunjuk ingatan jangka panjang, ingatan singkat, catatan jangka panjang/NPC eksplisit, kecocokan judul/kunci konkret, dan ingatan terbaru dengan posisi sumber yang dapat dibandingkan. Jika pencarian vektor tidak tersedia atau tanpa hasil yang memenuhi syarat, semua entri dinilai. Eksperimental dan tidak menjamin ingatan lengkap. Ambang ini adalah perkiraan masukan, bukan anggaran injeksi.",

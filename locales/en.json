@@ -202,6 +202,7 @@
   "stlo.modal.groupOverrides.duplicate": "Choose each character only once.",
   "stlo.modal.groupOverrides.priority": "Priority",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "View latest injection calculation",
   "stlo.manager.all": "Show all lorebooks",
   "stlo.manager.filterHelp": "Only changes the list of books you can add. Does not change character links.",
   "stlo.manager.add": "Add lorebook",
