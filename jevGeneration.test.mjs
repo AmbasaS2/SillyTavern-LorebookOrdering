@@ -671,10 +671,14 @@ test('existing report opens with compact overview and collapsible decision/usage
     const nodes=walk(panel);
     assert.equal(panel.className,'stlo-jev-report');
     assert.ok(nodes.some(n=>n.className==='stlo-report-overview'));
-    assert.equal(nodes.filter(n=>n.className==='stlo-report-summary-card').length,6);
+    assert.ok(nodes.some(n=>n.className==='stlo-report-funnel'));
+    assert.ok(nodes.some(n=>n.className==='stlo-report-search-grid'));
+    assert.ok(nodes.some(n=>n.className==='stlo-report-budget-bar'));
     const sections=nodes.filter(n=>n.className==='stlo-report-section');
     assert.ok(sections.length>=3);
-    assert.equal(sections.filter(n=>n.open).length,1);
+    assert.equal(sections.filter(n=>n.open).length,0);
+    assert.ok(nodes.some(n=>n.textContent==='Jev search result'));
+    assert.ok(nodes.some(n=>n.textContent==='RP prompt inclusion'));
     assert.deepEqual({token:h.counters.token,jev:h.counters.jev,vector:h.counters.vector,sorted:h.counters.sorted},counters);
     assert.equal(JSON.stringify(h.settings.stlo),before);
 });
@@ -758,4 +762,27 @@ test('a tokenizer identity observed to change cannot revive a previous measureme
     assert.equal(h.bridge().publishInjection({...context,records:[],complete:false}),false);
     await h.generate();
     assert.notEqual(h.bridge().context().generation,context.generation);
+});
+
+test('readable Jev report keeps partial usage and unconfirmed activation distinct',()=>{
+    const first=source.indexOf('function metricUsageText('),last=source.indexOf('function syncJevTopBar()',first);
+    const makeNode=()=>({children:[],attrs:{},append(...nodes){this.children.push(...nodes);},setAttribute(k,v){this.attrs[k]=v;}});
+    let panel;
+    const sandbox={document:{createElement:makeNode},translate:t=>t,jevStatusLabel:phase=>phase,
+        metricsHistory:[],currentJevReport:()=>({phase:'ready',metricsId:1,activationObserved:false,candidates:71,assessed:70,selected:4,accepted:3,injected:0,requests:2,successfulRequests:2,
+            actualInputTokens:56494,usageReportedBatches:1,estimatedInputTokens:94218,requestMs:3473,elapsedMs:3755,sharedJevBudget:10000,sharedJevUsed:null,
+            bookBudgets:[],bookBudgetObserved:false,finalRecallBudgetTokens:null,
+            rpInjection:{confirmed:0,excluded:0,unknown:3,complete:false,measured:0,tokens:null}}),
+        Popup:class{constructor(node){panel=node;}show(){}},POPUP_TYPE:{TEXT:1}};
+    runInNewContext(source.slice(first,last)+'\nopenJevReport();',sandbox);
+    const walk=n=>[n,...n.children.flatMap(walk)],nodes=walk(panel);
+    const has=t=>nodes.some(n=>n.textContent===t);
+    const hero=nodes.find(n=>n.className==='stlo-report-hero');
+    assert.equal(hero.children[0].textContent,'Unmeasured');
+    assert.ok(has('56,494'));assert.ok(has('1/2'));assert.ok(has('94,218'));
+    assert.ok(has('3.47 s'));assert.ok(has('3.76 s'));
+    assert.ok(has('Unconfirmed'));assert.ok(has('Confirmed RP memory tokens'));
+    assert.ok(!nodes.some(n=>n.className==='stlo-report-budget-bar'));
+    assert.ok(!has('No budget exclusions'));
+    assert.ok(nodes.filter(n=>n.className==='stlo-report-section').every(n=>!n.open));
 });
