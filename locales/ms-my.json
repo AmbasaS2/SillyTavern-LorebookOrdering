@@ -197,6 +197,8 @@
   "stlo.jev.strict": "Ketat",
   "stlo.jev.balanced": "Seimbang",
   "stlo.jev.generous": "Longgar",
+  "stlo.jev.bonus": "Bonus",
+  "stlo.jev.bonusHelp": "Jika masih ada bajet selepas pilihan biasa, Jev boleh menambah satu ingatan yang tidak dijangka untuk menghidupkan adegan.",
   "stlo.jev.prompt": "Prompt pemilihan",
   "stlo.jev.promptHelp": "Sunting kriteria keputusan, bukan format respons berstruktur. Tetapan dikongsi antara watak.",
   "stlo.jev.reset": "Pulihkan lalai",

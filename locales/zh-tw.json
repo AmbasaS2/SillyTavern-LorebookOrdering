@@ -197,6 +197,8 @@
   "stlo.jev.strict": "嚴格",
   "stlo.jev.balanced": "平衡",
   "stlo.jev.generous": "寬鬆",
+  "stlo.jev.bonus": "彩蛋",
+  "stlo.jev.bonusHelp": "一般篩選後若還有預算，Jev 可以加入一則能為場景增添趣味的意外記憶。",
   "stlo.jev.prompt": "選擇提示詞",
   "stlo.jev.promptHelp": "編輯判定標準，而非結構化回應格式。設定由所有角色共用。",
   "stlo.jev.reset": "還原預設",

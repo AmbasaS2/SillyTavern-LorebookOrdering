@@ -1178,6 +1178,8 @@ function installStloModalStyles() {
         .stlo-jev-settings .stlo-jev-field { display:flex; flex-direction:column; justify-content:space-between; align-items:stretch; gap:2px; min-width:0; }
         .stlo-jev-settings .stlo-jev-field .stlo-field-heading { gap:4px; }
         .stlo-jev-settings .stlo-jev-field .stlo-field-heading > label { min-width:0; overflow-wrap:anywhere; text-align:left; }
+        .stlo-jev-settings .stlo-jev-style-row > select { flex:1 1 7em; min-width:0; margin:0 !important; }
+        .stlo-jev-settings .stlo-jev-style-row > label { flex:0 0 auto; white-space:nowrap; gap:4px; }
         .stlo-jev-settings .stlo-jev-field > :is(select,input[type="number"]) { width:100% !important; min-width:0; max-width:100%; min-height:1.8em; box-sizing:border-box; margin:0 !important; }
         .stlo-modal-ui .stlo-jev-prompt-library { display:grid; gap:5px; width:100%; min-width:0; text-align:start; margin-block:7px; }
         .stlo-modal-ui .stlo-jev-prompt-library :is(.stlo-jev-prompt-heading,.stlo-jev-prompt-selection,.stlo-jev-prompt-tools) { display:flex; align-items:center; gap:4px; min-width:0; }
@@ -1701,13 +1703,20 @@ async function decideJevWithRetry(run, prepared, batches) {
         }
     }
     if(queue.length||!isCurrentJev(run))return null;
-    for(const item of decisions)run.metrics.selected.set(item.key,{decision:'include',score:Number.isFinite(item.score)?item.score:null,
+    const ranked=rankJevDecisions(prepared,decisions);
+    for(const item of decisions){
+        if(item.bonus){
+            if(item.key!==ranked.at(-1))continue;
+            run.bonusKey=item.key;
+        }
+        run.metrics.selected.set(item.key,{decision:'include',score:Number.isFinite(item.score)?item.score:null,
         source:run.candidateSources?.get(item.key)??(run.options.mode==='filtered'?'native':'all')});
+    }
     if(run.options.partialInjection===true){
         run.excerpts=new Map(decisions.filter(item=>item.excerpt).map(item=>[item.key,item.excerpt]));
         updateJevReport(run,{partialSelected:run.excerpts.size});
     }
-    return rankJevDecisions(prepared, decisions);
+    return ranked;
 }
 
 // The optional filtered mode uses a native dry scan after the existing vector
@@ -1837,7 +1846,7 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         const diagnostics = new Map();
         const accepted = await fitJevRecall(entries, worlds, ranked, {
             budget, worldInfoBudget: worldInfoBudget || Infinity, bookBudgets, countTokens: getTokenCountAsync, countEntryTokens:countBudgetEntry,
-            bookPriorities, diagnostics,
+            bookPriorities, diagnostics, bonusKey:run.bonusKey,
         });
         if (!isCurrentJev(run)) { abort(true); return; }
         run.metrics.limits=new Map(bookBudgets);
@@ -2107,7 +2116,14 @@ async function openJevSettings() {
                 <details class="stlo-jev-advanced"><summary data-i18n="stlo.jev.advanced">Advanced Jev settings</summary><div class="stlo-jev-advanced-body">
                 <div class="stlo-jev-fields">
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-recent" data-i18n="stlo.jev.recent">Recent messages</label>${infoHelp('stlo.jev.recentHelp', 'Jev reads this many recent messages in full by default. Default: 20.')}</div><input type="number" id="stlo-jev-recent" class="text_pole textarea_compact" min="1" max="100" step="1" value="${jevOptions.recent}"></div>
-                <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Default selection style</label>${infoHelp('stlo.jev.presetHelp', 'Strict: direct relevance. Balanced: default. Generous: indirect relevance too. Changing this selects the built-in prompt.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select></div>
+                <div class="stlo-jev-field">
+                    <div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Default selection style</label>${infoHelp('stlo.jev.presetHelp', 'Strict: direct relevance. Balanced: default. Generous: indirect relevance too. Changing this selects the built-in prompt.')}</div>
+                    <div class="stlo-option-line stlo-jev-style-row">
+                        <select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select>
+                        <label class="checkbox_label stlo-checkrow" for="stlo-jev-bonus"><input type="checkbox" id="stlo-jev-bonus" ${jevOptions.bonus?'checked':''}><span class="checkmark"></span><i class="fa-solid fa-gift" aria-hidden="true"></i><span data-i18n="stlo.jev.bonus">Bonus</span></label>
+                        ${infoHelp('stlo.jev.bonusHelp', 'Jev can add one unexpected memory that enriches the scene, if there is room after the usual selections.')}
+                    </div>
+                </div>
                 </div>
                 <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-partial"><input type="checkbox" id="stlo-jev-partial" ${jevOptions.partialInjection===true?'checked':''}><span class="checkmark"></span><span data-i18n="stlo.jev.partial">Partial injection (experimental)</span></label>${infoHelp('stlo.jev.partialHelp','Only long structured Scene memories, with a built-in prompt and no reading limits. Jev may select a safe excerpt in the same request; uncertainty keeps the full text. Full-text budgets and native activation remain unchanged.')}</div>
                 <details class="stlo-jev-advanced stlo-jev-reading-limits" ${jevOptions.messageLength || jevOptions.loreLength ? 'open' : ''}>
@@ -2161,6 +2177,7 @@ async function openJevSettings() {
                             mode: document.querySelector('input[name="stlo-jev-mode"]:checked')?.value,
                             adaptiveThreshold: val('stlo-jev-adaptive-threshold'),
                             partialInjection: document.getElementById('stlo-jev-partial')?.checked===true,
+                            bonus: document.getElementById('stlo-jev-bonus')?.checked===true,
                             recent: val('stlo-jev-recent'),
                             messageLength: val('stlo-jev-message-length'),
                             loreLength: val('stlo-jev-lore-length'),
