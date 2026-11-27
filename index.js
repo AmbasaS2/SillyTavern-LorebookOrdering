@@ -11,7 +11,7 @@ import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../.
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate, selectAdaptiveJevMode, DEFAULT_JEV_ADAPTIVE_THRESHOLD, createAdaptiveCueCache, coverAdaptiveJevCandidates } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate, selectAdaptiveJevMode, DEFAULT_JEV_ADAPTIVE_THRESHOLD, createAdaptiveCueCache, coverAdaptiveJevCandidates, applyJevExcerpts } from './jevRecall.mjs';
 
 import { createJevPromptLibrary, mountJevPromptLibrary } from './jevPromptLibrary.mjs';
 
@@ -174,6 +174,10 @@ function openJevReport() {
         [translate('Additional recent candidates', 'stlo.jev.adaptiveRecent'), report.adaptiveRecent],
         [translate('Candidates', 'stlo.jev.candidates'), report.candidates],
         [translate('Model selected', 'stlo.jev.selected'), report.selected],
+        [translate('Successful excerpt questions', 'stlo.jev.partialQuestions'), report.partialQuestions],
+        [translate('Confident excerpt selections', 'stlo.jev.partialSelected'), report.partialSelected],
+        [translate('Excerpts applied to final scan', 'stlo.jev.partialApplied'), report.partialApplied],
+        [translate('Characters removed from final scan (not tokens)', 'stlo.jev.partialSavedChars'), report.partialSavedChars],
         [translate('Within budget', 'stlo.jev.accepted'), report.accepted],
         [translate('Actually activated', 'stlo.jev.injected'), report.injected],
         [translate('Book budget rejected', 'stlo.jev.rejectedBook'), report.rejectedBook],
@@ -323,7 +327,7 @@ async function stloJevInterceptor(chat, contextSize, abort, type) {
             const settings=new Map(EXTENSION_STATE.scanWorldSettings);
             const active=new Set(entries.map(entry=>entry.world));
             const worlds=new Set([...getJevWorlds(settings,run.characterRecall)].filter(world=>active.has(world)));
-            const full=prepareJevRecall(entries,worlds,chat??getContext().chat??[],run.options);
+            const full=prepareJevRecall(entries,worlds,chat??getContext().chat??[],{...run.options,partialInjection:false});
             // Chat/file vectors alone cannot provide World Info candidates.
             const worldVectors=Boolean(nativeAvailable&&extension_settings.vectors?.enabled_world_info&&
                 entries.some(entry=>isJevCandidate(entry,worlds)&&(entry.vectorized||extension_settings.vectors?.enabled_for_all)));
@@ -953,7 +957,7 @@ async function handleWorldInfoEntriesLoaded(eventData) {
         }
         if (HAS_WORLDINFO_SCAN_DONE && run?.selection?.worlds.size && !run.preparing && !run.preview && isCurrentJev(run)) {
             const receipt = globalThis.STWII?.recordStloJevRecall;
-            const appliedKeys = typeof receipt === 'function' ? new Set() : null;
+            const appliedKeys = typeof receipt === 'function'||run.selection.excerpts?.size ? new Set() : null;
             const arrays = loreArrays(eventData);
             const [global, character, chat, persona] = arrays;
             const strategy = typeof world_info_character_strategy === 'undefined' ? 0 : Number(world_info_character_strategy);
@@ -987,7 +991,8 @@ async function handleWorldInfoEntriesLoaded(eventData) {
             }
             // Optional display receipt, bound to this scan payload. Never alter
             // injection or fail a reply because a viewer is unavailable.
-            if (appliedKeys) {
+            if(run.selection.excerpts?.size)run.selection.excerptAppliedKeys=appliedKeys;
+            if (typeof receipt==='function'&&appliedKeys) {
                 try { receipt(eventData, appliedKeys); } catch { /* display only */ }
             }
         }
@@ -1070,6 +1075,7 @@ async function abortJevPreparation(run, abort, error) {
 async function decideJevWithRetry(run, prepared, batches) {
     const queue = [...batches];
     const decisions = [];
+    let partialQuestions=0;
     let completed = 0;
     let assessed = 0;
     let confirmedInput = 0;
@@ -1094,6 +1100,7 @@ async function decideJevWithRetry(run, prepared, batches) {
             }
             if (!isCurrentJev(run)) return null;
             decisions.push(...result.decisions);
+            partialQuestions+=batch.partialPlans?.size??0;
             queue.shift();
             completed++;
             assessed += batch.candidates.size;
@@ -1103,6 +1110,7 @@ async function decideJevWithRetry(run, prepared, batches) {
             }
             updateJevReport(run, {
                 completedBatches: completed,
+                ...(run.options.partialInjection===true?{partialQuestions}:{}),
                 unassessed: prepared.candidates.size - assessed,
                 actualInputTokens: reportedUsage ? confirmedInput : undefined,
                 usageReportedBatches: reportedUsage,
@@ -1110,6 +1118,9 @@ async function decideJevWithRetry(run, prepared, batches) {
         } catch (error) {
             if (!isCurrentJev(run)) return null;
             if (error?.name === 'JevInputLimitError') {
+                // Excerpt questions are optional. Prefer the unchanged base
+                // request over splitting/retrying solely for an excerpt.
+                if(batch.baseBatch){queue[0]=batch.baseBatch;continue;}
                 const smaller = splitJevBatch(batch);
                 if (!smaller.length) throw error;
                 // Only an explicit provider size rejection can cause an
@@ -1121,7 +1132,12 @@ async function decideJevWithRetry(run, prepared, batches) {
             if (!await askJevRetry(run, error)) return null;
         }
     }
-    return queue.length || !isCurrentJev(run) ? null : rankJevDecisions(prepared, decisions);
+    if(queue.length||!isCurrentJev(run))return null;
+    if(run.options.partialInjection===true){
+        run.excerpts=new Map(decisions.filter(item=>item.excerpt).map(item=>[item.key,item.excerpt]));
+        updateJevReport(run,{partialSelected:run.excerpts.size});
+    }
+    return rankJevDecisions(prepared, decisions);
 }
 
 // The optional filtered mode uses a native dry scan after the existing vector
@@ -1222,6 +1238,7 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
             unassessed: prepared?.candidates.size ?? 0, inputChars: 0, estimatedInputTokens: 0,
             truncatedMessages: prepared?.stats.truncatedMessages ?? 0, truncatedLore: prepared?.stats.truncatedLore ?? 0,
             sharedEntries: prepared?.stats.sharedEntries ?? 0, plannedBatches: 0, completedBatches: 0,
+            ...(run.options.partialInjection===true?{partialQuestions:0,partialSelected:0,partialApplied:0,partialSavedChars:0}:{}),
         });
         if (!prepared) {
             // Empty candidates are a successful zero-selection, not a failure.
@@ -1248,7 +1265,9 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
             bookPriorities, diagnostics,
         });
         if (!isCurrentJev(run)) { abort(true); return; }
-        run.selection = { accepted, worlds, budget, contextSize };
+        const excerpts=run.excerpts?new Map([...run.excerpts].filter(([key])=>accepted.has(key))):null;
+        run.excerpts=null;
+        run.selection = { accepted, worlds, budget, contextSize, ...(excerpts?.size?{excerpts}:{}) };
         await restoreNativeVectorHits(run);
         const reasons = [...diagnostics.values()];
         updateJevReport(run, { phase: 'ready', selected: ranked.length, accepted: accepted.size,
@@ -1509,6 +1528,7 @@ async function openJevSettings() {
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-recent" data-i18n="stlo.jev.recent">Recent messages</label>${infoHelp('stlo.jev.recentHelp', 'Jev reads this many recent messages in full by default. Default: 20.')}</div><input type="number" id="stlo-jev-recent" class="text_pole textarea_compact" min="1" max="100" step="1" value="${jevOptions.recent}"></div>
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Default selection style</label>${infoHelp('stlo.jev.presetHelp', 'Strict: direct relevance. Balanced: default. Generous: indirect relevance too. Changing this selects the built-in prompt.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select></div>
                 </div>
+                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-partial"><input type="checkbox" id="stlo-jev-partial" ${jevOptions.partialInjection===true?'checked':''}><span class="checkmark"></span><span data-i18n="stlo.jev.partial">Partial injection (experimental)</span></label>${infoHelp('stlo.jev.partialHelp','Only long structured Scene memories, with a built-in prompt and no reading limits. Jev may select a safe excerpt in the same request; uncertainty keeps the full text. Full-text budgets and native activation remain unchanged.')}</div>
                 <details class="stlo-jev-advanced stlo-jev-reading-limits" ${jevOptions.messageLength || jevOptions.loreLength ? 'open' : ''}>
                     <summary class="stlo-reading-summary"><span data-i18n="stlo.jev.readingLimits">Reading limits</span><small id="stlo-jev-reading-status"></small></summary>
                     <div class="stlo-jev-fields stlo-jev-limit-fields">
@@ -1559,6 +1579,7 @@ async function openJevSettings() {
                             inputVersion: 2,
                             mode: document.querySelector('input[name="stlo-jev-mode"]:checked')?.value,
                             adaptiveThreshold: val('stlo-jev-adaptive-threshold'),
+                            partialInjection: document.getElementById('stlo-jev-partial')?.checked===true,
                             recent: val('stlo-jev-recent'),
                             messageLength: val('stlo-jev-message-length'),
                             loreLength: val('stlo-jev-lore-length'),
@@ -1686,6 +1707,8 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
         document.getElementById('stlo-jev-lore-length').value = String(defaults.loreLength);
         const threshold=document.getElementById('stlo-jev-adaptive-threshold');
         if(threshold)threshold.value=String(DEFAULT_JEV_ADAPTIVE_THRESHOLD);
+        const partial=document.getElementById('stlo-jev-partial');
+        if(partial)partial.checked=false;
         syncReadingStatus();
         promptModel.chooseBuiltin('balanced');
         ui.render();
@@ -3016,13 +3039,18 @@ function registerPerLoopBudgetTrimmer() {
                 }
 
                 // The core builds the final prompt from activated.entries.
-                // Its recursion buffer was already assembled before this hook,
-                // so editing activated.text would not undo a recursion trigger.
-                // Leave all text untouched rather than deleting a kept entry
-                // or unrelated system instruction that has matching content.
+                // All native activation, recursion and budget decisions used
+                // full text. Only now may the separate opt-in excerpt replace
+                // a generation-local copy; never edit activated.text or books.
                 finishOrder();
                 if (dropped) stloDebug('Trimmed WI entries structurally:', dropped);
-                if (run?.selection && args?.state?.next === 0) recordJevActivated([...entries.values()]);
+                if (run?.selection && args?.state?.next === 0 && isCurrentJev(run)) {
+                    if(jev?.excerpts?.size){
+                        const {applied,savedChars}=applyJevExcerpts(entries,jev.accepted,jev.excerptAppliedKeys,jev.excerpts);
+                        updateJevReport(run,{partialApplied:applied,partialSavedChars:savedChars});
+                    }
+                    recordJevActivated([...entries.values()]);
+                }
             } catch (e) {
                 console.warn('🦥 STLO', '[STLO] per-loop budget trimmer error:', e);
             }

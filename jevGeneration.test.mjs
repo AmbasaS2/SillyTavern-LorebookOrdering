@@ -15,7 +15,7 @@ const raw = [
 ];
 const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
-function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false}={}) {
+function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false,partialInjection=false,partialAnswers,jevBudget=1000}={}) {
     const listeners=new Map();
     const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0};
     const events=new Proxy({}, {get:(_,key)=>key});
@@ -25,7 +25,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         off(k,f){listeners.set(k,(listeners.get(k)||[]).filter(x=>x!==f));},
         async emit(k,...args){for(const fn of [...(listeners.get(k)||[])])await fn(...args);},
     };
-    const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode,adaptiveThreshold},jevProfileId:'nano',jevBudget:1000},
+    const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode,adaptiveThreshold,partialInjection},jevProfileId:'nano',jevBudget},
         connectionManager:{profiles:[profile]},vectors:{enabled_world_info:vectors,enabled_chats:extraVectors,enabled_files:extraVectors},disabledExtensions:[]};
     const books=new Map([['A',{stlo:{}}],['B',{stlo:{}}],['C',{stlo:{jevExclude:true}}]]);
     const ctx={groupId:null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
@@ -75,6 +75,14 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
             batches.push([...prepared.candidates.keys()]);
             if(counters.jev<=sizeFailures)throw new recall.JevInputLimitError('Jev rejected the input size.');
             if(counters.jev<=failures||counters.jev===failAt)throw Error('Jev is unavailable (503).');
+            if(partialAnswers){
+                const answers=Object.fromEntries([...prepared.candidates].map(([id,key])=>[id,{choice:!decisions||decisions.includes(key)?'include':'skip',probabilities:{include:scores[key]??.9}}]));
+                if(partialAnswers!=='missing')for(const [id,plan] of prepared.partialPlans??[]){
+                    const choice=[...plan.options.keys()][0];
+                    answers[id]={choice,probabilities:{[choice]:partialAnswers==='low'?.5:.96}};
+                }
+                return recall.requestJevRecall(prepared,recall.getNanoJevConnection(profile),{},undefined,async()=>({ok:true,json:async()=>({choices:[{message:{content:JSON.stringify({answers})}}],usage:{prompt_tokens:100}})}));
+            }
             return { decisions:[...prepared.candidates.values()].filter(key=>!decisions||decisions.includes(key)).map(key=>({key,score:scores[key]??.9})), inputTokens:100 };
         },
     };
@@ -480,4 +488,51 @@ test('adaptive coverage reaching the full set is reported as full without a seco
     assert.equal(h.counters.vector,1);
     assert.equal(h.counters.preview,1);
     assert.equal(h.counters.jev,1);
+});
+
+function excerptScene(){
+    const filler=n=>('The stone terrace displayed rows of painted tiles and marble carvings. '+n+' ').repeat(7);
+    return ['Timeline: Early spring, at the observatory.','Scene:\nIona found the copper bell beside the sealed gate.',
+        filler(1),'Iona promised to keep the copper bell until they reunited. The captain accepted this condition.',filler(2),
+        filler(3),filler(4),'The captain left the observatory and Iona carried the bell home.',
+        'Result: Iona kept the copper bell for the promised reunion.'].join('\n\n');
+}
+
+test('partial injection keeps the native scan and full budget intact, applies only at final activation, and has no additional request',async()=>{
+    const scene=entry('A',1,excerptScene(),{vectorized:true});
+    const constant=entry('B',2,excerptScene(),{constant:true});
+    const entries=[scene,constant,entry('C',2,'Native unaffected')];
+    const base=harness({entries,jevBudget:9000});
+    await base.generate();
+    const opt=harness({entries,jevBudget:9000,partialInjection:true,partialAnswers:'high',receiptMode:true});
+    const scan=await opt.generate();
+    assert.equal(base.counters.jev,1);
+    assert.equal(opt.counters.jev,1);
+    assert.equal(opt.counters.vector,1);
+    assert.equal(opt.counters.abort,0);
+    assert.equal(opt.report().partialQuestions,1);
+    assert.equal(opt.report().partialSelected,1);
+    assert.equal(opt.report().partialApplied,1);
+    assert.ok(opt.report().partialSavedChars>0);
+    assert.equal(opt.report().accepted,base.report().accepted);
+    assert.equal(scan.find(e=>e.world==='A').content,'@@activate\n'+scene.content);
+    assert.equal(opt.activated().find(e=>e.world==='B').content,constant.content);
+    assert.match(opt.activated().find(e=>e.world==='A').content,/promised to keep the copper bell/);
+    assert.ok(opt.activated().find(e=>e.world==='A').content.length<scene.content.length);
+    assert.equal(scene.content,excerptScene());
+    assert.deepEqual(opt.receipts[0].keys,[recall.jevEntryKey(scene)]);
+    for(const partialAnswers of ['low','missing']){
+        const h=harness({entries,jevBudget:9000,partialInjection:true,partialAnswers});
+        await h.generate();
+        assert.equal(h.counters.jev,1);
+        assert.equal(h.report().partialApplied,0);
+        assert.equal(h.activated().find(e=>e.world==='A').content,scene.content);
+    }
+    const size=harness({entries,jevBudget:9000,partialInjection:true,partialAnswers:'high',sizeFailures:1});
+    await size.generate();
+    assert.equal(size.counters.jev,2);
+    assert.equal(size.counters.popup,0);
+    assert.equal(size.report().partialQuestions,0);
+    assert.equal(size.report().partialApplied,0);
+    assert.equal(size.activated().find(e=>e.world==='A').content,scene.content);
 });

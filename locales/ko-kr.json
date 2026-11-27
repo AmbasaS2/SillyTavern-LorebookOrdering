@@ -248,5 +248,11 @@
   "stlo.jev.adaptiveEligible": "검색 전 전체 적격 후보",
   "stlo.jev.adaptiveNative": "네이티브 검색 후보",
   "stlo.jev.adaptiveDurable": "장기 기억 단서로 추가한 후보",
-  "stlo.jev.adaptiveRecent": "최근성으로 추가한 후보"
+  "stlo.jev.adaptiveRecent": "최근성으로 추가한 후보",
+  "stlo.jev.partial": "부분 주입 (실험)",
+  "stlo.jev.partialHelp": "내장 판정 프롬프트를 사용하고 읽기 제한이 없는 긴 구조화 Scene 기억만 대상입니다. 기존 Jev 요청 안에서 안전한 발췌를 선택하며 불확실하면 전문을 유지합니다. 전문 기준 예산과 기존 활성화 동작은 유지됩니다.",
+  "stlo.jev.partialQuestions": "성공한 부분 선택 질문",
+  "stlo.jev.partialSelected": "충분한 확신으로 선택한 발췌",
+  "stlo.jev.partialApplied": "최종 활성 목록에 적용한 발췌",
+  "stlo.jev.partialSavedChars": "최종 활성 목록에서 줄인 문자 수 (토큰 아님)"
 }

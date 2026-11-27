@@ -343,3 +343,83 @@ test('adaptive durable cues, explicit same-chat recency, eligibility and cache i
     cache.clear();
     assert.equal(get().candidateKeys.has(jevEntryKey(promise)),true);
 });
+
+function excerptScene(){
+    const filler=n=>('The stone terrace displayed rows of painted tiles and marble carvings. '+n+' ').repeat(7);
+    return ['Timeline: Early spring, at the observatory.','Scene:\nIona found the copper bell beside the sealed gate.',
+        filler(1),'Iona promised to keep the copper bell until they reunited. The captain accepted this condition.',filler(2),
+        filler(3),filler(4),'The captain left the observatory and Iona carried the bell home.',
+        'Result: Iona kept the copper bell for the promised reunion.'].join('\n\n');
+}
+
+test('partial questions preserve binary decisions, fit existing batches, and fail open to full text',async()=>{
+    const {applyJevExcerpts,normalizeJevOptions}=await import('./jevRecall.mjs');
+    const e=lore('A',1,excerptScene());
+    const pinned=lore('A',2,excerptScene(),{constant:true});
+    const worlds=new Set(['A']);
+    const messages=[{mes:'The captain returns. Iona reaches for the bell.'}];
+    const base=prepareJevRecall([e,pinned],worlds,messages,{});
+    const prepared=prepareJevRecall([e,pinned],worlds,messages,{partialInjection:true});
+    assert.deepEqual(prepared.body.questions,base.body.questions);
+    assert.equal(prepared.partialPlans.size,1);
+    const fullBatch=planJevRequests(base)[0];
+    const batches=planJevRequests(prepared);
+    assert.equal(batches.length,1);
+    const batch=batches[0];
+    assert.deepEqual(batch.body.questions.e1,fullBatch.body.questions.e1);
+    assert.equal(batch.partialPlans.size,1);
+    assert.equal(batch.candidates.size,1);
+    assert.ok(batch.estimatedTokens>fullBatch.estimatedTokens);
+    assert.ok(batch.estimatedTokens<=JEV_REQUEST_TARGET);
+    const constrained=planJevRequests(prepared,fullBatch.estimatedTokens,JEV_QUESTION_TARGET);
+    assert.equal(constrained.length,1);
+    assert.deepEqual(constrained[0].body,fullBatch.body);
+    assert.equal(constrained[0].partialPlans,undefined);
+    assert.equal(normalizeJevOptions().partialInjection,undefined);
+    for(const opts of [{partialInjection:true,prompt:'My exact criteria.'},{inputVersion:2,partialInjection:true,loreLength:1000},{inputVersion:2,partialInjection:true,messageLength:100}]){
+        assert.equal(prepareJevRecall([e],worlds,messages,opts).partialPlans,undefined);
+    }
+    for(const source of ['Scene:\n'+e.content,e.content+' {{user}}',e.content.replace('Result:','Conclusion:')]){
+        assert.equal(prepareJevRecall([{...e,content:source}],worlds,messages,{partialInjection:true}).partialPlans,undefined);
+    }
+    const choice=[...batch.partialPlans.get('p1').options.keys()][0];
+    const call=async(secondary,primary='include')=>requestJevRecall(batch,connection,{},undefined,async(_url,req)=>{
+        const sent=JSON.parse(req.body);
+        const questions=JSON.parse(sent.custom_include_body).response_format.questions;
+        assert.deepEqual(questions.e1.criteria,{include:null,skip:null});
+        assert.ok(questions.p1.criteria.full);
+        return response({answers:{e1:{choice:primary,probabilities:{include:.9,skip:.1}},...(secondary===undefined?{}:{p1:secondary})}});
+    });
+    const result=await call({choice,probabilities:{[choice]:.92}});
+    assert.equal(result.decisions.length,1);
+    assert.equal(result.decisions[0].score,.9);
+    const excerpt=result.decisions[0].excerpt;
+    assert.equal(excerpt.source,e.content);
+    assert.ok(excerpt.text.length<e.content.length);
+    assert.match(excerpt.text,/Timeline: Early spring/);
+    assert.match(excerpt.text,/Iona found the copper bell/);
+    assert.match(excerpt.text,/promised to keep the copper bell/);
+    assert.match(excerpt.text,/The captain left the observatory/);
+    assert.match(excerpt.text,/Result: Iona kept the copper bell/);
+    for(const secondary of [undefined,{choice:'full',probabilities:{full:1}},{choice,probabilities:{[choice]:.5}},{choice,confidence:1},{choice:'unknown',probabilities:{unknown:1}}]){
+        const r=await call(secondary);
+        assert.equal(r.decisions[0].excerpt,undefined);
+    }
+    assert.equal((await call({choice,probabilities:{[choice]:.99}},'skip')).decisions.length,0);
+    const key=jevEntryKey(e);
+    const accepted=await fitJevRecall([e],worlds,[key],{budget:excerpt.text.length+10,worldInfoBudget:10000,bookBudgets:new Map(),countTokens:async text=>text.length});
+    assert.equal(accepted.size,0,'reserve full source cost, not shortened text');
+    const selection=new Map([[key,0]]),applied=new Set([key]),excerpts=new Map([[key,excerpt]]);
+    const stored=e.content;
+    const activated=new Map([[key,e],[jevEntryKey(pinned),pinned]]);
+    assert.deepEqual(applyJevExcerpts(activated,selection,applied,excerpts),{applied:1,savedChars:stored.length-excerpt.text.length});
+    assert.equal(activated.get(key).content,excerpt.text);
+    assert.equal(e.content,stored);
+    assert.equal(activated.get(jevEntryKey(pinned)),pinned);
+    for(const changed of [{...e,content:stored+' edited'},{...e,constant:true},{...e,position:7}]){
+        const a=new Map([[key,changed]]);
+        assert.equal(applyJevExcerpts(a,selection,applied,excerpts).applied,0);
+        assert.equal(a.get(key),changed);
+    }
+    assert.equal(applyJevExcerpts(new Map([[key,e]]),selection,new Set(),excerpts).applied,0);
+});

@@ -247,5 +247,11 @@
   "stlo.jev.adaptiveEligible": "Eligible candidates before filtering",
   "stlo.jev.adaptiveNative": "Native hits",
   "stlo.jev.adaptiveDurable": "Additional durable-memory candidates",
-  "stlo.jev.adaptiveRecent": "Additional recent candidates"
+  "stlo.jev.adaptiveRecent": "Additional recent candidates",
+  "stlo.jev.partial": "Partial injection (experimental)",
+  "stlo.jev.partialHelp": "Only long structured Scene memories, with a built-in prompt and no reading limits. Jev may select a safe excerpt in the same request; uncertainty keeps the full text. Full-text budgets and native activation remain unchanged.",
+  "stlo.jev.partialQuestions": "Successful excerpt questions",
+  "stlo.jev.partialSelected": "Confident excerpt selections",
+  "stlo.jev.partialApplied": "Excerpts applied to final scan",
+  "stlo.jev.partialSavedChars": "Characters removed from final scan (not tokens)"
 }
