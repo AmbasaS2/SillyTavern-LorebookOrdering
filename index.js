@@ -1155,6 +1155,8 @@ function installStloModalStyles() {
         .stlo-info-popup[hidden] { display: none !important; }
         .stlo-info-popup small { display: block; margin: 0; font-size: 14px; line-height: 1.5; color: inherit; }
         .stlo-info-popup small + small { margin-top: 6px; }
+        .stlo-info-popup [data-i18n="stlo.jev.modeHelp"],
+        .stlo-info-popup [data-i18n="stlo.jev.adaptiveHelp"] { white-space: pre-line; }
         .stlo-modal-ui .stlo-jev-advanced { width: 100%; box-sizing: border-box; margin: 2px 0; }
         .stlo-modal-ui .stlo-jev-advanced > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
         .stlo-modal-ui .stlo-jev-advanced-body { display: flex; flex-direction: column; gap: 7px; padding: 7px 0 0 6px; width:100%; box-sizing:border-box; min-width:0; }
@@ -2092,12 +2094,12 @@ async function openJevSettings() {
                     </div>
                 </div>
                 <div class="world_entry_form_control stlo-section">
-                <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All: assess every eligible entry instead of ordinary vector recall for Jev books. Filtered: assess only keyword/vector hits. Other vector recall is retained.')}</div>
+                <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All passes every eligible lore entry to Jev.\n\nWith search candidates, Jev assesses only keyword and vector hits.\n\nAutomatic switching uses all entries for smaller inputs. For large inputs, it narrows the list to search hits plus extra memory candidates.')}</div>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="all" ${jevOptions.mode === "all" ? "checked" : ""}><span data-i18n="stlo.jev.modeAll">All eligible lorebook entries (default)</span></label>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="filtered" ${jevOptions.mode === "filtered" ? "checked" : ""}><span data-i18n="stlo.jev.modeFiltered">Vector / keyword search candidates</span></label>
-                <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="adaptive" ${jevOptions.mode === "adaptive" ? "checked" : ""}><span data-i18n="stlo.jev.modeAdaptive">Adaptive (experimental)</span></label>
+                <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="adaptive" ${jevOptions.mode === "adaptive" ? "checked" : ""}><span data-i18n="stlo.jev.modeAdaptive">Switch by input size (experimental)</span></label>
                 <div class="stlo-jev-field" id="stlo-jev-adaptive-field" ${jevOptions.mode==='adaptive'?'':'hidden'}>
-                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Full-plan input threshold (estimated tokens)</label>${infoHelp('stlo.jev.adaptiveHelp','Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues, concise entries, explicit long-term/NPC records, concrete title/key matches, and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.')}</div>
+                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Switching threshold (estimated input tokens)</label>${infoHelp('stlo.jev.adaptiveHelp', 'At or below the threshold, Jev assesses all eligible entries. If the estimate is higher or an entry exceeds the request limit, Jev assesses search hits plus extra memory candidates.\n\nIf World Info vector search is unavailable or finds no candidates, Jev uses all eligible entries.\n\nThis threshold estimates what Jev reads. The separate total Jev budget controls how much lore is injected.')}</div>
                     <input type="number" id="stlo-jev-adaptive-threshold" class="text_pole textarea_compact" min="1" max="100000000" step="1" value="${jevOptions.adaptiveThreshold??DEFAULT_JEV_ADAPTIVE_THRESHOLD}">
                 </div>
                 </div>
