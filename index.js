@@ -15,6 +15,11 @@ import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normal
 
 import { createJevPromptLibrary, mountJevPromptLibrary } from './jevPromptLibrary.mjs';
 
+function slothToastTitle() {
+    const locale = String(getCurrentLocale() || '').toLowerCase();
+    return '🦥 ' + (/^ko(?:[-_]|$)/.test(locale) ? '로어북 예산 관리' : 'STLO');
+}
+
 const EXTENSION_NAME = 'stlo';
 const SELECTORS = {
     WORLD_EDITOR_SELECT: '#world_editor_select',
@@ -334,7 +339,7 @@ const HAS_WORLDINFO_SCAN_DONE = Boolean(event_types && event_types.WORLDINFO_SCA
 const DEBUG_STLO = false;
 function stloDebug(...args) {
     if (DEBUG_STLO && typeof console !== 'undefined') {
-        console.info('[STLO][DEBUG]', ...args);
+        console.info('🦥 STLO', '[STLO][DEBUG]', ...args);
     }
 }
 // Utility functions
@@ -419,10 +424,10 @@ async function loadStloLocale() {
                 stloDebug('Unable to expose stloI18nStatus:', e2);
             }
         } catch (e) {
-            console.warn('[STLO i18n] applyLocale() threw:', e);
+            console.warn('🦥 STLO', '[STLO i18n] applyLocale() threw:', e);
         }
     } catch (e) {
-        console.warn('[STLO] i18n load failed:', e);
+        console.warn('🦥 STLO', '[STLO] i18n load failed:', e);
     }
 }
 
@@ -444,7 +449,7 @@ function cleanupListeners(listeners, listenerArray) {
                 source.removeListener(event, handler);
             }
         } catch (error) {
-            console.error('Error removing event listener:', error);
+            console.error('🦥 STLO', 'Error removing event listener:', error);
         }
     });
     listenerArray.length = 0;
@@ -463,7 +468,7 @@ function setupEventHandlers() {
         try {
             await handleWorldInfoEntriesLoaded(data);
         } catch (e) {
-            console.warn('[STLO] WORLDINFO_ENTRIES_LOADED handler error:', e);
+            console.warn('🦥 STLO', '[STLO] WORLDINFO_ENTRIES_LOADED handler error:', e);
         }
     };
     eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, handler);
@@ -673,7 +678,7 @@ function getCurrentCharacterLinkedLorebooks() {
     try {
         fileName = getCharaFilename(this_chid);
     } catch (error) {
-        console.warn('[STLO] Could not resolve character filename for linked lorebooks:', error);
+        console.warn('🦥 STLO', '[STLO] Could not resolve character filename for linked lorebooks:', error);
     }
 
     const charLore = Array.isArray(world_info?.charLore)
@@ -751,7 +756,7 @@ function getCachedVectorThreshold(world, fallback) {
             && typeof value === 'number' && Number.isFinite(value)
             && value >= 0 && value <= 1) return value;
     } catch (error) {
-        console.error('Error reading cached STLO vector threshold:', error);
+        console.error('🦥 STLO', 'Error reading cached STLO vector threshold:', error);
     }
     return fallback;
 }
@@ -956,7 +961,7 @@ async function handleWorldInfoEntriesLoaded(eventData) {
         // Older hosts lack a structured budget hook. Do not pre-disable
         // unactivated lore simply because the default global budget is finite.
     } catch (error) {
-        console.warn('[STLO] handleWorldInfoEntriesLoaded error:', error);
+        console.warn('🦥 STLO', '[STLO] handleWorldInfoEntriesLoaded error:', error);
     }
 }
 
@@ -1022,7 +1027,7 @@ function cancelJevReply(run, abort) {
 }
 async function abortJevPreparation(run, abort, error) {
     if (!isCurrentJev(run)) { abort(true); return; }
-    console.warn('[STLO] Jev preparation failed:', error?.name ?? 'Error');
+    console.warn('🦥 STLO', '[STLO] Jev preparation failed:', error?.name ?? 'Error');
     try {
         await askJevRetry(run, error, false);
     } finally {
@@ -1213,7 +1218,7 @@ function guardUnpreparedJevReply(_data, dryRun) {
     if (dryRun || !run?.enabled || run.selection || !isCurrentJev(run)) return;
     updateJevReport(run, { phase: 'cancelled', error: translate('Recall preparation did not complete.', 'stlo.jev.vectorMissing') });
     stopGeneration();
-    toastr.error(translate('Recall preparation did not complete. The reply was cancelled.', 'stlo.jev.prepareCancelled'));
+    toastr.error(translate('Recall preparation did not complete. The reply was cancelled.', 'stlo.jev.prepareCancelled'), slothToastTitle());
 }
 function recordJevActivated(entries) {
     const run = jevGeneration;
@@ -1240,7 +1245,7 @@ async function getLorebookSettings(worldName) {
         // Not in cache: intentionally return defaults without fetching
         return { ...DEFAULT_LOREBOOK_SETTINGS };
     } catch (error) {
-        console.error(`Error reading STLO settings for ${worldName} from cache:`, error);
+        console.error('🦥 STLO', `Error reading STLO settings for ${worldName} from cache:`, error);
         return { ...DEFAULT_LOREBOOK_SETTINGS };
     }
 }
@@ -1286,7 +1291,7 @@ async function setLorebookSettings(worldName, settings) {
         // Native ST updates its cache before saving. Never leave an
         // unverified value cached as though the write had succeeded.
         worldInfoCache.delete(worldName);
-        console.error('[STLO] Error saving or verifying lorebook settings:', worldName, error);
+        console.error('🦥 STLO', '[STLO] Error saving or verifying lorebook settings:', worldName, error);
         return false;
     } finally {
         EXTENSION_STATE.scanWorldSettings = new Map();
@@ -1345,13 +1350,13 @@ async function selectLorebookByIndex(index) {
 async function openStloForLorebook(name) {
     const trimmed = String(name ?? '').trim();
     if (!trimmed) {
-        toastr.warning(translate('Usage: /stlo <lorebook name>', 'stlo.cmd.usage'));
+        toastr.warning(translate('Usage: /stlo <lorebook name>', 'stlo.cmd.usage'), slothToastTitle());
         return '';
     }
 
     const idx = findLorebookIndexByName(trimmed);
     if (idx === -1) {
-        toastr.warning(tKey('stlo.cmd.notfound', 'Lorebook not found: ${0}', trimmed));
+        toastr.warning(tKey('stlo.cmd.notfound', 'Lorebook not found: ${0}', trimmed), slothToastTitle());
         return '';
     }
 
@@ -1382,7 +1387,7 @@ function registerStloSlashCommand() {
             `,
         }));
     } catch (e) {
-        console.warn('[STLO] Failed to register /stlo command:', e);
+        console.warn('🦥 STLO', '[STLO] Failed to register /stlo command:', e);
     }
 }
 
@@ -1490,7 +1495,7 @@ async function openJevSettings() {
                         if (!promptUi || promptUi.isBusy()) return false;
                         const promptState = promptModel.snapshot();
                         if (!promptState) {
-                            toastr.warning(tr('Prompt text cannot be empty.', 'promptEmpty'));
+                            toastr.warning(tr('Prompt text cannot be empty.', 'promptEmpty'), slothToastTitle());
                             return false;
                         }
                         const val = id => document.getElementById(id)?.value;
@@ -1505,13 +1510,13 @@ async function openJevSettings() {
                         };
                         const numeric = [[opts.recent, 1, 100, false], [opts.messageLength, 100, 20000, true], [opts.loreLength, 100, 20000, true]];
                         if (numeric.some(([value, min, max, allowZero]) => !String(value ?? '').trim() || !Number.isSafeInteger(Number(value)) || (!(allowZero && Number(value) === 0) && (Number(value) < min || Number(value) > max)))) {
-                            toastr.error(translate('Check the Jev numeric settings and custom prompt.', 'stlo.jev.validation'));
+                            toastr.error(translate('Check the Jev numeric settings and custom prompt.', 'stlo.jev.validation'), slothToastTitle());
                             return false;
                         }
                         const rawBudget = val('stlo-jev-budget');
                         const budget = Number(rawBudget);
                         if (!String(rawBudget ?? '').trim() || !Number.isSafeInteger(budget) || budget <= 0) {
-                            toastr.error(translate('Enter a positive whole-number injection budget.', 'stlo.jev.invalidBudget'));
+                            toastr.error(translate('Enter a positive whole-number injection budget.', 'stlo.jev.invalidBudget'), slothToastTitle());
                             return false;
                         }
                         result.jevBudget = budget;
@@ -1547,11 +1552,11 @@ async function openJevSettings() {
                 setCharacterJevRecall(settings, avatar, result.characterChoice);
             }
             saveSettingsDebounced();
-            toastr.success(translate('Settings saved.', 'stlo.jev.settingsSaved'));
+            toastr.success(translate('Settings saved.', 'stlo.jev.settingsSaved'), slothToastTitle());
         }
     } catch (error) {
-        console.error('[STLO] Error opening Jev settings:', error);
-        toastr.error(translate('Failed to open or save Jev settings.', 'stlo.jev.settingsError'));
+        console.error('🦥 STLO', '[STLO] Error opening Jev settings:', error);
+        toastr.error(translate('Failed to open or save Jev settings.', 'stlo.jev.settingsError'), slothToastTitle());
     } finally {
         if (frame !== null) cancelAnimationFrame(frame);
         document.getElementById('stlo-info-popup')?.remove();
@@ -1594,7 +1599,7 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
         button.setAttribute('aria-label', label);
     }
     const ui = mountJevPromptLibrary({ target, model: promptModel, generosity: preset, Popup, POPUP_TYPE, tr,
-        warn: message => toastr.warning(message), isOpen });
+        warn: message => toastr.warning(message, slothToastTitle()), isOpen });
     const messageLimit = document.getElementById('stlo-jev-message-length');
     const loreLimit = document.getElementById('stlo-jev-lore-length');
     const readingStatus = document.getElementById('stlo-jev-reading-status');
@@ -1765,7 +1770,7 @@ function readBookSettings(root, currentSettings, characterAvatar, showBookJev) {
     const required = [SELECTORS.LOREBOOK_PRIORITY_SELECT, SELECTORS.LOREBOOK_BUDGET_MODE,
         SELECTORS.LOREBOOK_BUDGET_VALUE, 'lorebook-order-adjustment-enabled', 'lorebook-order-adjustment',
         'lorebook-order-adjustment-group-only', 'lorebook-only-when-speaking'];
-    const fail = (fallback, key) => { toastr.error(translate(fallback, key)); return null; };
+    const fail = (fallback, key) => { toastr.error(translate(fallback, key), slothToastTitle()); return null; };
     if (required.some(id => !field(id))) return fail('Settings form not properly loaded. Please try again.', 'stlo.validation.formNotLoaded');
     const priorityValue = field(SELECTORS.LOREBOOK_PRIORITY_SELECT).value;
     const priority = priorityValue === 'null' ? null : Number(priorityValue);
@@ -1942,14 +1947,14 @@ async function openLorebookSettings(worldName = null) {
                 const onEdit = () => { card.dirty = true; setTitle(card); };
                 for (const event of ['change', 'input', 'stlo-book-change']) listen(editor, event, onEdit, card.editorListeners);
             } catch (error) {
-                console.error('[STLO] Could not open book settings:', name, error);
+                console.error('🦥 STLO', '[STLO] Could not open book settings:', name, error);
                 if (!alive || !cards.includes(card)) return;
                 removeModalListeners(card.editorListeners);
                 card.name = '';
                 card.editor = null;
                 card.body.replaceChildren(card.picker);
                 card.picker.disabled = false;
-                toastr.error(tr('Could not load lorebook settings.', 'loadFailed') + ' ' + name);
+                toastr.error(tr('Could not load lorebook settings.', 'loadFailed') + ' ' + name, slothToastTitle());
             } finally {
                 card.loading = false;
                 card.remove.disabled = false;
@@ -2044,12 +2049,12 @@ async function openLorebookSettings(worldName = null) {
                 }
                 if (failed.length) {
                     status.textContent = tr('Saved', 'savedCount') + ': ' + count + ' · ' + tr('Not verified', 'failedCount') + ': ' + failed.map(card => card.name).join(', ');
-                    toastr.error(status.textContent);
+                    toastr.error(status.textContent, slothToastTitle());
                     failed[0].disclosure.open = true;
                     return false;
                 }
                 if (protect.checked !== getProtectAlwaysOn()) setProtectAlwaysOn(protect.checked);
-                toastr.success(translate('Settings saved.', 'stlo.jev.settingsSaved'));
+                toastr.success(translate('Settings saved.', 'stlo.jev.settingsSaved'), slothToastTitle());
                 return true;
             } finally { setBusy(false); }
         };
@@ -2068,8 +2073,8 @@ async function openLorebookSettings(worldName = null) {
         setupStloInfoPopups(listeners, root);
         await closed;
     } catch (error) {
-        console.error('[STLO] Could not open lorebook manager:', error);
-        toastr.error(translate('Could not open lorebook settings.', 'stlo.manager.loadFailed'));
+        console.error('🦥 STLO', '[STLO] Could not open lorebook manager:', error);
+        toastr.error(translate('Could not open lorebook settings.', 'stlo.manager.loadFailed'), slothToastTitle());
     } finally {
         alive = false;
         for (const card of cards) { removeModalListeners(card.editorListeners); removeModalListeners(card.listeners); }
@@ -2465,11 +2470,11 @@ function getCharacterOverrides(root, existing = {}) {
     for (const row of container.querySelectorAll('.stlo-group-card')) {
         const key = row.querySelector('.stlo-group-character').value;
         if (!key) {
-            toastr.error(translate('Select a character or remove the empty card.', 'stlo.modal.groupOverrides.emptyCard'));
+            toastr.error(translate('Select a character or remove the empty card.', 'stlo.modal.groupOverrides.emptyCard'), slothToastTitle());
             return null;
         }
         if (overrides.has(key)) {
-            toastr.error(translate('Choose each character only once.', 'stlo.modal.groupOverrides.duplicate'));
+            toastr.error(translate('Choose each character only once.', 'stlo.modal.groupOverrides.duplicate'), slothToastTitle());
             return null;
         }
         const priority = Number(row.querySelector('.stlo-group-priority-select').value);
@@ -2477,11 +2482,11 @@ function getCharacterOverrides(root, existing = {}) {
         const raw = row.querySelector('.stlo-group-adjustment').value;
         const orderAdjustment = enabled ? Number(raw) : 0;
         if (!Number.isInteger(priority) || priority < 1 || priority > 5) {
-            toastr.error(translate('Priority value must be between 1 and 5', 'stlo.validation.priorityRange'));
+            toastr.error(translate('Priority value must be between 1 and 5', 'stlo.validation.priorityRange'), slothToastTitle());
             return null;
         }
         if ((enabled && !raw.trim()) || !Number.isInteger(orderAdjustment) || orderAdjustment < -10000 || orderAdjustment > 10000) {
-            toastr.error(translate('Order adjustment must be between -10000 and 10000', 'stlo.validation.orderAdjustmentRange'));
+            toastr.error(translate('Order adjustment must be between -10000 and 10000', 'stlo.validation.orderAdjustmentRange'), slothToastTitle());
             return null;
         }
         overrides.set(key, { ...(Object.hasOwn(existing, key) ? existing[key] : {}), priority, orderAdjustment });
@@ -2615,7 +2620,7 @@ async function applyPriorityOrdering(eventData) {
             stloDebug('applyPriorityOrdering summary:', { processed: processedEntries.length, skippedOnlyWhenSpeaking });
         }
     } catch (error) {
-        console.error('Error applying priority ordering:', error);
+        console.error('🦥 STLO', 'Error applying priority ordering:', error);
     }
 }
 
@@ -2640,11 +2645,11 @@ async function init() {
             if (HAS_WORLDINFO_SCAN_DONE) {
                 registerPerLoopBudgetTrimmer();
             } else {
-                console.warn('[STLO] This SillyTavern version lacks WORLDINFO_SCAN_DONE. Per-book budget trimming is unavailable without unsafe prompt edits.');
+                console.warn('🦥 STLO', '[STLO] This SillyTavern version lacks WORLDINFO_SCAN_DONE. Per-book budget trimming is unavailable without unsafe prompt edits.');
             }
 
         } catch (error) {
-            console.error('Failed to load STLO extension:', error);
+            console.error('🦥 STLO', 'Failed to load STLO extension:', error);
         }
     };
 
@@ -2683,7 +2688,7 @@ function calculateTotalWIBudget(contextSize = null) {
 
         return (Number.isFinite(totalBudget) && totalBudget > 0) ? totalBudget : 0;
     } catch (e) {
-        console.warn('[STLO] calculateTotalWIBudget error:', e);
+        console.warn('🦥 STLO', '[STLO] calculateTotalWIBudget error:', e);
         return 0;
     }
 }
@@ -2729,7 +2734,7 @@ async function calculateLorebookBudget(settings, totalBudget, contextSize = null
         // default mode → no per-lorebook limit; defer to SillyTavern's global WI handling
         return 0;
     } catch (e) {
-        console.warn('[STLO] calculateLorebookBudget error:', e);
+        console.warn('🦥 STLO', '[STLO] calculateLorebookBudget error:', e);
         return 0;
     }
 }
@@ -2754,7 +2759,7 @@ function registerBudgetEnforcementHandlers() {
 
         EXTENSION_STATE.budgetHandlersRegistered = true;
     } catch (e) {
-        console.warn('[STLO] Failed to register budget reset handlers:', e);
+        console.warn('🦥 STLO', '[STLO] Failed to register budget reset handlers:', e);
     }
 }
 
@@ -2953,13 +2958,13 @@ function registerPerLoopBudgetTrimmer() {
                 if (dropped) stloDebug('Trimmed WI entries structurally:', dropped);
                 if (run?.selection && args?.state?.next === 0) recordJevActivated([...entries.values()]);
             } catch (e) {
-                console.warn('[STLO] per-loop budget trimmer error:', e);
+                console.warn('🦥 STLO', '[STLO] per-loop budget trimmer error:', e);
             }
         };
 
         eventSource.on(event_types.WORLDINFO_SCAN_DONE, onScanDone);
         eventListeners.push({ source: eventSource, event: event_types.WORLDINFO_SCAN_DONE, handler: onScanDone });
     } catch (e) {
-        console.warn('[STLO] Failed to register per-loop budget trimmer:', e);
+        console.warn('🦥 STLO', '[STLO] Failed to register per-loop budget trimmer:', e);
     }
 }
