@@ -192,6 +192,8 @@ Jev is a **decision model**, not your RP writing model. It selects eligible exis
 
 <p align="left"><img src="assets/readme/mobile/ui-jev-settings.svg" alt="Jev 설정 / Jev settings" width="480" /></p>
 
+To find **Latest Jev recall**, expand **Advanced Jev settings** and scroll to its bottom.
+
 **Step 1 — Prepare NanoGPT**
 
 1. Create or use a subscription API key.
@@ -210,7 +212,7 @@ The ordinary NanoGPT endpoint or its native connection profile is not selectable
 
 Continue RP normally. Lorebook Ordering automatically requests `typesafe/jev-1.14`. You do not have to change your main API or the saved profile's normal chat model.
 
-> 🦥 **Why NanoGPT only?** I was too lazy to install an extra server plugin, so I implemented Jev through NanoGPT’s subscription endpoint only. Now I’m (very lazily) waiting for SillyTavern to support Jev natively.
+> 🦥 **Why NanoGPT only, instead of a direct Jev key?** This fork supports Jev through NanoGPT’s subscription endpoint only. Connecting a Jev key directly would mean installing a separate server plugin… and I was too lazy for that. I'll wait, very patiently, for SillyTavern to support direct Jev keys without a plugin. (The name is not an accident.)
 
 | Scope | Setting |
 | --- | --- |
@@ -666,6 +668,8 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 <p align="left"><img src="assets/readme/mobile/ui-jev-settings.svg" alt="Jev 설정 / Jev settings" width="480" /></p>
 
+**최근 Jev 실행**은 **Jev 고급 설정**을 펼친 뒤 아래쪽에서 찾을 수 있습니다.
+
 **1단계. 나노GPT 연결 준비**
 
 1. 나노GPT 구독 API 키 준비.
@@ -684,7 +688,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 평소처럼 롤플하면 STLO가 `typesafe/jev-1.14`를 자동 지정합니다. 메인 RP API나 프로필의 일반 채팅 모델을 바꿀 필요 없습니다.
 
-> 🦥 **왜 나노GPT만 지원하나요?** 제가 별도 서버 플러그인까지 설치하기 귀찮아서 나노GPT 구독 경로로만 구현했습니다. 실리태번이 언젠가 Jev를 자체 지원해 주길 느긋하게 기다리는 중입니다. (게으름뱅이의 소원)
+> 🦥 **왜 Jev 키는 직접 연동할 수 없고 나노GPT만 되나요?** 이 포크에서는 Jev를 나노GPT 구독 전용 경로로만 사용할 수 있습니다. Jev 키를 직접 연동하려면 별도 서버 플러그인까지 설치해야 하는데요… 제가 귀찮았습니다. 실리태번이 언젠가 플러그인 없이 Jev 키를 직접 연동할 수 있게 해 주는 그날까지 느긋하게 기다리겠습니다. (괜히 게으름뱅이가 아닙니다. 🦥)
 
 | 적용 범위 | 설정 |
 | --- | --- |
