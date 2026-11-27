@@ -737,11 +737,26 @@ export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoB
     const relevantConstants = [...constants.values()].filter(entry =>
         worlds.has(entry.world) || !entry.ignoreBudget || entry.__stloReservedConstant === true);
     const selected = ranked.map(key => candidates.get(key)).filter(Boolean);
-    const counts = new Map(await Promise.all([...relevantConstants, ...selected].map(async entry => {
-        const tokens = await countEntryTokens(entry);
-        if (!Number.isFinite(tokens) || tokens <= 0) throw Error('Could not count lore tokens.');
-        return [jevEntryKey(entry), tokens];
-    })));
+    // Keep the same counts and admission order, but avoid sending a burst of
+    // tokenizer work for every selected lore entry at once on large books.
+    const toCount = [...relevantConstants, ...selected];
+    const counts = new Map();
+    let nextCount = 0;
+    let countFailed = false;
+    const countWorker = async () => {
+        while (!countFailed && nextCount < toCount.length) {
+            const entry = toCount[nextCount++];
+            try {
+                const tokens = await countEntryTokens(entry);
+                if (!Number.isFinite(tokens) || tokens <= 0) throw Error('Could not count lore tokens.');
+                counts.set(jevEntryKey(entry), tokens);
+            } catch (error) {
+                countFailed = true;
+                throw error;
+            }
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, toCount.length) }, countWorker));
     const usedByBook = new Map();
     let usedTotal = 0;
     let usedJev = 0;

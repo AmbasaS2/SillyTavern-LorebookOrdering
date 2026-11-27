@@ -633,3 +633,23 @@ test('adaptive cue and plan caches stay bounded and useful over repeated oversiz
     console.log('oversized-book warm scans:',JSON.stringify({runs:20,entries:1600,cueCacheHits:warm.hits,planCacheHits:20*1024,elapsedMs:Math.round(performance.now()-started)}));
     cues.clear();assert.deepEqual(cues.stats(),{entries:0,chars:0,hits:0,misses:0});
 });
+
+
+test('Jev admission bounds concurrent tokenizer work and preserves relevance order', async () => {
+    const entries = Array.from({ length: 24 }, (_, i) => lore('Memory', i, 'memory ' + i));
+    const ranked = entries.map(jevEntryKey).reverse();
+    let inFlight = 0, peak = 0, calls = 0;
+    const selected = await fitJevRecall(entries, new Set(['Memory']), ranked, {
+        budget: 80, worldInfoBudget: 80, bookBudgets: new Map(),
+        countTokens: async () => {
+            calls++;
+            peak = Math.max(peak, ++inFlight);
+            await new Promise(resolve => setTimeout(resolve, 1));
+            inFlight--;
+            return 10;
+        },
+    });
+    assert.equal(calls, entries.length);
+    assert.ok(peak <= 3);
+    assert.deepEqual([...selected.keys()], ranked.slice(0, 8));
+});
