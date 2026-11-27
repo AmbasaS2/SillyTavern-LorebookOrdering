@@ -450,7 +450,7 @@ It updates on generation events only. No new DOM observer, polling or repeated U
 > [!TIP]
 > Memory Books creates and maintains memories; STLO recalls them like other eligible lore. WorldInfo Info can show confirmed Jev activation, and Lorebook Manager can read those entries. None is required. Jev never changes the RP model or the saved lore.
 
-[Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info of Sloth / 나무늘보의 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
+[Sloth the Lorebook Manager / 로어북 매니저: 게으름뱅이](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info of Sloth / 게으름뱅이가 읽는 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
 
 The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
 
@@ -927,7 +927,7 @@ Jev OFF: 기존 검색 방식 유지. 저장된 벡터·로어·발동 설정은
 > [!TIP]
 > 메모리북은 기억을 저장하고 STLO는 그 기억을 포함한 기존 로어를 호출합니다. 월드인포인포에서는 실제 Jev 발동을 확인하고 로어북 매니저에서는 내용을 읽을 수 있습니다. 모두 선택 사항이며 STLO는 원문과 RP 모델을 변경하지 않습니다.
 
-[Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info of Sloth / 나무늘보의 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
+[Sloth the Lorebook Manager / 로어북 매니저: 게으름뱅이](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [WorldInfo Info of Sloth / 게으름뱅이가 읽는 월드인포인포](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo)
 
 아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
