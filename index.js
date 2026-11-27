@@ -1703,20 +1703,13 @@ async function decideJevWithRetry(run, prepared, batches) {
         }
     }
     if(queue.length||!isCurrentJev(run))return null;
-    const ranked=rankJevDecisions(prepared,decisions);
-    for(const item of decisions){
-        if(item.bonus){
-            if(item.key!==ranked.at(-1))continue;
-            run.bonusKey=item.key;
-        }
-        run.metrics.selected.set(item.key,{decision:'include',score:Number.isFinite(item.score)?item.score:null,
+    for(const item of decisions)run.metrics.selected.set(item.key,{decision:'include',score:Number.isFinite(item.score)?item.score:null,
         source:run.candidateSources?.get(item.key)??(run.options.mode==='filtered'?'native':'all')});
-    }
     if(run.options.partialInjection===true){
         run.excerpts=new Map(decisions.filter(item=>item.excerpt).map(item=>[item.key,item.excerpt]));
         updateJevReport(run,{partialSelected:run.excerpts.size});
     }
-    return ranked;
+    return rankJevDecisions(prepared, decisions);
 }
 
 // The optional filtered mode uses a native dry scan after the existing vector
@@ -1846,7 +1839,7 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         const diagnostics = new Map();
         const accepted = await fitJevRecall(entries, worlds, ranked, {
             budget, worldInfoBudget: worldInfoBudget || Infinity, bookBudgets, countTokens: getTokenCountAsync, countEntryTokens:countBudgetEntry,
-            bookPriorities, diagnostics, bonusKey:run.bonusKey,
+            bookPriorities, diagnostics,
         });
         if (!isCurrentJev(run)) { abort(true); return; }
         run.metrics.limits=new Map(bookBudgets);
@@ -2121,7 +2114,7 @@ async function openJevSettings() {
                     <div class="stlo-option-line stlo-jev-style-row">
                         <select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select>
                         <label class="checkbox_label stlo-checkrow" for="stlo-jev-bonus"><input type="checkbox" id="stlo-jev-bonus" ${jevOptions.bonus?'checked':''}><span class="checkmark"></span><i class="fa-solid fa-gift" aria-hidden="true"></i><span data-i18n="stlo.jev.bonus">Bonus</span></label>
-                        ${infoHelp('stlo.jev.bonusHelp', 'Jev can add one unexpected memory that enriches the scene, if there is room after the usual selections.')}
+                        ${infoHelp('stlo.jev.bonusHelp', 'Jev also looks for memories that could make the current scene more entertaining or surprising.')}
                     </div>
                 </div>
                 </div>

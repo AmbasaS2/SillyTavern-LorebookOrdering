@@ -198,7 +198,7 @@
   "stlo.jev.balanced": "平衡",
   "stlo.jev.generous": "宽松",
   "stlo.jev.bonus": "彩蛋",
-  "stlo.jev.bonusHelp": "常规筛选后若还有预算，Jev 可以添加一条能为场景增添趣味的意外记忆。",
+  "stlo.jev.bonusHelp": "Jev 也会寻找能让当前场景更有趣或带来意外感的记忆。",
   "stlo.jev.prompt": "选择提示词",
   "stlo.jev.promptHelp": "编辑判定标准，而非结构化响应格式。设置在所有角色间共享。",
   "stlo.jev.reset": "恢复默认",
