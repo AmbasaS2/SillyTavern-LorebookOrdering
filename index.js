@@ -399,7 +399,7 @@ function reportNum(value){
     return Number.isFinite(value)?value.toLocaleString():translate('Unmeasured','stlo.metrics.unmeasured');
 }
 function reportSeconds(ms){
-    return Number.isFinite(ms)?(ms/1000).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' s':reportNum(null);
+    return Number.isFinite(ms)?(ms/1000).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+reportLabel('seconds','s'):reportNum(null);
 }
 function reportUsage(value,reported,successful){
     return Number.isFinite(value)&&reported>0&&Number.isFinite(successful)?reportNum(value):reportNum(null);
@@ -478,6 +478,9 @@ function appendReportBudget(panel,report,budgetOnly){
         const value=reportNode(block,'div','stlo-report-hero stlo-report-budget-number');
         reportNode(value,'strong','',reportNum(report.sharedJevUsed));
         if(Number.isFinite(report.sharedJevBudget))reportNode(value,'span','','/ '+reportNum(report.sharedJevBudget)+' '+reportLabel('tokens','tokens'));
+        if(Number.isFinite(report.sharedJevBudget)&&report.sharedJevBudget>0&&Number.isFinite(report.sharedJevUsed)&&report.sharedJevUsed>=0){
+            reportNote(value,(100*report.sharedJevUsed/report.sharedJevBudget).toLocaleString(undefined,{maximumFractionDigits:1})+'%');
+        }
         reportBudgetBar(block,report.sharedJevBudget,report.sharedJevUsed);
         if(Number.isFinite(report.sharedJevRemaining))reportLine(block,reportLabel('remaining','Remaining budget'),reportNum(report.sharedJevRemaining));
         const known=report.finalRecallBudgetUnknown?' ('+reportNum(report.finalRecallBudgetKnown)+' + '+report.finalRecallBudgetUnknown+' '+tr('Unmeasured','unmeasured')+')':'';
@@ -499,7 +502,7 @@ function appendReportSearch(panel,report){
     const block=reportNode(panel,'section','stlo-report-primary');
     reportHeading(block,reportLabel('searchUsage','AI search usage'),'magnifying-glass');
     const grid=reportNode(block,'div','stlo-report-search-grid');
-    const coverage=(reported,total)=>Number.isFinite(reported)&&Number.isFinite(total)&&reported<total?reported+'/'+total:null;
+    const coverage=(reported,total)=>Number.isFinite(reported)&&Number.isFinite(total)&&reported<total?reportLabel('reportedRequests','Reported requests')+': '+reported+'/'+total:null;
     reportStat(grid,reportLabel('input','Input tokens'),reportUsage(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests),coverage(report.usageReportedBatches,report.successfulRequests));
     reportStat(grid,reportLabel('output','Output tokens'),reportUsage(report.actualOutputTokens,report.outputUsageBatches,report.successfulRequests),coverage(report.outputUsageBatches,report.successfulRequests));
     reportStat(grid,reportLabel('requests','AI requests'),reportNum(report.requests));
@@ -512,16 +515,22 @@ function appendReportRP(panel,report){
     reportHeading(block,reportLabel('rpInclusion','RP prompt inclusion'),'circle-info');
     const rp=report.rpInjection,activated=reportActivation(report);
     if(!rp){
+        if(Number.isFinite(activated))reportLine(block,reportLabel('unknown','Unconfirmed'),reportNum(activated));
         reportNote(block,translate('Final RP inclusion is unmeasured unless a compatible viewer provides evidence. Activation is not proof of injection.','stlo.metrics.rpUnavailable'));
         return;
     }
-    const grid=reportNode(block,'div','stlo-report-rp-grid');
-    for(const [label,value] of [[reportLabel('confirmed','Confirmed'),rp.confirmed],[reportLabel('excluded','Excluded'),rp.excluded],[reportLabel('unknown','Unconfirmed'),rp.unknown]])
-        reportStat(grid,label,reportNum(value));
-    // Show unknown rather than implying an activation receipt was a final payload.
+    if(rp.confirmed===0&&rp.excluded===0&&rp.unknown>0){
+        reportLine(block,reportLabel('unknown','Unconfirmed'),reportNum(rp.unknown));
+    }else{
+        const grid=reportNode(block,'div','stlo-report-rp-grid');
+        for(const [label,value] of [[reportLabel('confirmed','Confirmed'),rp.confirmed],[reportLabel('excluded','Excluded'),rp.excluded],[reportLabel('unknown','Unconfirmed'),rp.unknown]])
+            reportStat(grid,label,reportNum(value));
+    }
     if(rp.unknown>0||rp.complete!==true)reportNote(block,reportLabel('rpPending','Activation alone does not confirm final RP inclusion.'));
-    reportLine(block,reportLabel('rpTokens','Confirmed RP memory tokens'),reportNum(rp.tokens));
-    reportNote(block,reportLabel('rpMeasured','Measured entries')+': '+reportNum(rp.measured)+' / '+reportNum(rp.confirmed));
+    if(rp.confirmed>0||rp.complete===true){
+        reportLine(block,reportLabel('rpTokens','Confirmed RP memory tokens'),reportNum(rp.tokens));
+        if(rp.measured!==rp.confirmed)reportNote(block,reportLabel('rpMeasured','Measured entries')+': '+reportNum(rp.measured)+' / '+reportNum(rp.confirmed));
+    }
 }
 function appendMemoryMetrics(panel,report){
     if(!report||report.metricsId===undefined)return;
@@ -1100,7 +1109,7 @@ function installStloModalStyles() {
         .stlo-report-section > summary:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
         .stlo-report-section-body { display:grid; gap:3px; padding:3px 10px 10px; min-width:0; }
         .stlo-report-section[open] > .stlo-report-section-body { border-top:1px solid var(--stlo-report-rule); }
-        .stlo-report-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,auto); align-items:baseline; gap:8px; padding-block:4px; font-size:.88em; line-height:1.4; min-width:0; }
+        .stlo-report-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,42%); align-items:baseline; gap:8px; padding-block:4px; font-size:.88em; line-height:1.4; min-width:0; }
         .stlo-report-row > span:first-child { min-width:0; overflow-wrap:anywhere; }
         .stlo-report-value { min-width:0; text-align:end; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; font-weight:600; }
         .stlo-report-book-card { display:grid; gap:2px; min-width:0; padding:8px 0; border-bottom:1px solid var(--stlo-report-rule); }

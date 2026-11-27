@@ -779,9 +779,10 @@ test('readable Jev report keeps partial usage and unconfirmed activation distinc
     const has=t=>nodes.some(n=>n.textContent===t);
     const hero=nodes.find(n=>n.className==='stlo-report-hero');
     assert.equal(hero.children[0].textContent,'Unmeasured');
-    assert.ok(has('56,494'));assert.ok(has('1/2'));assert.ok(has('94,218'));
+    assert.ok(has('56,494'));assert.ok(has('Reported requests: 1/2'));assert.ok(has('94,218'));
     assert.ok(has('3.47 s'));assert.ok(has('3.76 s'));
-    assert.ok(has('Unconfirmed'));assert.ok(has('Confirmed RP memory tokens'));
+    assert.ok(has('Unconfirmed'));assert.ok(has('Confirmed RP Jev memory: rendered individual tokens (host estimate)'));
+    assert.ok(!has('Confirmed RP memory tokens'),'all-unconfirmed summary stays compact');
     assert.ok(!nodes.some(n=>n.className==='stlo-report-budget-bar'));
     assert.ok(!has('No budget exclusions'));
     assert.ok(nodes.filter(n=>n.className==='stlo-report-section').every(n=>!n.open));
