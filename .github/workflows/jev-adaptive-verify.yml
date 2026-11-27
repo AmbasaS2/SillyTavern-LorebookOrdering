@@ -1,7 +1,7 @@
 name: Verify adaptive Jev recall
 on:
   push:
-    branches: [main, dev/jev-adaptive-recall, fix/stlo-metrics-lifecycle]
+    branches: [main, dev/jev-adaptive-recall, fix/stlo-metrics-lifecycle, test/stlo-standalone-host]
   pull_request:
     branches: [main]
 jobs:

@@ -578,3 +578,37 @@ test('metadata anchor cache notices title and keyword edits without touching ful
     cache.clear();
     assert.equal(get().anchorCount,1);
 });
+
+
+test('adaptive cue and plan caches stay bounded and useful over repeated oversized book scans',async()=>{
+    const {createAdaptiveCueCache,createAdaptivePlanCache,estimateAdaptiveJevPlan,coverAdaptiveJevCandidates}=await import('./jevRecall.mjs');
+    const entries=Array.from({length:1600},(_,i)=>({world:'large',uid:i,comment:'Archive '+i,key:[],content:i%137===0?'Mara made a promise. '+('Plain wall. ').repeat(48):('An ordinary stone terrace '+i+'. ').repeat(26)}));
+    const worlds=new Set(['large']),native=new Set([jevEntryKey(entries[10])]);
+    const messages=[{mes:'Mara examines the seal.'}];
+    const plan=createAdaptivePlanCache({maxEntries:1024,maxChars:2000000});
+    const cues=createAdaptiveCueCache({maxEntries:1024,maxChars:2000000});
+    const first=coverAdaptiveJevCandidates(entries,worlds,native,{messages,cueCache:cues});
+    const initial=cues.stats(),expected=[...first.candidateKeys].sort();
+    const p=estimateAdaptiveJevPlan(entries,worlds,messages,{},plan);
+    assert.equal(initial.entries,1024);
+    assert.equal(initial.hits,0);
+    assert.equal(p.cacheMisses,1600);
+    const started=performance.now();
+    for(let i=0;i<20;i++){
+        const next=coverAdaptiveJevCandidates(entries,worlds,native,{messages,cueCache:cues});
+        assert.deepEqual([...next.candidateKeys].sort(),expected);
+        const q=estimateAdaptiveJevPlan(entries,worlds,messages,{},plan);
+        assert.equal(q.estimatedTokens,p.estimatedTokens);
+        assert.equal(q.cacheHits,1024);
+    }
+    const warm=cues.stats();
+    assert.equal(warm.hits,20*1024);
+    assert.equal(warm.entries,1024);
+    assert.ok(warm.chars<=2000000);
+    entries[0].content='A different record about a wooden shelf. '.repeat(22);
+    const next=coverAdaptiveJevCandidates(entries,worlds,native,{messages,cueCache:cues});
+    assert.equal(next.candidateKeys.has(jevEntryKey(entries[0])),false);
+    assert.equal(cues.stats().misses-warm.misses,576);
+    console.log('oversized-book warm scans:',JSON.stringify({runs:20,entries:1600,cueCacheHits:warm.hits,planCacheHits:20*1024,elapsedMs:Math.round(performance.now()-started)}));
+    cues.clear();assert.deepEqual(cues.stats(),{entries:0,chars:0,hits:0,misses:0});
+});

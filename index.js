@@ -168,6 +168,17 @@ function metricsScope(){
 function currentMetrics(){
     try{return metricsCurrent&&metricsCurrent.scope===metricsScope()?metricsCurrent:null;}catch{return null;}
 }
+function canShareMetrics(m,tokenizer=metricsTokenizer()){
+    if(!m||m.sharingInvalidated)return false;
+    if(m.tokenizer!==tokenizer){
+        // Once an incompatible tokenizer was observed, an old opaque handle
+        // must not revive when the user later returns to that tokenizer.
+        m.sharingInvalidated=true;
+        m.ledger.clear();m.companionPending.clear();
+        return false;
+    }
+    return Boolean(tokenizer);
+}
 function beginMetrics(run){
     // One latest generation ledger; history stores numeric snapshots only.
     metricsCurrent?.ledger.clear();
@@ -225,13 +236,14 @@ async function countBudgetEntry(entry){
     const text=content+'\n';
     const tokenizer=metricsTokenizer();
     let count;
-    if(tokenizer&&m.tokenizer===tokenizer){
+    if(canShareMetrics(m,tokenizer)){
         count=await m.ledger.measure({target:jevEntryKey(entry),text,tokenizer},()=>countWithLoreInsight(text),
             ()=>currentMetrics()===m&&metricsTokenizer()===tokenizer);
         count=count??0;
     }else{
-        // Unknown tokenizer cannot safely share across cloned entries.
-        count=await getEntryTokenCountCached(entry);
+        // Unknown tokenizer cannot safely share across cloned entries. If
+        // identity changed mid-run, do not use the old object count cache.
+        count=m.sharingInvalidated?await getTokenCountAsync(text).catch(()=>0):await getEntryTokenCountCached(entry);
     }
     observeBudgetCount(m,entry,text,count,tokenizer);
     return count;
@@ -241,7 +253,7 @@ function knownBudgetCount(m,entry){
     const tokenizer=metricsTokenizer();
     const local=m.localCounts.get(entry);
     if(local?.text===text&&local.tokenizer===tokenizer)return local.count;
-    if(tokenizer&&m.tokenizer===tokenizer)return m.ledger.lookup({target:jevEntryKey(entry),text,tokenizer});
+    if(canShareMetrics(m,tokenizer))return m.ledger.lookup({target:jevEntryKey(entry),text,tokenizer});
     return null;
 }
 function publishScanMetrics(run, entries, observed){
@@ -301,16 +313,16 @@ function installMemoryMetricsBridge(){
         version:METRICS_VERSION,
         context(){
             const m=currentMetrics();const tokenizer=metricsTokenizer();
-            return m?.active&&tokenizer&&m.tokenizer===tokenizer?{generation:m.handle,tokenizer}:null;
+            return m?.active&&canShareMetrics(m,tokenizer)?{generation:m.handle,tokenizer}:null;
         },
         lookup({generation,tokenizer,target,text,padding}={}){
             const m=currentMetrics();
-            if(!m?.active||m.handle!==generation||m.tokenizer!==tokenizer||metricsTokenizer()!==tokenizer)return null;
+            if(!m?.active||m.handle!==generation||!canShareMetrics(m)||m.tokenizer!==tokenizer)return null;
             return m.ledger.lookup({target,text,tokenizer,padding});
         },
         async measure({generation,tokenizer,target,text,padding}={}){
             const m=currentMetrics();
-            const valid=()=>currentMetrics()===m&&m?.active&&m.handle===generation&&m.tokenizer===tokenizer&&metricsTokenizer()===tokenizer;
+            const valid=()=>currentMetrics()===m&&m?.active&&m.handle===generation&&canShareMetrics(m)&&m.tokenizer===tokenizer;
             if(!valid()||typeof text!=='string'||typeof target!=='string')return null;
             // The current companion counter calls the host directly. A future
             // recursive adapter must not wait on its own in-flight promise.
@@ -320,7 +332,7 @@ function installMemoryMetricsBridge(){
         },
         selection({generation,key}={}){
             const m=currentMetrics();
-            if(!m?.active||m.handle!==generation||typeof key!=='string')return null;
+            if(!m?.active||m.handle!==generation||!canShareMetrics(m)||typeof key!=='string')return null;
             const selected=m.selected.get(key);
             if(!selected)return null;
             return {...selected,budget:m.accepted.has(key)?(m.trims.get(key)??'accepted'):(selected.budget??'not-accepted'),
@@ -328,7 +340,7 @@ function installMemoryMetricsBridge(){
         },
         publishInjection({generation,tokenizer,records,complete}={}){
             const m=currentMetrics();
-            if(!m?.active||!m.recallEnabled||m.handle!==generation||m.tokenizer!==tokenizer||metricsTokenizer()!==tokenizer||m.activated===null)return false;
+            if(!m?.active||!m.recallEnabled||m.handle!==generation||!canShareMetrics(m)||m.tokenizer!==tokenizer||m.activated===null)return false;
             // The companion owns final payload evidence. We aggregate only
             // STLO-selected entries; ignore native-only entries on this side.
             if(!Array.isArray(records))return false;
@@ -611,11 +623,25 @@ function finishJevGeneration() {
     stopJevGeneration();
 }
 function onJevStopped() {
-    if (jevGeneration?.metrics?.active && jevGeneration.report?.phase !== 'cancelled') {
-        updateJevReport(jevGeneration, { phase: 'cancelled' });
+    const run=jevGeneration;
+    if (run?.metrics?.active && run.report?.phase !== 'cancelled') {
+        updateJevReport(run, { phase: 'cancelled' });
     }
-    archiveMetrics(jevGeneration);
-    if(jevGeneration?.metrics===metricsCurrent){metricsCurrent?.ledger.clear();metricsCurrent=null;}
+    archiveMetrics(run);
+    // ST 1.19.1 hideStopButton emits GENERATION_ENDED before STOPPED.
+    // finishJevGeneration may already have released the run. A STOPPED
+    // event invalidates the remaining handle even in that host ordering.
+    const m=currentMetrics();
+    if(m){
+        m.ledger.clear();m.companionPending.clear();metricsCurrent=null;
+        // Retain factual completed recall statistics, but never display an
+        // unfinished preparation as still running after the host stopped.
+        if(!run&&lastJevReport?.metricsId===m.id&&['preparing','running','retry','ready'].includes(lastJevReport.phase)){
+            lastJevReport={...lastJevReport,phase:'cancelled'};
+            metricsHistory=metricsHistory.map(row=>row.id===m.id?{...row,phase:'cancelled'}:row);
+            syncJevTopBar();
+        }
+    }
     stopJevGeneration();
 }
 function startJevGeneration(type, _options, dryRun) {
