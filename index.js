@@ -750,8 +750,15 @@ function stopJevGeneration() {
     jevGeneration?.controller.abort();
     jevGeneration = null;
 }
+function isJevPreparationPending(run) {
+    return Boolean(run && (run.intercepting || run.awaitingVector || run.preparing));
+}
 function finishJevGeneration() {
     const run = jevGeneration;
+    // Host GENERATION_ENDED is a UI-unlock event, not an identified reply.
+    // Preparation cannot have completed its own reply while still awaiting recall.
+    // Explicit GENERATION_STOPPED and CHAT_CHANGED still cancel immediately.
+    if (isJevPreparationPending(run)) return;
     if (run?.selection && run.report.phase === 'ready') recordJevActivated([],true);
     archiveMetrics(run);
     stopJevGeneration();
@@ -777,6 +784,7 @@ function onJevStopped() {
         }
     }
     stopJevGeneration();
+    resetBudgetState();
 }
 function startJevGeneration(type, _options, dryRun) {
     if (dryRun || !['normal', 'continue', 'regenerate', 'swipe'].includes(type)) return;
@@ -805,6 +813,7 @@ function rememberForcedEntries(entries) {
 async function stloJevInterceptor(chat, contextSize, abort, type) {
     const run = jevGeneration;
     if (!run || !HAS_WORLDINFO_SCAN_DONE || !isCurrentJev(run) || !['normal', 'continue', 'regenerate', 'swipe'].includes(type)) return;
+    run.intercepting = true;
     try {
         run.enabled = run.characterRecall ?? await hasActiveJevLorebook(getContext());
         if (!isCurrentJev(run)) { abort(true); return; }
@@ -842,6 +851,8 @@ async function stloJevInterceptor(chat, contextSize, abort, type) {
         await prepareJevGeneration(run, chat, contextSize, abort, type);
     } catch (error) {
         await abortJevPreparation(run, abort, error);
+    } finally {
+        run.intercepting = false;
     }
 }
 
@@ -1873,7 +1884,10 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
 function guardUnpreparedJevReply(_data, dryRun) {
     const run = jevGeneration;
     if(!dryRun&&run?.metrics?.pending?.keys.size===0&&isCurrentJev(run))publishScanMetrics(run,[],true);
-    if (dryRun || !run?.enabled || run.selection || !isCurrentJev(run)) return;
+    // A parallel background assembly cannot be the visible reply while the
+    // visible interceptor is still executing. Keep the missing-vector fail-safe
+    // when it returned and is only waiting for the native vector interceptor.
+    if (dryRun || run?.intercepting || run?.preparing || !run?.enabled || run.selection || !isCurrentJev(run)) return;
     updateJevReport(run, { phase: 'cancelled', error: translate('Recall preparation did not complete.', 'stlo.jev.vectorMissing') });
     stopGeneration();
     toastr.error(translate('Recall preparation did not complete. The reply was cancelled.', 'stlo.jev.prepareCancelled'), slothToastTitle());
@@ -3437,7 +3451,9 @@ function registerBudgetEnforcementHandlers() {
     try {
         if (EXTENSION_STATE.budgetHandlersRegistered) return;
 
-        const resetGen = resetBudgetState;
+        const resetGen = () => {
+            if (!isJevPreparationPending(jevGeneration)) resetBudgetState();
+        };
         eventSource.on(event_types.GENERATION_ENDED, resetGen);
         eventListeners.push({ source: eventSource, event: event_types.GENERATION_ENDED, handler: resetGen });
 

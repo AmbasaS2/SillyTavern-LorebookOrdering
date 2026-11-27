@@ -16,7 +16,7 @@ const raw = [
 ];
 const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
-function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false,partialInjection=false,partialAnswers,jevBudget=1000,companionMode,group=false}={}) {
+function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false,partialInjection=false,partialAnswers,jevBudget=1000,companionMode,group=false,endDuringJev=false,endBeforeVector=false,stopDuringJev=false}={}) {
     const listeners=new Map();
     const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0,token:0};
     const events=new Proxy({}, {get:(_,key)=>key});
@@ -85,6 +85,8 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         requestJevRecall:async(prepared)=>{
             counters.jev++;
             batches.push([...prepared.candidates.keys()]);
+            if (endDuringJev) await eventSource.emit(events.GENERATION_ENDED);
+            if (stopDuringJev) await eventSource.emit(events.GENERATION_STOPPED);
             if(counters.jev<=sizeFailures)throw new recall.JevInputLimitError('Jev rejected the input size.');
             if(counters.jev<=failures||counters.jev===failAt)throw Error('Jev is unavailable (503).');
             if(partialAnswers){
@@ -124,13 +126,14 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLDINFO_FORCE_ACTIVATE,hits);
     };
     const code=source.replace(/^import .*?;\s*$/gm,'').replace('import.meta.url',JSON.stringify('file:///stlo/index.js'));
-    runInNewContext(code+'\nsetupEventHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration,setCharacterJevRecall,openJevReport};',sandbox);
+    runInNewContext(code+'\nsetupEventHandlers(); registerBudgetEnforcementHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration,setCharacterJevRecall,openJevReport};',sandbox);
     async function generate({dryRun=false}={}){
         await eventSource.emit(events.GENERATION_STARTED,'normal',{},dryRun);
         if(!dryRun)companionCache.clear();
         if(dryRun)return;
         const abort=()=>{counters.abort++;};
         await sandbox.stlo_jevInterceptor(ctx.chat,10000,abort,'normal');
+        if (endBeforeVector) await eventSource.emit(events.GENERATION_ENDED);
         if(!counters.abort&&vectors)await sandbox.vectors_rearrangeChat(ctx.chat,10000,abort,'normal');
         if(counters.abort)return;
         const entries=await sandbox.getSortedEntries();
@@ -808,4 +811,28 @@ test('readable Jev report keeps partial usage and unconfirmed activation distinc
     assert.ok(!nodes.some(n=>n.className==='stlo-report-budget-bar'));
     assert.ok(!has('No budget exclusions'));
     assert.ok(nodes.filter(n=>n.className==='stlo-report-section').every(n=>!n.open));
+});
+
+test('an unrelated UI unlock does not discard a pending paid recall or native vector handoff', async()=>{
+    for (const mode of ['all','filtered']) {
+        const h=harness({mode,endDuringJev:true,endBeforeVector:mode==='filtered'});
+        await h.generate();
+        assert.equal(h.counters.jev,1);
+        assert.equal(h.counters.abort,0);
+        assert.equal(h.counters.vector,1);
+        assert.ok(h.activated().some(e=>e.world==='A'&&e.uid===1));
+        assert.equal(h.report().phase,'done');
+        await h.end();
+        assert.equal(h.report().phase,'done');
+    }
+});
+
+test('an explicit host stop still cancels paid recall and prevents injection',async()=>{
+    const h=harness({stopDuringJev:true});
+    await h.generate();
+    assert.equal(h.counters.jev,1);
+    assert.ok(h.counters.abort>0);
+    assert.equal(h.activated().length,0);
+    assert.equal(h.bridge().context(),null);
+    assert.equal(h.report().phase,'cancelled');
 });
