@@ -171,5 +171,11 @@
   "stlo.jev.status.none": "Noch kein Bericht",
   "stlo.jev.modeAll": "Alle geeigneten Lorebook-Einträge (Standard)",
   "stlo.jev.modeFiltered": "Vektor-/Schlüsselworttreffer",
-  "stlo.jev.close": "Schließen"
+  "stlo.jev.close": "Schließen",
+  "stlo.metrics.budgetReport": "Letzter Lorebook-Budgetbericht",
+  "stlo.metrics.budgetComplete": "Budgetprüfung abgeschlossen",
+  "stlo.metrics.budgetOnlyHelp": "Jev ist aus. Nur bestehende Lore-Budgetprüfungen werden angezeigt.",
+  "stlo.metrics.allActivated": "Alle aktivierten Lore-Einträge",
+  "stlo.metrics.allScanExclusions": "Alle STLO-Scan-Budgetausschlüsse",
+  "stlo.metrics.scanDropped": "Durch STLO-Scanbudget entfernt"
 }

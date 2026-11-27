@@ -293,5 +293,11 @@
   "stlo.metrics.selectionDetails": "Candidate and budget decisions",
   "stlo.metrics.partialDetails": "Partial injection details",
   "stlo.metrics.requestDetails": "Requests, usage and timing",
-  "stlo.metrics.over": "Over budget"
+  "stlo.metrics.over": "Over budget",
+  "stlo.metrics.budgetReport": "Latest lorebook budget report",
+  "stlo.metrics.budgetComplete": "Budget check complete",
+  "stlo.metrics.budgetOnlyHelp": "Jev is off. Only existing lore budget checks are reported.",
+  "stlo.metrics.allActivated": "All activated lore entries",
+  "stlo.metrics.allScanExclusions": "All STLO scan budget exclusions",
+  "stlo.metrics.scanDropped": "Removed by STLO scan budget"
 }

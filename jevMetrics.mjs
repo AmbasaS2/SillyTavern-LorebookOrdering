@@ -52,9 +52,9 @@ export function createTokenLedger({maxEntries=2048,maxChars=2000000}={}){
             const key=descriptor(d);
             if(key===null||typeof measure!=='function'||!isStillValid())return null;
             const existing=find(d);
-            if(existing)return existing.promise;
+            if(existing){const value=await existing.promise;return isStillValid()?value:null;}
             if(d.text.length>maxChars||maxEntries<1){
-                try{const value=await measure();return validCount(value)&&!(value===0&&d.text.trim())?value:null;}catch{return null;}
+                try{const value=await measure();return isStillValid()&&validCount(value)&&!(value===0&&d.text.trim())?value:null;}catch{return null;}
             }
             while(records.size>=maxEntries||chars+d.text.length>maxChars){
                 const first=records.values().next().value;
@@ -67,8 +67,8 @@ export function createTokenLedger({maxEntries=2048,maxChars=2000000}={}){
                 if(!validCount(value)||(value===0&&d.text.trim())){drop(record);return null;}
                 let valid=false;
                 try{valid=isStillValid();}catch{/* Expire unverifiable results. */}
-                if(!valid)drop(record);
-                else record.value=value;
+                if(!valid){drop(record);return null;}
+                record.value=value;
                 return value;
             },()=>{drop(record);return null;});
             return record.promise;
@@ -77,7 +77,20 @@ export function createTokenLedger({maxEntries=2048,maxChars=2000000}={}){
     };
 }
 
-export function summarizeBookBudgets(entries, limits, knownCount, keyOf, originallyIgnored, selectedKeys=new Set(), managedWorlds=new Set()){
+export function summarizeScanTrims(trimReasons,activatedKeys=new Set()){
+    const byBook=new Map();let total=0;
+    for(const [key,reason] of trimReasons){
+        if(activatedKeys.has(key)||!['book','jev','world'].includes(reason))continue;
+        try{
+            const pair=JSON.parse(key);
+            if(!Array.isArray(pair)||pair.length!==2||typeof pair[0]!=='string'||!pair[0])continue;
+            byBook.set(pair[0],(byBook.get(pair[0])??0)+1);total++;
+        }catch{/* Unrecognized key is not a verified book-level exclusion. */}
+    }
+    return {total,byBook};
+}
+
+export function summarizeBookBudgets(entries, limits, knownCount, keyOf, originallyIgnored, selectedKeys=new Set(), managedWorlds=new Set(),trimReasons=new Map()){
     const books=new Map();
     const rowFor=world=>{
         if(!books.has(world)){
@@ -106,7 +119,9 @@ export function summarizeBookBudgets(entries, limits, knownCount, keyOf, origina
             if(known)row.recalledBudgetKnown+=count;else row.recalledBudgetUnknown++;
         }
     }
-    return [...books.values()].map(row=>({...row,
+    const trims=summarizeScanTrims(trimReasons,seen);
+    for(const world of trims.byBook.keys())rowFor(world);
+    return [...books.values()].map(row=>({...row,scanDropped:trims.byBook.get(row.world)??0,
         remaining:row.cap!==null&&row.budgetUnknown===0?Math.max(0,row.cap-row.budgetUsedKnown):null,
         over:row.cap!==null&&row.budgetUnknown===0?Math.max(0,row.budgetUsedKnown-row.cap):null}));
 }
@@ -156,5 +171,6 @@ export function historyRow(report){
         actualOutputTokens:report.actualOutputTokens,outputUsageBatches:report.outputUsageBatches,
         cacheReadTokens:report.cacheReadTokens,cacheReadBatches:report.cacheReadBatches,
         requestMs:report.requestMs,elapsedMs:report.elapsedMs,finalRecallBudgetTokens:report.finalRecallBudgetTokens,
+        totalActivated:report.totalActivated??null,totalScanDropped:report.totalScanDropped??null,
         rpTokens:report.rpInjection?.tokens??null,rpConfirmed:report.rpInjection?.confirmed??null};
 }

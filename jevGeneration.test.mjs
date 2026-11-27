@@ -29,6 +29,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode,adaptiveThreshold,partialInjection},jevProfileId:'nano',jevBudget},
         connectionManager:{profiles:[profile]},vectors:{enabled_world_info:vectors,enabled_chats:extraVectors,enabled_files:extraVectors},disabledExtensions:[]};
     const books=new Map([['A',{stlo:{}}],['B',{stlo:{}}],['C',{stlo:{jevExclude:true}}]]);
+    let chatId='chat1';
     const ctx={groupId:group?'group-one':null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
     const force=new Map();
     const batches=[], vectorKeys=[], receipts=[];
@@ -49,7 +50,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         ...recall,...metrics,Map,Set,Array,Object,Promise,URL,AbortController,AbortSignal,structuredClone,performance,
         main_api:'openai',stloTokenizers:{getTokenizerModel:()=> 'fixture-tokenizer'},
         eventSource,event_types:events,extension_settings:settings,document:doc,Popup,POPUP_TYPE:{CONFIRM:2,TEXT:1},NOTE_MODULE_NAME:'note',
-        characters:[{avatar:'avatar.png'},{avatar:'other.png'}],this_chid:0,getCurrentChatId:()=> 'chat1',getContext:()=>ctx,
+        characters:[{avatar:'avatar.png'},{avatar:'other.png'}],this_chid:0,getCurrentChatId:()=>chatId,getContext:()=>ctx,
         getTokenCountAsync:async s=>{counters.token++;return s.length;},getRequestHeaders:()=>({}),getMaxContextSize:()=>10000,world_info_character_strategy:strategy,world_info_insertion_strategy:{evenly:0,character_first:1,global_first:2},
         getCharacterCardFields:()=>({}),world_info:{},getCharaFilename:()=> 'avatar',world_info_budget:100,world_info_budget_cap:0,world_info_include_names:false,
         worldInfoCache:books,world_names:[...books.keys()],selected_world_info:[...books.keys()],power_user:{},METADATA_KEY:'world',
@@ -142,7 +143,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,companionStats:()=>({calls:companionCalls,tokenizations:companionTokenizations}),companionCount:text=>sandbox.STWII?.loreTokenCountV1?.count(text),setSpeaker:id=>eventSource.emit(events.GROUP_MEMBER_DRAFTED,id),bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),openReport:async()=>{await sandbox.testApi.openJevReport();return lastPopupPanel;},elements};
+    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,companionStats:()=>({calls:companionCalls,tokenizations:companionTokenizations}),companionCount:text=>sandbox.STWII?.loreTokenCountV1?.count(text),setSpeaker:id=>eventSource.emit(events.GROUP_MEMBER_DRAFTED,id),changeChat:async id=>{chatId=id;await eventSource.emit(events.CHAT_CHANGED,id);},bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),openReport:async()=>{await sandbox.testApi.openJevReport();return lastPopupPanel;},elements};
 }
 
 test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
@@ -655,6 +656,9 @@ test('report and measurement handle do not leak to a different drafted group spe
     await h.setSpeaker(1);
     assert.equal(h.bridge().context(),null);
     assert.equal(h.report(),null);
+    await h.setSpeaker(0);
+    assert.equal(h.bridge().context(),null,'a previous speaker handle must not revive');
+    assert.equal(h.report(),null);
 });
 
 test('existing report opens with compact overview and collapsible decision/usage sections, without extra work',async()=>{
@@ -673,4 +677,51 @@ test('existing report opens with compact overview and collapsible decision/usage
     assert.equal(sections.filter(n=>n.open).length,1);
     assert.deepEqual({token:h.counters.token,jev:h.counters.jev,vector:h.counters.vector,sorted:h.counters.sorted},counters);
     assert.equal(JSON.stringify(h.settings.stlo),before);
+});
+
+test('budget-only report counts observed native activation and structural trims without inventing Jev decisions',async()=>{
+    const entries=[entry('A',1,'Core',{constant:true,order:500}),entry('A',2,'Oversized entry '.repeat(20),{constant:true,order:200}),entry('B',1,'Native core',{constant:true})];
+    const h=harness({enabled:false,vectors:false,entries});
+    h.books.get('A').stlo={budgetMode:'fixed',budget:20};
+    await h.generate();
+    const report=h.report();
+    assert.equal(h.counters.jev,0);
+    assert.equal(report.mode,'budget-only');
+    assert.equal(report.totalActivated,2);
+    assert.equal(report.totalScanDropped,1);
+    assert.equal(report.selected,undefined);
+    assert.equal(report.finalRecallBudgetTokens,null);
+    const book=report.bookBudgets.find(x=>x.world==='A');
+    assert.equal(book.scanDropped,1);
+    assert.equal(book.budgetUsedKnown,5);
+    assert.equal(book.remaining,15);
+    const handle=h.bridge().context();
+    assert.ok(handle);
+    assert.equal(h.bridge().publishInjection({...handle,records:[],complete:true}),false);
+    await h.end();
+    const panel=await h.openReport();
+    const walk=node=>[node,...(node.children??[]).flatMap(walk)];
+    const nodes=walk(panel);
+    assert.ok(nodes.some(n=>n.textContent==='Latest lorebook budget report'));
+    assert.ok(!nodes.some(n=>n.textContent==='Search and injection efficiency'));
+    assert.ok(!nodes.some(n=>n.textContent==='Candidates'));
+    await h.changeChat('au-copy');
+    assert.equal(h.report(),null);
+    assert.equal(h.bridge().context(),null);
+    await h.changeChat('chat1');
+    assert.equal(h.bridge().context(),null);
+});
+
+test('companion pending count is shared for identical text under different eligible keys',async()=>{
+    const shared='Shared identical lore text.';
+    const h=harness({entries:[entry('A',1,shared),entry('B',2,shared)],companionMode:'ready',vectors:false});
+    await h.generate();
+    assert.equal(h.counters.jev,1);
+    assert.equal(h.counters.token,0);
+    assert.equal(h.companionStats().tokenizations,1);
+    assert.equal(h.companionStats().calls,1);
+    const context=h.bridge().context();
+    for(const e of h.activated()){
+        assert.equal(h.bridge().lookup({...context,target:recall.jevEntryKey(e),text:shared+'\n'}),shared.length+1);
+    }
 });
