@@ -153,10 +153,14 @@ try{
        assert.equal(result.rp[1].markers.length,3);
      }else if(caseId==='au'){
        await send();await done();const a=await handle();
-       const switchChat=name=>page.evaluate(async n=>{const c=SillyTavern.getContext();await c.openCharacterChat(n);return {world:c.chatMetadata.world_info,cleared:window.STLOMemoryMetrics.context()===null};},name);
-       result.switch=await switchChat(altChat);
+       const switchChat=async(name,world)=>{
+         await page.evaluate(async n=>{await SillyTavern.getContext().openCharacterChat(n);},name);
+         await page.waitForFunction(({name,world})=>{const c=SillyTavern.getContext();return c.getCurrentChatId()===name&&c.chatMetadata.world_info===world;},{name,world});
+         return page.evaluate(()=>({world:SillyTavern.getContext().chatMetadata.world_info,cleared:window.STLOMemoryMetrics.context()===null}));
+       };
+       result.switch=await switchChat(altChat,bBook);
        await send();await done();const b=await handle();
-       result.return=await switchChat(baseChat);
+       result.return=await switchChat(baseChat,aBook);
        await send();await done();result.handles=[a,b,await handle()];
        assert.deepEqual(result.switch,{world:bBook,cleared:true});assert.deepEqual(result.return,{world:aBook,cleared:true});
        assert.equal(result.rp.length,3);assert.equal(new Set(result.handles).size,3);assert.ok(result.handles.every(Boolean));
