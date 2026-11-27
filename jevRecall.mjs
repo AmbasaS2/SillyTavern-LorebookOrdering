@@ -490,9 +490,10 @@ const DURABLE_RECALL_CUE = /\b(?:promis\w*|vow\w*|pledge\w*|oath\w*|swore|sworn|
 export function createAdaptiveCueCache({maxEntries=1024,maxChars=2000000}={}) {
     const cache=new Map();
     const metadataCache=new Map();
-    let chars=0,metadataChars=0;
+    let chars=0,metadataChars=0,hits=0,misses=0;
     return {
-        clear(){cache.clear();metadataCache.clear();chars=0;metadataChars=0;},
+        clear(){cache.clear();metadataCache.clear();chars=0;metadataChars=0;hits=0;misses=0;},
+        stats(){return {entries:cache.size,chars,hits,misses};},
         metadata(entry){
             const key=jevEntryKey(entry);
             const title=String(entry.comment??'').slice(0,512);
@@ -514,17 +515,17 @@ export function createAdaptiveCueCache({maxEntries=1024,maxChars=2000000}={}) {
             const title=String(entry.comment??'');
             const content=entry.content;
             const old=cache.get(key);
-            if(old&&old.title===title&&old.content===content)return old.match;
+            if(old&&old.title===title&&old.content===content){hits++;return old.match;}
+            misses++;
             if(old){cache.delete(key);chars-=old.size;}
             const match=DURABLE_RECALL_CUE.test(title)||DURABLE_RECALL_CUE.test(content);
             const size=title.length+content.length;
-            if(size>maxChars||maxEntries<1)return match;
-            while(cache.size>=maxEntries||chars+size>maxChars){
-                const first=cache.keys().next().value;
-                if(first===undefined)break;
-                chars-=cache.get(first).size;cache.delete(first);
+            // A sequential scan larger than the cache would evict every
+            // previous entry on every turn. Keep the bounded working set,
+            // compute uncached entries normally, and never skip candidates.
+            if(cache.size<maxEntries&&chars+size<=maxChars){
+                cache.set(key,{title,content,size,match});chars+=size;
             }
-            cache.set(key,{title,content,size,match});chars+=size;
             return match;
         },
     };
