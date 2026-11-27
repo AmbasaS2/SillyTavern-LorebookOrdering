@@ -725,3 +725,37 @@ test('companion pending count is shared for identical text under different eligi
         assert.equal(h.bridge().lookup({...context,target:recall.jevEntryKey(e),text:shared+'\n'}),shared.length+1);
     }
 });
+
+
+test('native ended-before-stopped ordering still invalidates the completed generation handle',async()=>{
+    const h=harness();
+    await h.generate();
+    const context=h.bridge().context();
+    const entry=h.activated().find(e=>e.world==='A'&&e.uid===1);
+    const descriptor={...context,target:recall.jevEntryKey(entry),text:entry.content+'\n'};
+    await h.end();
+    assert.ok(h.bridge().lookup(descriptor)>0,'ordinary completion allows deferred measurement');
+    await h.stop();
+    assert.equal(h.bridge().context(),null);
+    assert.equal(h.bridge().lookup(descriptor),null);
+    assert.equal(await h.bridge().measure(descriptor),null);
+    assert.equal(h.report().injected,3,'retain factual completed recall result');
+});
+
+test('a tokenizer identity observed to change cannot revive a previous measurement handle',async()=>{
+    const h=harness();
+    await h.generate();
+    const context=h.bridge().context();
+    const e=h.activated().find(e=>e.world==='A'&&e.uid===1);
+    const descriptor={...context,target:recall.jevEntryKey(e),text:e.content+'\n'};
+    assert.ok(h.bridge().lookup(descriptor)>0);
+    h.setTokenizer('different');
+    assert.equal(h.bridge().context(),null);
+    h.setTokenizer('fixture-tokenizer');
+    assert.equal(h.bridge().context(),null);
+    assert.equal(h.bridge().lookup(descriptor),null);
+    assert.equal(h.bridge().selection({generation:context.generation,key:descriptor.target}),null);
+    assert.equal(h.bridge().publishInjection({...context,records:[],complete:false}),false);
+    await h.generate();
+    assert.notEqual(h.bridge().context().generation,context.generation);
+});
