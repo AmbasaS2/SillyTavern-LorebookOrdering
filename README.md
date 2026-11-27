@@ -226,7 +226,7 @@ Continue RP normally. Lorebook Ordering automatically requests `typesafe/jev-1.1
 | --- | --- |
 | **All eligible entries (default)** | Eligible entries in all active, non-excluded books, even if native search misses them |
 | **Vector / keyword search candidates** | Only eligible entries found by native search; missed entries cannot be recovered |
-| **Adaptive (experimental)** | Assess all below the estimated input threshold; above it, supplement native hits with memory cues. Fall back to all if vector recall is unavailable or no eligible hits are found. |
+| **Switch by input size (experimental)** | Assess all eligible entries up to the estimated input threshold. Above it, assess search results plus extra memory candidates. Use all entries if vector search is unavailable or finds no eligible candidates. |
 
 To keep a book on native activation, use **Exclude this lorebook from Jev** in Budget Management. With Jev off, ordinary native activation continues unchanged.
 
@@ -729,13 +729,13 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 | --- | --- |
 | **전체 로어북 항목 (기본값)** | 기존 검색에서 놓친 일반 로어까지 평가 |
 | **벡터·키워드 검색 후보** | 기존 검색에 걸린 적격 항목만 평가. 놓친 항목은 되살릴 수 없음 |
-| **적응형 (실험)** | 전체 판단이 작으면 전부, 크면 기존 검색 후보에 기억 단서를 보강해 판정 |
+| **입력량에 따라 자동 전환 (실험)** | 예상 입력량이 기준 이하면 전체를 판정하고, 넘으면 검색 결과에 기억 후보를 보태 판정 |
 
 특정 책만 기존 호출 방식으로 쓰고 싶다면 예산 관리 카드의 Jev 제외 옵션을 사용하세요.
 
 **로어북이 너무 커졌다면? 적응형 (실험)**
 
-Jev 판정 대상에서 적응형을 선택하면 **전체 판단 입력량 임계값 (추정 토큰)**이 나타납니다. 기본값은 56,000입니다. 주입 예산과 다른 숫자예요!
+Jev 판정 대상에서 **입력량에 따라 자동 전환 (실험)**을 선택하면 **자동 전환 기준 (예상 입력 토큰)**이 나타납니다. 기본값은 56,000입니다. 실제 주입량은 별도의 Jev 전체 예산으로 제한합니다.
 
 - 전체 판정 예상 입력량이 기준 이하면 적격 항목 전체를 판단합니다.
 - 기준을 넘으면 기존 검색 후보에 오래된 약속·습관 등 장기 기억 단서, 짧은 기록, 명시적인 LT/NPC 역할, 제목·키워드 일치, 같은 채팅의 비교 가능한 최근 기록을 더합니다.
