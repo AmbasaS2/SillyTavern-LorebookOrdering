@@ -198,7 +198,7 @@
   "stlo.jev.balanced": "Seimbang",
   "stlo.jev.generous": "Longgar",
   "stlo.jev.bonus": "Bonus",
-  "stlo.jev.bonusHelp": "Jika anggaran masih tersisa setelah pemilihan biasa, Jev dapat menambahkan satu ingatan tak terduga yang memperkaya adegan.",
+  "stlo.jev.bonusHelp": "Jev juga mencari ingatan yang bisa membuat adegan saat ini lebih menarik atau mengejutkan.",
   "stlo.jev.prompt": "Prompt pemilihan",
   "stlo.jev.promptHelp": "Edit kriteria keputusan, bukan format respons terstruktur. Pengaturan dibagikan antar karakter.",
   "stlo.jev.reset": "Pulihkan default",

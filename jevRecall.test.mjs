@@ -18,27 +18,25 @@ const profile = {
 const connection = getNanoJevConnection(profile);
 const response = data => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(data) } }] }) });
 
-test('bonus is opt-in, admits at most one memory, and gives ordinary selections budget priority', async () => {
-    const entries = [lore('A', 1, 'Regular memory'), lore('B', 2, 'Callback'), lore('B', 3, 'Another callback')];
-    const worlds = new Set(['A', 'B']);
+test('bonus adds shared guidance without extra questions, batches or a separate selection cap', async () => {
+    const entries = [lore('A', 1, 'Regular memory'), lore('A', 2, 'Callback'), lore('A', 3, 'Another callback')];
+    const worlds = new Set(['A']);
     const messages = [{ name: 'User', mes: 'What happened?' }];
     const ordinary = prepareJevRecall(entries, worlds, messages);
-    assert.deepEqual(Object.keys(ordinary.body.questions.e1.criteria), ['include', 'skip']);
-    const bonus = prepareJevRecall(entries, worlds, messages, { bonus: true });
-    const ask = prepared => requestJevRecall(prepared, connection, {}, undefined, async () => response({ answers: {
-        e1: { choice: 'include', probabilities: { include: .6 } },
-        e2: { choice: 'bonus', probabilities: { bonus: .9 } },
-        e3: { choice: 'bonus', probabilities: { bonus: .8 } },
-    } }));
-    await assert.rejects(ask(ordinary), /decision for every candidate/);
-    const { decisions } = await ask(bonus);
-    const ranked = rankJevDecisions(bonus, decisions);
-    assert.deepEqual(ranked, entries.slice(0, 2).map(jevEntryKey));
-    const options = { bonusKey: ranked[1], worldInfoBudget: 20, bookBudgets: new Map([['B', 9]]), countTokens: async () => 6 };
-    const tight = await fitJevRecall(entries, worlds, ranked, { ...options, budget: 6 });
-    assert.deepEqual([...tight.keys()], ranked.slice(0, 1));
-    const ample = await fitJevRecall(entries, worlds, ranked, { ...options, budget: 12 });
-    assert.deepEqual([...ample.keys()], ranked);
+    const withBonus = prepareJevRecall(entries, worlds, messages, { bonus: true });
+    const [base] = planJevRequests(ordinary);
+    const [bonus] = planJevRequests(withBonus);
+    assert.deepEqual(bonus.body.questions, base.body.questions);
+    assert.ok(bonus.body.state.assessment.startsWith(base.body.state.assessment));
+    assert.match(bonus.body.state.assessment, /make the next reply more entertaining/);
+    assert.deepEqual(planJevRequests(withBonus, base.estimatedTokens), planJevRequests(ordinary, base.estimatedTokens));
+    const { decisions } = await requestJevRecall(bonus, connection, {}, undefined, async () => response({
+        answers: Object.fromEntries([...bonus.candidates.keys()].map(id => [id, { choice: 'include' }])),
+    }));
+    const ranked = rankJevDecisions(withBonus, decisions);
+    assert.deepEqual(ranked, entries.map(jevEntryKey));
+    const accepted = await fitJevRecall(entries, worlds, ranked, { budget: 18, worldInfoBudget: 18, bookBudgets: new Map(), countTokens: async () => 6 });
+    assert.deepEqual([...accepted.keys()], ranked);
 });
 
 test('budget token counts share an async request and retry a failed count', async () => {

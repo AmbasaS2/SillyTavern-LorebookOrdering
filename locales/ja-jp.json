@@ -198,7 +198,7 @@
   "stlo.jev.balanced": "バランス",
   "stlo.jev.generous": "寛容",
   "stlo.jev.bonus": "おまけ",
-  "stlo.jev.bonusHelp": "通常の選定後に予算が残っていれば、場面を面白くする意外な記憶を最大1件追加します。",
+  "stlo.jev.bonusHelp": "Jevは、今の場面に面白さや意外性を加えられる記憶も探します。",
   "stlo.jev.prompt": "選択プロンプト",
   "stlo.jev.promptHelp": "構造化応答形式ではなく判定基準を編集します。設定は全キャラクターで共通です。",
   "stlo.jev.reset": "既定値に戻す",
