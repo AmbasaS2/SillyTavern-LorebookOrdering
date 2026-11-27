@@ -42,11 +42,11 @@ jobs:
               check(q('.stlo-report-budget-bar').max===10000&&q('.stlo-report-budget-bar').value===1522,'budget values');
               check(text.includes('56,494')&&text.includes('2,127')&&text.includes('15.2%'),'summary numbers');
               check(!text.includes('94,218'),'estimate only in details');
-              check(!overflow(),'closed overflow');
+              check(!overflow(),'closed overflow '+p.scrollWidth+'/'+p.clientWidth+' page '+document.documentElement.scrollWidth+'/'+document.documentElement.clientWidth);
               const before=all('.stlo-report-section');
               for(const d of sections){d.querySelector('summary').click();check(d.open,'native open');}
               check(p.innerText.includes('94,218'),'estimate available in detail');
-              check(!overflow(),'expanded overflow');
+              check(!overflow(),'expanded overflow '+p.scrollWidth+'/'+p.clientWidth+' page '+document.documentElement.scrollWidth+'/'+document.documentElement.clientWidth);
               check(before.every((n,i)=>n===all('.stlo-report-section')[i]),'stable DOM nodes');
               for(const d of sections){d.querySelector('summary').click();check(!d.open,'native close');}
               document.body.dataset.smoke='PASS';
@@ -56,7 +56,7 @@ jobs:
               const locale=JSON.parse(fs.readFileSync('locales/'+lang+'.json','utf8'));
               const color=theme==='dark'?'#e8e6df':'#333',bg=theme==='dark'?'#1c222c':'#f3f3f0';
               const file='/tmp/stlo-report-'+lang+'-'+width+'-'+theme+'.html';
-              fs.writeFileSync(file,'<!doctype html><html lang="'+lang+'"><meta charset="utf-8"><style>:root{--SmartThemeBodyColor:'+color+';--SmartThemeBorderColor:#888;--SmartThemeQuoteColor:#8aa4b8}body{margin:0;width:'+width+'px;background:'+bg+';color:'+color+';font:14px Arial,sans-serif}#fixture{width:min(calc(100% - 36px),560px);margin:12px auto}'+css+'</style><div id="fixture"></div><script>const locale='+JSON.stringify(locale)+';const translate=(fallback,key)=>locale[key]??fallback;const report='+JSON.stringify(report)+';const metricsHistory=[{...report,time:0,activated:4,rpTokens:null}];const currentJevReport=()=>report;const POPUP_TYPE={TEXT:1};class Popup{constructor(panel){this.panel=panel}show(){document.querySelector("#fixture").append(this.panel)}}\n'+code+'\n'+test+'</script>');
+              fs.writeFileSync(file,'<!doctype html><html lang="'+lang+'"><meta charset="utf-8"><style>:root{--SmartThemeBodyColor:'+color+';--SmartThemeBorderColor:#888;--SmartThemeQuoteColor:#8aa4b8}body{margin:0;width:100%;max-width:'+width+'px;background:'+bg+';color:'+color+';font:14px Arial,sans-serif}#fixture{width:min(calc(100% - 36px),560px);margin:12px auto}'+css+'</style><div id="fixture"></div><script>const locale='+JSON.stringify(locale)+';const translate=(fallback,key)=>locale[key]??fallback;const report='+JSON.stringify(report)+';const metricsHistory=[{...report,time:0,activated:4,rpTokens:null}];const currentJevReport=()=>report;const POPUP_TYPE={TEXT:1};class Popup{constructor(panel){this.panel=panel}show(){document.querySelector("#fixture").append(this.panel)}}\n'+code+'\n'+test+'</script>');
           }
           NODE
           pids=()
