@@ -317,12 +317,12 @@ test('adaptive durable cues, explicit same-chat recency, eligibility and cache i
     const promise=lore('A',2,'오래전 둘만의 약속을 했다.');
     const habit=lore('B',2,'Their morning ritual was to read by the door.');
     const secret=lore('B',3,'A secret only the captain knows.');
-    const recent=lore('B',10,'A stone arch.',{STMB_chatId:'chat-a',STMB_sourceRanges:[[5,6],[20,22]]});
-    const recent2=lore('A',9,'A path.',{STMB_chatId:'chat-a',STMB_start:15,STMB_end:16});
-    const recent3=lore('A',8,'A chair.',{STMB_chatId:'chat-a',STMB_start:8,STMB_end:10});
-    const older=lore('A',500,'A window.',{STMB_chatId:'chat-a',STMB_start:1,STMB_end:4});
-    const foreign=lore('A',501,'A gate.',{STMB_chatId:'chat-b',STMB_start:100,STMB_end:101});
-    const invalid=lore('A',502,'A road.',{STMB_chatId:'chat-a',STMB_sourceRanges:[[30,25]],STMB_start:100,STMB_end:101});
+    const recent=lore('B',10,'A stone arch. '.repeat(70),{STMB_chatId:'chat-a',STMB_sourceRanges:[[5,6],[20,22]]});
+    const recent2=lore('A',9,'A path. '.repeat(70),{STMB_chatId:'chat-a',STMB_start:15,STMB_end:16});
+    const recent3=lore('A',8,'A chair. '.repeat(70),{STMB_chatId:'chat-a',STMB_start:8,STMB_end:10});
+    const older=lore('A',500,'A window. '.repeat(70),{STMB_chatId:'chat-a',STMB_start:1,STMB_end:4});
+    const foreign=lore('A',501,'A gate. '.repeat(70),{STMB_chatId:'chat-b',STMB_start:100,STMB_end:101});
+    const invalid=lore('A',502,'A road. '.repeat(70),{STMB_chatId:'chat-a',STMB_sourceRanges:[[30,25]],STMB_start:100,STMB_end:101});
     const disabled=lore('A',503,'A promise',{disable:true});
     const special=lore('A',504,'A secret',{position:7});
     const pinned=lore('A',505,'A habit',{constant:true});
@@ -336,7 +336,7 @@ test('adaptive durable cues, explicit same-chat recency, eligibility and cache i
     assert.equal(get().durableCount,3);
     assert.equal(get().recentCount,3);
     assert.equal(get().eligibleCount,10);
-    promise.content='A pebble.';
+    promise.content='A pebble. '.repeat(70);
     assert.equal(get().candidateKeys.has(jevEntryKey(promise)),false);
     promise.comment='A vow';
     assert.equal(get().candidateKeys.has(jevEntryKey(promise)),true);
@@ -422,4 +422,20 @@ test('partial questions preserve binary decisions, fit existing batches, and fai
         assert.equal(a.get(key),changed);
     }
     assert.equal(applyJevExcerpts(new Map([[key,e]]),selection,new Set(),excerpts).applied,0);
+});
+
+test('adaptive retains concise implicit memories without relying on titles or keywords',async()=>{
+    const {coverAdaptiveJevCandidates}=await import('./jevRecall.mjs');
+    const worlds=new Set(['A']);
+    const rule=lore('A',1,'The lantern signals departure.');
+    const habit=lore('A',2,'Mara counts three quiet breaths before answering a difficult question, then touches the blue ring.');
+    const promise=lore('A',3,'He handed her the key. "When the bell sounds, I will be here."');
+    const secret=lore('A',4,'Mira saw the ledger. Ellis was outside.');
+    const filler=lore('A',5,'The harbor stonework was grey. '.repeat(50));
+    const disabled=lore('A',6,'A concealed note',{disable:true});
+    const entries=[rule,habit,promise,secret,filler,disabled];
+    const coverage=coverAdaptiveJevCandidates(entries,worlds,new Set([jevEntryKey(rule)]));
+    assert.deepEqual([...coverage.candidateKeys], [rule,habit,promise,secret].map(jevEntryKey));
+    assert.equal(coverage.compactCount,3);
+    assert.equal(coverage.eligibleCount,5);
 });

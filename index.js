@@ -171,6 +171,7 @@ function openJevReport() {
         [translate('Eligible candidates before filtering', 'stlo.jev.adaptiveEligible'), report.adaptiveEligible],
         [translate('Native hits', 'stlo.jev.adaptiveNative'), report.adaptiveNative],
         [translate('Additional durable-memory candidates', 'stlo.jev.adaptiveDurable'), report.adaptiveDurable],
+        [translate('Additional concise memories', 'stlo.jev.adaptiveCompact'), report.adaptiveCompact],
         [translate('Additional recent candidates', 'stlo.jev.adaptiveRecent'), report.adaptiveRecent],
         [translate('Candidates', 'stlo.jev.candidates'), report.candidates],
         [translate('Model selected', 'stlo.jev.selected'), report.selected],
@@ -1216,7 +1217,7 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
             if(adaptiveCueScope!==scope){adaptiveCueCache.clear();adaptiveCueScope=scope;}
             const coverage=coverAdaptiveJevCandidates(entries,worlds,candidateKeys,{chatId:run.chatId,cueCache:adaptiveCueCache});
             const report={adaptiveEligible:coverage.eligibleCount,adaptiveNative:coverage.nativeCount,
-                adaptiveDurable:coverage.durableCount,adaptiveRecent:coverage.recentCount};
+                adaptiveDurable:coverage.durableCount,adaptiveCompact:coverage.compactCount,adaptiveRecent:coverage.recentCount};
             if(!coverage.nativeCount||coverage.candidateKeys.size===coverage.eligibleCount){
                 // Preserve existing zero-hit fallback and vector replay. If
                 // coverage itself reaches the whole set, report it honestly.
@@ -1518,7 +1519,7 @@ async function openJevSettings() {
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="filtered" ${jevOptions.mode === "filtered" ? "checked" : ""}><span data-i18n="stlo.jev.modeFiltered">Vector / keyword search candidates</span></label>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="adaptive" ${jevOptions.mode === "adaptive" ? "checked" : ""}><span data-i18n="stlo.jev.modeAdaptive">Adaptive (experimental)</span></label>
                 <div class="stlo-jev-field" id="stlo-jev-adaptive-field" ${jevOptions.mode==='adaptive'?'':'hidden'}>
-                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Full-plan input threshold (estimated tokens)</label>${infoHelp('stlo.jev.adaptiveHelp','Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.')}</div>
+                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Full-plan input threshold (estimated tokens)</label>${infoHelp('stlo.jev.adaptiveHelp','Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues, concise entries, and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.')}</div>
                     <input type="number" id="stlo-jev-adaptive-threshold" class="text_pole textarea_compact" min="1" max="100000000" step="1" value="${jevOptions.adaptiveThreshold??DEFAULT_JEV_ADAPTIVE_THRESHOLD}">
                 </div>
                 </div>

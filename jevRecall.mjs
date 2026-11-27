@@ -394,6 +394,7 @@ function adaptiveSourceEnd(entry, chatId) {
 
 export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId, cueCache=createAdaptiveCueCache()}={}) {
     const eligible=new Set(),candidateKeys=new Set(),durable=new Set(),dated=[];
+    let compactCount=0;
     let nativeCount=0;
     for(const entry of entries){
         if(!isJevCandidate(entry,worlds))continue;
@@ -402,6 +403,10 @@ export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId,
         eligible.add(key);
         if(nativeKeys.has(key)){candidateKeys.add(key);nativeCount++;}
         else if(cueCache.matches(entry)){candidateKeys.add(key);durable.add(key);}
+        // Concise entries can encode an implicit habit, promise, or identity
+        // without any durable keyword. Read all such entries rather than guess.
+        // This is a positive coverage lane, never an automatic activation.
+        else if(entry.content.length<=512){candidateKeys.add(key);compactCount++;}
         const end=adaptiveSourceEnd(entry,chatId);
         if(end!==null)dated.push({key,end});
     }
@@ -413,7 +418,7 @@ export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId,
         if(!candidateKeys.has(key)){candidateKeys.add(key);recentCount++;}
     }
     return {candidateKeys,eligibleCount:eligible.size,nativeCount,
-        durableCount:durable.size,recentCount,supplementalCount:durable.size+recentCount};
+        durableCount:durable.size,compactCount,recentCount,supplementalCount:durable.size+compactCount+recentCount};
 }
 
 export function splitJevBatch(batch) {

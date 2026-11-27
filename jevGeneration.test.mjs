@@ -420,7 +420,7 @@ test('adaptive preserves all assessment below threshold, selects native hits abo
     assert.equal(low.report().candidates,3);
     assert.equal(low.counters.preview,0);
     assert.equal(low.counters.jev,1);
-    const high=harness({mode:'adaptive',adaptiveThreshold:1});
+    const high=harness({mode:'adaptive',adaptiveThreshold:1,entries:raw.map(e=>e.world==='B'&&e.uid===1?{...e,content:'Unrelated stonework. '.repeat(40)}:e)});
     await high.generate();
     assert.equal(high.report().mode,'filtered');
     assert.equal(high.report().candidates,2);
@@ -446,7 +446,7 @@ test('adaptive without World Info vectors or eligible native hits returns to the
 test('adaptive coverage restores old durable memories before Jev without changing legacy filtered or full recall',async()=>{
     const rule=entry('A',2,'The lantern must be blue.');
     const promise=entry('B',8,'Long ago, Iona promised to keep the copper bell until reunion.',{key:[],comment:'Scene 1'});
-    const habit=entry('B',9,'Every morning Iona left a cup facing the window.',{key:[],comment:'Scene 2'});
+    const habit=entry('B',9,'Mara counts three quiet breaths before answering a difficult question, then touches the blue ring.',{key:[],comment:'Scene 2'});
     const oversized=entry('A',1,'An unrelated massive item. '.repeat(300),{vectorized:true});
     const fillers=Array.from({length:230},(_,i)=>entry('B',100+i,('The stone terrace and granite steps stood beneath clouds. ').repeat(40),{key:[],comment:'Scene '+(100+i)}));
     const entries=[rule,promise,habit,oversized,...fillers,entry('B',90,'Core remains complete.',{constant:true}),entry('C',2,'Excluded secret.')];
@@ -467,7 +467,8 @@ test('adaptive coverage restores old durable memories before Jev without changin
     assert.equal(filtered.report().candidates,2);
     assert.equal(adaptive.report().candidates,4);
     assert.equal(adaptive.report().adaptiveNative,2);
-    assert.equal(adaptive.report().adaptiveDurable,2);
+    assert.equal(adaptive.report().adaptiveDurable,1);
+    assert.equal(adaptive.report().adaptiveCompact,1);
     assert.equal(adaptive.report().adaptiveRecent,0);
     assert.equal(adaptive.counters.vector,1);
     assert.equal(adaptive.counters.preview,1);
