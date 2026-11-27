@@ -32,7 +32,7 @@ const harbor=[fixture(1,'HARBOR_CORE','HARBOR_CORE: The brass seal belongs to Ma
 const alternate=[fixture(1,'AU_CORE','AU_CORE: The archive stands on a mountain.',{constant:true,order:500}),fixture(2,'AU_PROMISE','AU_PROMISE: Ellis will wait for the silver compass.',{order:300}),fixture(3,'AU_DETAIL','AU_DETAIL: The path crosses the observatory garden.',{order:200})];
 const seed=read(path.join(host,'default/content/settings.json'));
 const parser=await import(pathToFileURL(path.join(host,'src/character-card-parser.js')));
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ioAAAAASUVORK5CYII=','base64');
+const png=fs.readFileSync(path.join(host,'default/content/user-default.png'));
 function makeCard(name){
  const data={name,description:name+' is a fictional archivist.',personality:'Careful.',scenario:'A fictional archive.',first_mes:'The archive is open.',mes_example:'',creator_notes:'',system_prompt:'',post_history_instructions:'',alternate_greetings:[],tags:[],creator:'',character_version:'',extensions:{talkativeness:.5,fav:false,world:''}};
  return parser.write(png,JSON.stringify({spec:'chara_card_v2',spec_version:'2.0',...data,data,chat:baseChat,talkativeness:.5}));
