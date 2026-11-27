@@ -43,7 +43,7 @@ Jev is optional. You can use this fork solely for book-level priority, budgets a
 
 ## ⚡ Quick start
 
-**Current version: 2.2.4-ambasa.4.**
+**Current version: 2.2.4-ambasa.5.**
 
 > **Choose a book → set priority and budget → save → continue RP.**
 >
@@ -507,7 +507,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 2.2.4-ambasa.4.**
+**현재 버전: 2.2.4-ambasa.5.**
 
 > **책 선택 → 우선순위와 예산 설정 → 저장 → 다시 롤플!**
 >

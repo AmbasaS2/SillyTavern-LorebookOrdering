@@ -724,6 +724,38 @@ function addLorebookBudgetMenuItem() {
  * *single global* Max Entries value (round-robin by lorebook, in result order).
  * No override = no extra vector network request. Other vector queries are untouched.
  */
+let vectorCollectionNames = [];
+let vectorWorldByCollection = new Map();
+
+function getVectorWorldByCollection() {
+    const names = Array.isArray(world_names) ? world_names : [];
+    // Compare values, not just array identity/length: a host or another
+    // extension may rename or replace a name in place.
+    if (names.length === vectorCollectionNames.length
+        && names.every((name, index) => name === vectorCollectionNames[index])) return vectorWorldByCollection;
+    vectorCollectionNames = [...names];
+    vectorWorldByCollection = new Map(
+        names.filter(name => typeof name === 'string')
+            .map(name => ['world_' + getStringHash(name), name])
+    );
+    return vectorWorldByCollection;
+}
+
+function getCachedVectorThreshold(world, fallback) {
+    try {
+        // Read only the relevant scalar fields. getLorebookSettings clones all
+        // per-character settings; the vector wrapper never mutates them.
+        const settings = world && worldInfoCache.has(world) ? getCachedLorebook(world)?.[EXTENSION_NAME] : null;
+        const value = settings?.vectorThreshold;
+        if (settings?.vectorThresholdEnabled === true
+            && typeof value === 'number' && Number.isFinite(value)
+            && value >= 0 && value <= 1) return value;
+    } catch (error) {
+        console.error('Error reading cached STLO vector threshold:', error);
+    }
+    return fallback;
+}
+
 function installPerLorebookVectorThresholds() {
     if (window.fetch.__stloPerLorebookThresholds) return;
     const nativeFetch = window.fetch.bind(window);
@@ -745,22 +777,13 @@ function installPerLorebookVectorThresholds() {
             return nativeFetch(input, init);
         }
 
-        const worldByCollection = new Map(
-            (Array.isArray(world_names) ? world_names : [])
-                .filter(name => typeof name === 'string')
-                .map(name => ['world_' + getStringHash(name), name])
-        );
+        const worldByCollection = getVectorWorldByCollection();
         const originalThreshold = Number.isFinite(Number(request.threshold))
             ? Number(request.threshold) : 0;
         const groups = new Map();
         for (const id of request.collectionIds) {
             const world = worldByCollection.get(id);
-            const settings = world ? await getLorebookSettings(world) : null;
-            const value = settings?.vectorThreshold;
-            const enabled = settings?.vectorThresholdEnabled === true
-                && typeof value === 'number' && Number.isFinite(value)
-                && value >= 0 && value <= 1;
-            const threshold = enabled ? value : originalThreshold;
+            const threshold = getCachedVectorThreshold(world, originalThreshold);
             if (!groups.has(threshold)) groups.set(threshold, []);
             groups.get(threshold).push(id);
         }
