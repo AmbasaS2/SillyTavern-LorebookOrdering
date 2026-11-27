@@ -162,7 +162,7 @@ function metricsScope(){
     return JSON.stringify([getCurrentChatId(),getJevCharacterAvatar(context),context.groupId??null,EXTENSION_STATE.currentSpeakingCharacter??null]);
 }
 function currentMetrics(){
-    return metricsCurrent?.scope===metricsScope()?metricsCurrent:null;
+    try{return metricsCurrent&&metricsCurrent.scope===metricsScope()?metricsCurrent:null;}catch{return null;}
 }
 function beginMetrics(run){
     // One latest generation ledger; history stores numeric snapshots only.
@@ -182,15 +182,15 @@ function archiveMetrics(run){
     const row={...historyRow(run.report),scope:run.metrics.scope};
     metricsHistory=[row,...metricsHistory.filter(item=>item.id!==row.id&&item.scope===row.scope)].slice(0,8);
 }
-function observeBudgetCount(m,entry,text,count){
-    if(!m||currentMetrics()!==m)return;
+function observeBudgetCount(m,entry,text,count,tokenizer){
+    if(!m||currentMetrics()!==m||metricsTokenizer()!==tokenizer)return;
     if(Number.isSafeInteger(count)&&count>=0&&!(count===0&&text.trim()))
-        m.localCounts.set(entry,{text,count,tokenizer:metricsTokenizer()});
+        m.localCounts.set(entry,{text,count,tokenizer});
 }
 async function countBudgetEntry(entry){
     const m=currentMetrics();
     const content=typeof entry?.content==='string'?entry.content:'';
-    if(!m||!entry||typeof entry!=='object')return getEntryTokenCountCached(entry);
+    if(!m||jevGeneration?.metrics!==m||!isCurrentJev(jevGeneration)||!entry||typeof entry!=='object')return getEntryTokenCountCached(entry);
     const text=content+'\n';
     const tokenizer=metricsTokenizer();
     let count;
@@ -202,7 +202,7 @@ async function countBudgetEntry(entry){
         // Unknown tokenizer cannot safely share across cloned entries.
         count=await getEntryTokenCountCached(entry);
     }
-    observeBudgetCount(m,entry,text,count);
+    observeBudgetCount(m,entry,text,count,tokenizer);
     return count;
 }
 function knownBudgetCount(m,entry){
@@ -214,34 +214,50 @@ function knownBudgetCount(m,entry){
     return null;
 }
 function publishScanMetrics(run, entries, observed){
-    const m=run?.metrics;
-    if(!m?.active||!isCurrentJev(run))return;
-    const pending=m.pending;
-    if(!pending)return;
-    const keys=new Set(entries.map(jevEntryKey));
-    // A staged scan is not actual activation until the real host event
-    // or an empty final scan is followed by the real prompt hook.
-    if(keys.size!==pending.keys.size||[...keys].some(key=>!pending.keys.has(key)))return;
-    if(observed)m.activated=keys;
-    const rows=pending.rows;
-    const recalledUnknown=rows.reduce((n,row)=>n+row.recalledBudgetUnknown,0);
-    const known=rows.reduce((n,row)=>n+row.recalledBudgetKnown,0);
-    const funnel=summarizeFunnel(run.report,m.trims,observed?keys:null,m.accepted);
-    updateJevReport(run,{phase:'done',...(run.enabled?{}:{mode:'budget-only'}),
-        ...funnel,activationObserved:observed,bookBudgets:rows,
-        finalRecallBudgetKnown:known,finalRecallBudgetUnknown:recalledUnknown,
-        finalRecallBudgetTokens:recalledUnknown?null:known,
-        ...(run.enabled&&observed?{injected:funnel.activated}:{})});
+    try{
+        const m=run?.metrics;
+        if(!m?.active||!isCurrentJev(run))return;
+        const keys=new Set(entries.map(jevEntryKey));
+        if(observed)m.activated=keys;
+        else if(m.activated!==null)return;
+        const pending=m.pending;
+        const matches=!!pending&&keys.size===pending.keys.size&&[...keys].every(key=>pending.keys.has(key));
+        const funnel=summarizeFunnel(run.report,m.trims,observed?keys:null,m.accepted);
+        // A real activation event with different keys must not inherit an
+        // unrelated scan's budget total. Retain the observed funnel only.
+        if(!matches){
+            if(observed)updateJevReport(run,{phase:'done',...funnel,activationObserved:true,bookBudgetObserved:false,
+                bookBudgets:undefined,finalRecallBudgetTokens:null,finalRecallBudgetKnown:undefined,finalRecallBudgetUnknown:undefined,
+                sharedJevBudget:undefined,sharedJevUsed:undefined,sharedJevRemaining:undefined,
+                ...(run.enabled?{injected:funnel.activated}:{})});
+            return;
+        }
+        const rows=pending.rows;
+        const recalledUnknown=rows.reduce((n,row)=>n+row.recalledBudgetUnknown,0);
+        const known=rows.reduce((n,row)=>n+row.recalledBudgetKnown,0);
+        const jevKnown=rows.reduce((n,row)=>n+row.jevUsedKnown,0);
+        const jevUnknown=rows.reduce((n,row)=>n+row.jevUnknown,0);
+        const jevCap=run.selection?.budget;
+        updateJevReport(run,{phase:'done',...(run.enabled?{}:{mode:'budget-only'}),
+            ...funnel,activationObserved:observed,bookBudgetObserved:observed,bookBudgets:rows,
+            finalRecallBudgetKnown:observed?known:undefined,finalRecallBudgetUnknown:observed?recalledUnknown:undefined,
+            finalRecallBudgetTokens:observed&&!recalledUnknown?known:null,
+            sharedJevBudget:jevCap,sharedJevUsed:observed&&jevCap!==undefined&&!jevUnknown?jevKnown:null,
+            sharedJevRemaining:observed&&jevCap!==undefined&&!jevUnknown?Math.max(0,jevCap-jevKnown):null,
+            ...(run.enabled&&observed?{injected:funnel.activated}:{})});
+    }catch(error){stloDebug('Optional scan report:',error);}
 }
 function stageScanMetrics(run,entries,originallyIgnored){
-    const m=run?.metrics;
-    if(!m||!isCurrentJev(run))return;
-    m.active=true;
-    const list=[...entries];
-    const rows=summarizeBookBudgets(list,m.limits,entry=>knownBudgetCount(m,entry),jevEntryKey,originallyIgnored,
-        m.accepted,run.selection?.worlds??new Set());
-    m.pending={rows,keys:new Set(list.map(jevEntryKey))};
-    publishScanMetrics(run,list,false);
+    try{
+        const m=run?.metrics;
+        if(!m||!isCurrentJev(run)||m.activated!==null)return;
+        m.active=true;
+        const list=[...entries];
+        const rows=summarizeBookBudgets(list,m.limits,entry=>knownBudgetCount(m,entry),jevEntryKey,originallyIgnored,
+            m.accepted,run.selection?.worlds??new Set());
+        m.pending={rows,keys:new Set(list.map(jevEntryKey))};
+        publishScanMetrics(run,list,false);
+    }catch(error){stloDebug('Optional scan measurement:',error);}
 }
 // Optional contract, consumed by STWII only on its existing generation and
 // measurement paths. Never ask it to measure and never scan its DOM or data.
@@ -328,6 +344,8 @@ function appendMemoryMetrics(panel,report){
     const tr=(label,key)=>translate(label,'stlo.metrics.'+key);
     if(report.bookBudgets){
         const budgets=section(tr('Per-book budget use (host estimate, full text)','budgets'));
+        if(!report.bookBudgetObserved)line(budgets,tr('Provisional final scan; actual activation not confirmed.','provisional'));
+        if(report.sharedJevBudget!==undefined)line(budgets,tr('Shared Jev budget / used / remaining','sharedBudget')+': '+[report.sharedJevBudget,report.sharedJevUsed,report.sharedJevRemaining].map(num).join(' / '));
         for(const row of report.bookBudgets){
             line(budgets,row.world+' · '+tr('Cap','cap')+': '+(row.capKnown?(row.cap===null?tr('Shared / no separate cap','noCap'):num(row.cap)):unknown));
             line(budgets,tr('Used / remaining','usedRemaining')+': '+num(row.budgetUsedKnown)+(row.budgetUnknown?' + '+row.budgetUnknown+' '+unknown:'')+' / '+(row.remaining===null?unknown:num(row.remaining))+
@@ -335,9 +353,10 @@ function appendMemoryMetrics(panel,report){
         }
     }
     const comparison=section(tr('Search and injection efficiency','efficiency'));
-    line(comparison,tr('Search input: provider / attempted estimate','searchInput')+': '+metricUsageText(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests)+' / '+num(report.estimatedInputTokens));
+    line(comparison,tr('Search input: provider / attempted estimate','searchInput')+': '+(metricUsageText(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests)??unknown)+' / '+num(report.estimatedInputTokens));
     line(comparison,tr('Activated Jev memory: full budget tokens (host estimate)','recallBudget')+': '+num(report.finalRecallBudgetTokens)+(report.finalRecallBudgetUnknown?' ('+num(report.finalRecallBudgetKnown)+' + '+report.finalRecallBudgetUnknown+' '+unknown+')':''));
     const rp=report.rpInjection;
+    if(rp)line(comparison,tr('RP confirmed / excluded / unknown','rpFunnel')+': '+[rp.confirmed,rp.excluded,rp.unknown].map(num).join(' / '));
     line(comparison,tr('Confirmed RP Jev memory: rendered individual tokens (host estimate)','rpTokens')+': '+num(rp?.tokens)+(rp?' ('+rp.measured+'/'+rp.confirmed+' '+tr('measured','measured')+')':''));
     line(comparison,tr('Provider usage and host estimates are different units; cached tokens are not added again. Actual billing and unreported usage are unknown.','units'));
     if(!rp)line(comparison,tr('Final RP inclusion is unmeasured unless a compatible viewer provides evidence. Activation is not proof of injection.','rpUnavailable'));
@@ -499,6 +518,7 @@ function onJevStopped() {
         updateJevReport(jevGeneration, { phase: 'cancelled' });
     }
     archiveMetrics(jevGeneration);
+    if(jevGeneration?.metrics===metricsCurrent){metricsCurrent?.ledger.clear();metricsCurrent=null;}
     stopJevGeneration();
 }
 function startJevGeneration(type, _options, dryRun) {
@@ -757,7 +777,7 @@ function setupEventHandlers() {
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, recordJevActivated);
     eventSource.on(event_types.GENERATE_AFTER_DATA, guardUnpreparedJevReply);
     globalThis.stlo_jevInterceptor = stloJevInterceptor;
-    installMemoryMetricsBridge();
+    try{installMemoryMetricsBridge();}catch(error){stloDebug('Optional metrics bridge:',error);}
 
     // Track for cleanup
     eventListeners.push(

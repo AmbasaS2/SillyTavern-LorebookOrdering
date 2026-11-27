@@ -54,7 +54,7 @@ export function createTokenLedger({maxEntries=2048,maxChars=2000000}={}){
             const existing=find(d);
             if(existing)return existing.promise;
             if(d.text.length>maxChars||maxEntries<1){
-                const value=await measure();return validCount(value)?value:null;
+                try{const value=await measure();return validCount(value)&&!(value===0&&d.text.trim())?value:null;}catch{return null;}
             }
             while(records.size>=maxEntries||chars+d.text.length>maxChars){
                 const first=records.values().next().value;
@@ -65,7 +65,9 @@ export function createTokenLedger({maxEntries=2048,maxChars=2000000}={}){
             buckets.get(key).set(d.text,record);records.add(record);chars+=d.text.length;
             record.promise=Promise.resolve().then(measure).then(value=>{
                 if(!validCount(value)||(value===0&&d.text.trim())){drop(record);return null;}
-                if(!isStillValid())drop(record);
+                let valid=false;
+                try{valid=isStillValid();}catch{/* Expire unverifiable results. */}
+                if(!valid)drop(record);
                 else record.value=value;
                 return value;
             },()=>{drop(record);return null;});

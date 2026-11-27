@@ -132,7 +132,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
 }
 
 test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
@@ -578,4 +578,26 @@ test('metrics reuse full budget counts, keep confirmed RP measurements separate,
     await h.generate();
     assert.equal(bridge.lookup(budget),null);
     assert.equal(bridge.publishInjection({...context,records,complete:true}),false);
+});
+
+test('metrics invalidate on cancellation and tokenizer changes; mismatched host activation never inherits stale budget totals',async()=>{
+    const h=harness();
+    await h.generate();
+    const bridge=h.bridge(), context=bridge.context();
+    const a=h.activated().find(e=>e.world==='A'&&e.uid===1);
+    const descriptor={...context,target:recall.jevEntryKey(a),text:a.content+'\n'};
+    assert.ok(bridge.lookup(descriptor)>0);
+    h.setTokenizer('changed-tokenizer');
+    assert.equal(bridge.context(),null);
+    assert.equal(bridge.lookup(descriptor),null);
+    assert.equal(await bridge.measure(descriptor),null);
+    h.setTokenizer('fixture-tokenizer');
+    await h.hostActivation(h.activated().filter(e=>!(e.world==='A'&&e.uid===1)));
+    assert.equal(h.report().activationObserved,true);
+    assert.equal(h.report().bookBudgets,undefined);
+    assert.equal(h.report().finalRecallBudgetTokens,null);
+    assert.equal(h.report().injected,2);
+    await h.stop();
+    assert.equal(bridge.context(),null);
+    assert.equal(bridge.lookup(descriptor),null);
 });

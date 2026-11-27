@@ -283,5 +283,8 @@
   "stlo.metrics.historyUsage": "Input / output / cache read (provider reported)",
   "stlo.metrics.estimated": "Estimated input",
   "stlo.metrics.rpShort": "RP tokens",
-  "stlo.metrics.requestTime": "Request ms"
+  "stlo.metrics.requestTime": "Request ms",
+  "stlo.metrics.provisional": "Provisional final scan; actual activation not confirmed.",
+  "stlo.metrics.sharedBudget": "Shared Jev budget / used / remaining",
+  "stlo.metrics.rpFunnel": "RP confirmed / excluded / unknown"
 }

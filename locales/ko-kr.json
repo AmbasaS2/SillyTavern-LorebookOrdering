@@ -284,5 +284,8 @@
   "stlo.metrics.historyUsage": "입력 / 출력 / 캐시 읽기 (공급자 보고)",
   "stlo.metrics.estimated": "입력 추정",
   "stlo.metrics.rpShort": "RP 토큰",
-  "stlo.metrics.requestTime": "요청 ms"
+  "stlo.metrics.requestTime": "요청 ms",
+  "stlo.metrics.provisional": "최종 스캔 잠정값 · 실제 발동은 아직 미확인",
+  "stlo.metrics.sharedBudget": "공통 Jev 예산 / 사용 / 잔여",
+  "stlo.metrics.rpFunnel": "RP 포함 확인 / 제외 / 미확인"
 }
