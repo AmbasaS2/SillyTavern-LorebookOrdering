@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import * as recall from './jevRecall.mjs';
+import * as metrics from './jevMetrics.mjs';
 
 const source = readFileSync(new URL('./index.js',import.meta.url),'utf8');
 const entry = (world,uid,content,extra={}) => ({world,uid,content,key:['lantern'],comment:world+uid,order:100,constant:false,...extra});
@@ -17,7 +18,7 @@ const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
 function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false,partialInjection=false,partialAnswers,jevBudget=1000}={}) {
     const listeners=new Map();
-    const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0};
+    const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0,token:0};
     const events=new Proxy({}, {get:(_,key)=>key});
     const eventSource={
         on(k,f){if(!listeners.has(k))listeners.set(k,[]);listeners.get(k).push(f);},
@@ -44,10 +45,11 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     const popupResponses=[...responses];
     class Popup { constructor(_panel,_type,_input,opts){this.opts=opts;} async show(){counters.popup++;return popupResponses.shift()??0;} async completeCancelled(){} }
     const sandbox={
-        ...recall,Map,Set,Array,Object,Promise,URL,AbortController,AbortSignal,structuredClone,performance,
+        ...recall,...metrics,Map,Set,Array,Object,Promise,URL,AbortController,AbortSignal,structuredClone,performance,
+        main_api:'openai',stloTokenizers:{getTokenizerModel:()=> 'fixture-tokenizer'},
         eventSource,event_types:events,extension_settings:settings,document:doc,Popup,POPUP_TYPE:{CONFIRM:2,TEXT:1},NOTE_MODULE_NAME:'note',
         characters:[{avatar:'avatar.png'}],this_chid:0,getCurrentChatId:()=> 'chat1',getContext:()=>ctx,
-        getTokenCountAsync:async s=>s.length,getRequestHeaders:()=>({}),getMaxContextSize:()=>10000,world_info_character_strategy:strategy,world_info_insertion_strategy:{evenly:0,character_first:1,global_first:2},
+        getTokenCountAsync:async s=>{counters.token++;return s.length;},getRequestHeaders:()=>({}),getMaxContextSize:()=>10000,world_info_character_strategy:strategy,world_info_insertion_strategy:{evenly:0,character_first:1,global_first:2},
         getCharacterCardFields:()=>({}),world_info:{},getCharaFilename:()=> 'avatar',world_info_budget:100,world_info_budget_cap:0,world_info_include_names:false,
         worldInfoCache:books,world_names:[...books.keys()],selected_world_info:[...books.keys()],power_user:{},METADATA_KEY:'world',
         translate:t=>t,console:{warn(){},error(){},info(){},debug(){}},toastr:{error(){}},
@@ -130,7 +132,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
 }
 
 test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
@@ -536,4 +538,44 @@ test('partial injection keeps the native scan and full budget intact, applies on
     assert.equal(size.report().partialQuestions,0);
     assert.equal(size.report().partialApplied,0);
     assert.equal(size.activated().find(e=>e.world==='A').content,scene.content);
+});
+
+test('metrics reuse full budget counts, keep confirmed RP measurements separate, and invalidate generation handles',async()=>{
+    const h=harness();
+    await h.generate();
+    const report=h.report();
+    assert.equal(report.assessed,3);
+    assert.equal(report.activationObserved,true);
+    assert.equal(report.injected,3);
+    assert.equal(report.rpInjection,undefined);
+    assert.equal(report.finalRecallBudgetUnknown,0);
+    assert.equal(report.bookBudgets.find(x=>x.world==='A').recalled,2);
+    assert.ok(report.finalRecallBudgetTokens>0);
+    const bridge=h.bridge(), context=bridge.context();
+    assert.equal(bridge.version,1);
+    assert.ok(context);
+    const a=h.activated().find(e=>e.world==='A'&&e.uid===1);
+    const key=recall.jevEntryKey(a);
+    assert.equal(bridge.selection({generation:context.generation,key}).activated,true);
+    const budget={...context,target:key,text:a.content+'\n'};
+    const calls=h.counters.token;
+    assert.equal(bridge.lookup(budget),a.content.length+1);
+    assert.equal(await bridge.measure(budget),a.content.length+1);
+    assert.equal(h.counters.token,calls);
+    const rendered={...context,target:key,text:a.content};
+    assert.equal(bridge.lookup(rendered),null);
+    const measured=await Promise.all([bridge.measure(rendered),bridge.measure(rendered)]);
+    assert.deepEqual(measured,[a.content.length,a.content.length]);
+    assert.equal(h.counters.token,calls+1);
+    const records=h.activated().filter(e=>['A','B'].includes(e.world)&&!e.constant).map(e=>({key:recall.jevEntryKey(e),status:'confirmed',text:e.content}));
+    assert.equal(bridge.publishInjection({...context,records,complete:true}),true);
+    assert.equal(h.report().rpInjection.tokens,null);
+    for(const record of records)await bridge.measure({...context,target:record.key,text:record.text});
+    assert.equal(bridge.publishInjection({...context,records,complete:true}),true);
+    assert.equal(h.report().rpInjection.tokens,records.reduce((n,x)=>n+x.text.length,0));
+    await h.end();
+    assert.equal(bridge.lookup(budget),a.content.length+1);
+    await h.generate();
+    assert.equal(bridge.lookup(budget),null);
+    assert.equal(bridge.publishInjection({...context,records,complete:true}),false);
 });

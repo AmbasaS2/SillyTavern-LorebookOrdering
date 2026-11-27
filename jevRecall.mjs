@@ -1,3 +1,5 @@
+import { extractJevUsage } from './jevMetrics.mjs';
+
 export const DEFAULT_JEV_BUDGET = 10000;
 export const DEFAULT_JEV_ADAPTIVE_THRESHOLD = 56000;
 const NANO_JEV_ENDPOINT = 'https://nano-gpt.com/api/subscription/v1';
@@ -222,6 +224,7 @@ export function prepareJevRecall(entries, worlds, messages, options = {}, candid
         });
     if (!current.length) return null;
     const seen = new Set();
+    const eligibleSeen = new Set();
     const sharedSeen = new Set();
     const candidates = new Map();
     const background = [];
@@ -245,6 +248,7 @@ export function prepareJevRecall(entries, worlds, messages, options = {}, candid
         }
         if (!isJevCandidate(entry, worlds)) continue;
         const entryKey = jevEntryKey(entry);
+        eligibleSeen.add(entryKey);
         if (seen.has(entryKey) || (candidateKeys && !candidateKeys.has(entryKey))) continue;
         seen.add(entryKey);
         const candidate = record(entry);
@@ -267,6 +271,7 @@ export function prepareJevRecall(entries, worlds, messages, options = {}, candid
         }
     }
     if (!candidates.size) return null;
+    stats.eligibleEntries=eligibleSeen.size;
     stats.sharedEntries = background.length;
     // Old saved custom presets may contain the former transport-specific
     // opening sentence. Adapt just that known boilerplate at runtime.
@@ -395,18 +400,19 @@ function adaptiveSourceEnd(entry, chatId) {
 export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId, cueCache=createAdaptiveCueCache()}={}) {
     const eligible=new Set(),candidateKeys=new Set(),durable=new Set(),dated=[];
     let compactCount=0;
+    const sources=new Map();
     let nativeCount=0;
     for(const entry of entries){
         if(!isJevCandidate(entry,worlds))continue;
         const key=jevEntryKey(entry);
         if(eligible.has(key))continue;
         eligible.add(key);
-        if(nativeKeys.has(key)){candidateKeys.add(key);nativeCount++;}
-        else if(cueCache.matches(entry)){candidateKeys.add(key);durable.add(key);}
+        if(nativeKeys.has(key)){candidateKeys.add(key);nativeCount++;sources.set(key,'native');}
+        else if(cueCache.matches(entry)){candidateKeys.add(key);durable.add(key);sources.set(key,'adaptive-durable');}
         // Concise entries can encode an implicit habit, promise, or identity
         // without any durable keyword. Read all such entries rather than guess.
         // This is a positive coverage lane, never an automatic activation.
-        else if(entry.content.length<=512){candidateKeys.add(key);compactCount++;}
+        else if(entry.content.length<=512){candidateKeys.add(key);compactCount++;sources.set(key,'adaptive-concise');}
         const end=adaptiveSourceEnd(entry,chatId);
         if(end!==null)dated.push({key,end});
     }
@@ -415,9 +421,9 @@ export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId,
     dated.sort((a,b)=>b.end-a.end);
     let recentCount=0;
     for(const {key} of dated.slice(0,3)){
-        if(!candidateKeys.has(key)){candidateKeys.add(key);recentCount++;}
+        if(!candidateKeys.has(key)){candidateKeys.add(key);recentCount++;sources.set(key,'adaptive-recent');}
     }
-    return {candidateKeys,eligibleCount:eligible.size,nativeCount,
+    return {candidateKeys,sources,eligibleCount:eligible.size,nativeCount,
         durableCount:durable.size,compactCount,recentCount,supplementalCount:durable.size+compactCount+recentCount};
 }
 
@@ -491,11 +497,10 @@ export async function requestJevRecall(prepared, connection, headers, signal, fe
         const excerpt=plan?readJevExcerpt(plan,answers?.['p'+id.slice(1)]):null;
         selected.push({ key, score: Number.isFinite(score) ? score : 0, ...(excerpt?{excerpt}:{}) });
     }
-    const usage = data?.usage?.prompt_tokens ?? data?.usage?.input_tokens ?? decoded?.usage?.input_tokens;
-    return { decisions: selected, inputTokens: typeof usage === 'number' && Number.isFinite(usage) && usage >= 0 ? usage : null };
+    return { decisions: selected, ...extractJevUsage(data?.usage,decoded?.usage) };
 }
 
-export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoBudget, bookBudgets, countTokens, bookPriorities = new Map(), diagnostics = null }) {
+export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoBudget, bookBudgets, countTokens, countEntryTokens = entry=>countTokens(entry.content+'\n'), bookPriorities = new Map(), diagnostics = null }) {
     const accepted = new Map();
     if (!ranked.length) return accepted;
     const candidates = new Map();
@@ -508,7 +513,7 @@ export async function fitJevRecall(entries, worlds, ranked, { budget, worldInfoB
         worlds.has(entry.world) || !entry.ignoreBudget || entry.__stloReservedConstant === true);
     const selected = ranked.map(key => candidates.get(key)).filter(Boolean);
     const counts = new Map(await Promise.all([...relevantConstants, ...selected].map(async entry => {
-        const tokens = await countTokens(entry.content + '\n');
+        const tokens = await countEntryTokens(entry);
         if (!Number.isFinite(tokens) || tokens <= 0) throw Error('Could not count lore tokens.');
         return [jevEntryKey(entry), tokens];
     })));
