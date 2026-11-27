@@ -12,7 +12,7 @@ import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../.
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate, selectAdaptiveJevMode, DEFAULT_JEV_ADAPTIVE_THRESHOLD, createAdaptiveCueCache, coverAdaptiveJevCandidates, applyJevExcerpts } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate, selectAdaptiveJevMode, DEFAULT_JEV_ADAPTIVE_THRESHOLD, createAdaptiveCueCache, coverAdaptiveJevCandidates, applyJevExcerpts, createAdaptivePlanCache, estimateAdaptiveJevPlan, routeAdaptiveJevEstimate } from './jevRecall.mjs';
 
 import { createJevPromptLibrary, mountJevPromptLibrary } from './jevPromptLibrary.mjs';
 import { METRICS_VERSION, createUsageTracker, createTokenLedger, summarizeBookBudgets, summarizeFunnel, summarizeInjection, historyRow } from './jevMetrics.mjs';
@@ -72,6 +72,8 @@ let metricsCurrent=null;
 let metricsSerial=0;
 let metricsHistory=[];
 const adaptiveCueCache = createAdaptiveCueCache();
+const adaptivePlanCache = createAdaptivePlanCache();
+let adaptivePlanScope = null;
 let adaptiveCueScope = null;
 
 function getCachedLorebook(world) {
@@ -380,6 +382,7 @@ function openJevReport() {
     const fields = report ? [
         [translate('Status', 'stlo.jev.status'), jevStatusLabel(report.phase)],
         [translate('Adaptive full-plan estimate', 'stlo.jev.adaptiveEstimate'), report.adaptiveEstimate],
+        [translate('Adaptive estimate cache hits / new calculations', 'stlo.jev.adaptivePlanCache'), report.adaptivePlanCacheHits===undefined?undefined:report.adaptivePlanCacheHits+' / '+report.adaptivePlanCacheMisses],
         [translate('Candidate route', 'stlo.jev.adaptiveRoute'), report.requestedMode==='adaptive'?
             translate(report.mode==='filtered'?'Native hits + memory coverage':'All eligible lorebook entries (default)',
                 report.mode==='filtered'?'stlo.jev.adaptiveCoverageRoute':'stlo.jev.modeAll'):undefined],
@@ -565,15 +568,17 @@ async function stloJevInterceptor(chat, contextSize, abort, type) {
             const settings=new Map(EXTENSION_STATE.scanWorldSettings);
             const active=new Set(entries.map(entry=>entry.world));
             const worlds=new Set([...getJevWorlds(settings,run.characterRecall)].filter(world=>active.has(world)));
-            const full=prepareJevRecall(entries,worlds,chat??getContext().chat??[],{...run.options,partialInjection:false});
+            const scope=JSON.stringify([run.chatId,getJevCharacterAvatar(),getContext().groupId,EXTENSION_STATE.currentSpeakingCharacter,[...worlds].sort()]);
+            if(adaptivePlanScope!==scope){adaptivePlanCache.clear();adaptivePlanScope=scope;}
+            const full=estimateAdaptiveJevPlan(entries,worlds,chat??getContext().chat??[],run.options,adaptivePlanCache);
             // Chat/file vectors alone cannot provide World Info candidates.
             const worldVectors=Boolean(nativeAvailable&&extension_settings.vectors?.enabled_world_info&&
                 entries.some(entry=>isJevCandidate(entry,worlds)&&(entry.vectorized||extension_settings.vectors?.enabled_for_all)));
-            const route=selectAdaptiveJevMode(full,{threshold:run.options.adaptiveThreshold,vectorAvailable:worldVectors});
+            const route=routeAdaptiveJevEstimate(full,{threshold:run.options.adaptiveThreshold,vectorAvailable:worldVectors});
             run.requestedMode='adaptive';
             run.options={...run.options,mode:route.mode};
             if(route.mode==='all')run.adaptiveSnapshot={entries,settings};
-            updateJevReport(run,{requestedMode:'adaptive',mode:route.mode,adaptiveEstimate:route.estimatedTokens??undefined,adaptiveReason:route.reason});
+            updateJevReport(run,{requestedMode:'adaptive',mode:route.mode,adaptiveEstimate:route.estimatedTokens??undefined,adaptiveReason:route.reason,adaptivePlanCacheHits:full.cacheHits,adaptivePlanCacheMisses:full.cacheMisses});
         }
         if (run.options.mode === 'filtered' && nativeAvailable) {
             run.awaitingVector = true;
@@ -751,6 +756,8 @@ function setupEventHandlers() {
         stopJevGeneration();
         adaptiveCueCache.clear();
         adaptiveCueScope = null;
+        adaptivePlanCache.clear();
+        adaptivePlanScope=null;
         metricsCurrent?.ledger.clear();metricsCurrent=null;metricsHistory=[];
         lastJevReport = null;
         syncJevTopBar();
@@ -1475,7 +1482,7 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         if (hasCandidate && !messages.some(message => !message?.is_system && typeof message?.mes === 'string' && message.mes.trim())) {
             throw Error('No recent dialogue for Jev.');
         }
-        const prepared = prepareJevRecall(entries, worlds, messages, run.options, candidateKeys);
+        const prepared=prepareJevRecall(entries,worlds,messages,run.options,candidateKeys,run.requestedMode==='adaptive'?adaptivePlanCache:null);
         updateJevReport(run, { eligibleEntries:prepared?.stats.eligibleEntries??run.report.adaptiveEligible,
             assessed:0, candidates: prepared?.candidates.size ?? 0,
             unassessed: prepared?.candidates.size ?? 0, inputChars: 0, estimatedInputTokens: 0,

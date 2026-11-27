@@ -366,10 +366,14 @@ test('partial questions preserve binary decisions, fit existing batches, and fai
     const batches=planJevRequests(prepared);
     assert.equal(batches.length,1);
     const batch=batches[0];
-    assert.deepEqual(batch.body.questions.e1,fullBatch.body.questions.e1);
+    assert.deepEqual(batch.body.questions.e1.criteria,fullBatch.body.questions.e1.criteria);
+    assert.ok(batch.body.questions.e1.instructions.includes('excerptSources.e1'));
+    assert.ok(batch.body.questions.p1.instructions.includes('excerptSources.e1'));
+    assert.equal(batch.body.state.excerptSources.e1.paragraphs.length,7);
+    assert.ok(batch.excerptAddedEstimate<batch.excerptMinimumEstimatedSaving);
     assert.equal(batch.partialPlans.size,1);
     assert.equal(batch.candidates.size,1);
-    assert.ok(batch.estimatedTokens>fullBatch.estimatedTokens);
+    assert.ok(batch.estimatedTokens<fullBatch.estimatedTokens*1.5);
     assert.ok(batch.estimatedTokens<=JEV_REQUEST_TARGET);
     const constrained=planJevRequests(prepared,fullBatch.estimatedTokens,JEV_QUESTION_TARGET);
     assert.equal(constrained.length,1);
@@ -438,4 +442,63 @@ test('adaptive retains concise implicit memories without relying on titles or ke
     assert.deepEqual([...coverage.candidateKeys], [rule,habit,promise,secret].map(jevEntryKey));
     assert.equal(coverage.compactCount,3);
     assert.equal(coverage.eligibleCount,5);
+});
+
+test('adaptive estimate cache matches the exact full planner, invalidates edited inputs and avoids warm full serialization',async()=>{
+    const {createAdaptivePlanCache,estimateAdaptiveJevPlan,routeAdaptiveJevEstimate,selectAdaptiveJevMode}=await import('./jevRecall.mjs');
+    const cache=createAdaptivePlanCache({maxEntries:2000,maxChars:2000000});
+    const worlds=new Set(['A','B']);
+    const pinned=lore('A',9999,'Always-on background. 한글',{constant:true});
+    const entries=[pinned,...Array.from({length:1010},(_,i)=>lore(i%2?'A':'B',i,('행동과 약속. Quoted "word" \\ text. 🐦 '+i+' ').repeat(i%5+1),{key:['키',String(i)],comment:'Title '+i})),
+        lore('A',9998,'protected',{position:7}),lore('C',3,'foreign')];
+    const messages=[{mes:'old',is_system:true},{mes:'dialogue one'},{mes:'dialogue two',name:'User'}];
+    const compare=(entries,opts={},msgs=messages)=>{
+        const prepared=prepareJevRecall(entries,worlds,msgs,{...opts,partialInjection:false});
+        const estimated=estimateAdaptiveJevPlan(entries,worlds,msgs,opts,cache);
+        const expected=selectAdaptiveJevMode(prepared,{threshold:2000,vectorAvailable:true});
+        assert.deepEqual(routeAdaptiveJevEstimate(estimated,{threshold:2000,vectorAvailable:true}),expected);
+        assert.equal(estimated.estimatedTokens,planJevRequests(prepared).reduce((n,b)=>n+b.estimatedTokens,0));
+        return estimated;
+    };
+    const cold=compare(entries);
+    assert.equal(cold.cacheMisses,1010);assert.equal(cold.cacheHits,0);
+    const warm=compare(entries.slice().reverse());
+    assert.equal(warm.cacheMisses,0);assert.equal(warm.cacheHits,1010);
+    entries[2].content+=' Edited.';
+    entries[3].comment='New title';
+    entries[4].key=['new key'];
+    pinned.content+=' changed background';
+    const changed=compare(entries,{},[{mes:'new dialogue'}]);
+    assert.equal(changed.cacheMisses,3);assert.equal(changed.cacheHits,1007);
+    const limited=compare(entries,{inputVersion:2,loreLength:100,messageLength:100});
+    assert.equal(limited.cacheMisses,1010);
+    cache.clear();assert.equal(compare(entries).cacheHits,0);
+    const huge=[lore('A',1,'x '.repeat(100000))];
+    const oversized=estimateAdaptiveJevPlan(huge,worlds,messages,{},cache);
+    assert.equal(oversized.oversized,true);
+    assert.equal(oversized.estimatedTokens,null);
+    assert.equal(routeAdaptiveJevEstimate(oversized,{vectorAvailable:true}).mode,'filtered');
+});
+
+test('excerpt shared state sends the complete source once and respects all existing questions and batch limits',()=>{
+    const worlds=new Set(['A']);
+    const long=lore('A',1,excerptScene().replaceAll('The stone terrace displayed rows','UNIQUE_SOURCE_MARKER The stone terrace displayed rows'));
+    const other=lore('A',2,'Ordinary memory unrelated to the copper bell.');
+    const messages=[{mes:'The captain returns.'}];
+    const base=planJevRequests(prepareJevRecall([long,other],worlds,messages))[0];
+    const prepared=prepareJevRecall([long,other],worlds,messages,{partialInjection:true});
+    const batch=planJevRequests(prepared)[0];
+    assert.equal(batch.partialPlans.size,1);
+    assert.deepEqual(batch.body.questions.e2,base.body.questions.e2);
+    assert.equal(JSON.stringify(batch.body.questions).includes('UNIQUE_SOURCE_MARKER'),false);
+    assert.equal(JSON.stringify(batch.body.state.excerptSources.e1).includes('UNIQUE_SOURCE_MARKER'),true);
+    assert.equal(batch.body.state.excerptSources.e1.paragraphs[0].text,'Iona found the copper bell beside the sealed gate.');
+    const expected=estimateJevTokens(JSON.stringify(batch.body.state))+128+
+        Object.entries(batch.body.questions).reduce((n,[id,q])=>n+estimateJevTokens(JSON.stringify({[id]:q}))+12,0);
+    assert.equal(batch.estimatedTokens,expected);
+    assert.ok([...batch.questionCosts.values()].every(n=>batch.sharedEstimate+n<=JEV_QUESTION_TARGET));
+    const baseMax=Math.max(...base.questionCosts.values())+base.sharedEstimate;
+    const tight=planJevRequests(prepared,JEV_REQUEST_TARGET,baseMax);
+    assert.equal(tight.length,1);
+    assert.deepEqual(tight[0].body,base.body);
 });

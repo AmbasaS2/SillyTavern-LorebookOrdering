@@ -286,5 +286,6 @@
   "stlo.metrics.requestTime": "Request ms",
   "stlo.metrics.provisional": "Provisional final scan; actual activation not confirmed.",
   "stlo.metrics.sharedBudget": "Shared Jev budget / used / remaining",
-  "stlo.metrics.rpFunnel": "RP confirmed / excluded / unknown"
+  "stlo.metrics.rpFunnel": "RP confirmed / excluded / unknown",
+  "stlo.jev.adaptivePlanCache": "Adaptive estimate cache hits / new calculations"
 }
