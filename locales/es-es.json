@@ -92,6 +92,7 @@
   "stlo.vector.threshold.placeholder": "Vacío: usar ajuste global",
   "stlo.budget.recursionHelp": "Con el escaneo recursivo, una entrada excluida del resultado final puede haber activado otras.",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "Ver último cálculo de inserción",
   "stlo.jev.modeAdaptive": "Adaptativo (experimental)",
   "stlo.jev.adaptiveThreshold": "Umbral de entrada del plan completo (tokens estimados)",
   "stlo.jev.adaptiveHelp": "Por debajo del umbral se evalúan todas las entradas elegibles. Por encima, se complementan las coincidencias nativas de World Info con pistas duraderas, recuerdos breves, registros explícitos a largo plazo o de NPC, coincidencias concretas de título o clave y recuerdos recientes con posiciones de origen comparables. Sin búsqueda vectorial o coincidencias elegibles se evalúa todo. Es experimental y no garantiza la recuperación completa. El umbral estima la entrada, no el presupuesto de inyección.",

@@ -273,7 +273,7 @@ With Jev **off**, the same report action opens the latest lorebook budget report
 
 <p align="left"><img src="assets/readme/mobile/ui-budget-report.svg" alt="최근 로어북 예산 보고서 / Budget-only report" width="480" /></p>
 
-Open Lorebook Jev Recall → Advanced Jev settings → Latest Jev recall, or the compatible Chat Top Bar brain button when a report is available.
+Open Lorebook Budget Management → **View latest injection calculation** beside the manager title. When a report is available, the compatible Chat Top Bar also shows a scale shortcut next to Memory Books.
 
 If a request fails, choose **Retry Jev / Cancel reply**. Only failed batches are retried; there is no silent keyword fallback. Zero candidates can be a valid result.
 
@@ -788,7 +788,7 @@ Timeline/Scene/Result 형식의 적격 긴 기억에서만, 내장 판정 프롬
 
 <p align="left"><img src="assets/readme/mobile/ui-budget-report.svg" alt="최근 로어북 예산 보고서 / Budget-only report" width="480" /></p>
 
-입력창 왼쪽 확장 메뉴 → **로어북 Jev 호출 → Jev 고급 설정 → 최근 Jev 실행**. 호환 챗탑바의 두뇌 아이콘에서도 보고서가 있을 때 열 수 있어요. 최근 실행 비교는 현재 채팅·세션의 최근 8회 숫자 기록이며, 보고서를 여는 것만으로 새 AI 요청이나 토큰 계산이 시작되지는 않습니다.
+입력창 왼쪽 확장 메뉴에서 **로어북 예산 관리**를 열고 제목 오른쪽의 **최근 주입 계산 보기**를 누르세요. 보고서가 있으면 호환 챗탑바의 메모리북 옆 저울 아이콘에서도 열 수 있어요. 최근 실행 비교는 현재 채팅·세션의 최근 8회 숫자 기록이며, 보고서를 여는 것만으로 새 AI 요청이나 토큰 계산이 시작되지는 않습니다.
 
 오류가 나면 **Jev 재시도 / 답변 취소**를 선택합니다. 실패한 묶음만 재시도하고 키워드 호출로 몰래 대체하지 않아요. 후보 0개는 정상 결과일 수도 있습니다.
 

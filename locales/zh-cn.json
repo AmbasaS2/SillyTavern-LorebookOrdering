@@ -92,6 +92,7 @@
   "stlo.vector.threshold.placeholder": "留空使用全局设置",
   "stlo.budget.recursionHelp": "使用递归扫描时，最终未注入的条目也可能已触发其他条目。",
   "stlo.manager.title": "Lorebook Ordering for Sloths",
+  "stlo.manager.latestCalculation": "查看最近注入计算",
   "stlo.jev.modeAdaptive": "自适应（实验）",
   "stlo.jev.adaptiveThreshold": "全量判定输入阈值（估算令牌）",
   "stlo.jev.adaptiveHelp": "低于阈值时判定全部合格条目。超出时，在原生世界书搜索结果上补充长期记忆线索、短记忆、明确的长期/NPC记录、具体标题或关键词匹配，以及来源位置可比较的近期记忆。向量搜索不可用或无合格命中时进行全量判定。此为实验功能，不保证完整召回。阈值是输入估算值，不是注入预算。",

@@ -38,8 +38,16 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     const elements=new Map();
     const makeNode=()=>{
         const attrs=new Map();
-        return {dataset:{},title:'',children:[],append(...children){this.children.push(...children);for(const child of children)if(child.id)elements.set(child.id,child);counters.domWrites++;},
-            remove(){elements.delete(this.id);counters.domWrites++;},addEventListener(){},getAttribute(k){return attrs.get(k);},setAttribute(k,v){attrs.set(k,v);counters.domWrites++;}};
+        return {dataset:{},title:'',children:[],parentElement:null,
+            get nextElementSibling(){return this.parentElement?.children[this.parentElement.children.indexOf(this)+1]??null;},
+            append(...children){for(const child of children)this.insertBefore(child,null);},
+            insertBefore(child,anchor){
+                if(child.parentElement)child.parentElement.children.splice(child.parentElement.children.indexOf(child),1);
+                this.children.splice(anchor?this.children.indexOf(anchor):this.children.length,0,child);
+                child.parentElement=this;if(child.id)elements.set(child.id,child);counters.domWrites++;
+            },
+            remove(){if(this.parentElement)this.parentElement.children.splice(this.parentElement.children.indexOf(this),1);this.parentElement=null;elements.delete(this.id);counters.domWrites++;},
+            addEventListener(){},getAttribute(k){return attrs.get(k);},setAttribute(k,v){attrs.set(k,v);counters.domWrites++;}};
     };
     elements.set('extensionTopBar',makeNode());
     const doc={getElementById:id=>elements.get(id)||null,createElement:makeNode};
@@ -143,7 +151,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,companionStats:()=>({calls:companionCalls,tokenizations:companionTokenizations}),companionCount:text=>sandbox.STWII?.loreTokenCountV1?.count(text),setSpeaker:id=>eventSource.emit(events.GROUP_MEMBER_DRAFTED,id),changeChat:async id=>{chatId=id;await eventSource.emit(events.CHAT_CHANGED,id);},bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),openReport:async()=>{await sandbox.testApi.openJevReport();return lastPopupPanel;},elements};
+    return {makeNode,generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,companionStats:()=>({calls:companionCalls,tokenizations:companionTokenizations}),companionCount:text=>sandbox.STWII?.loreTokenCountV1?.count(text),setSpeaker:id=>eventSource.emit(events.GROUP_MEMBER_DRAFTED,id),changeChat:async id=>{chatId=id;await eventSource.emit(events.CHAT_CHANGED,id);},bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),openReport:async()=>{await sandbox.testApi.openJevReport();return lastPopupPanel;},elements};
 }
 
 test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
@@ -159,6 +167,20 @@ test('all-mode replaces managed world-vector collections while preserving native
     assert.equal(h.ctx.extensionPrompts['3_vectors'].value,'old');
     assert.equal(h.report().injected,3);
     assert.equal(h.elements.has('stlo-jev-topbar'),true);
+});
+
+test('report shortcut uses the scale immediately after Memory Books and before the fallback close icon',async()=>{
+    const h=harness(),bar=h.elements.get('extensionTopBar');
+    const close={id:'extensionTopBarCloseChat'};
+    bar.append(close);
+    await h.generate();
+    const report=h.elements.get('stlo-jev-topbar');
+    assert.match(report.className,/fa-scale-balanced/);
+    assert.equal(report.nextElementSibling,close);
+    const jobs=Object.assign(h.makeNode(),{id:'stmb-jobs-topbar'});
+    bar.insertBefore(jobs,report);
+    await h.generate();
+    assert.deepEqual(bar.children.map(x=>x.id),[jobs.id,report.id,close.id]);
 });
 
 test('filtered mode reuses one vector pass and one candidate scan; restores native transient state',async()=>{
