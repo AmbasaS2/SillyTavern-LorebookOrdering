@@ -230,5 +230,22 @@
   "stlo.vector.threshold.title": "Vector similarity threshold",
   "stlo.vector.threshold.help": "Enter a value from 0 to 1. Leave blank to use the global setting. Different thresholds can require additional requests, time and cost.",
   "stlo.vector.threshold.placeholder": "Leave blank to use global setting",
-  "stlo.budget.recursionHelp": "With recursive scanning, lore excluded from the final prompt can still have activated other lore."
+  "stlo.budget.recursionHelp": "With recursive scanning, lore excluded from the final prompt can still have activated other lore.",
+  "stlo.jev.modeAdaptive": "Adaptive (experimental)",
+  "stlo.jev.adaptiveThreshold": "Full-plan input threshold (estimated tokens)",
+  "stlo.jev.adaptiveHelp": "Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.",
+  "stlo.jev.adaptiveEstimate": "Adaptive full-plan estimate",
+  "stlo.jev.adaptiveRoute": "Candidate route",
+  "stlo.jev.adaptiveCoverageRoute": "Native hits + memory coverage",
+  "stlo.jev.adaptiveDecision": "Adaptive decision",
+  "stlo.jev.adaptiveReason.empty": "No eligible candidates",
+  "stlo.jev.adaptiveReason.within-threshold": "Within the estimated input threshold",
+  "stlo.jev.adaptiveReason.above-threshold": "Above the estimated input threshold",
+  "stlo.jev.adaptiveReason.vector-unavailable": "World Info vector recall unavailable; assessed all",
+  "stlo.jev.adaptiveReason.empty-filter": "No native hits; assessed all",
+  "stlo.jev.adaptiveReason.coverage-all": "Candidate coverage includes every eligible entry",
+  "stlo.jev.adaptiveEligible": "Eligible candidates before filtering",
+  "stlo.jev.adaptiveNative": "Native hits",
+  "stlo.jev.adaptiveDurable": "Additional durable-memory candidates",
+  "stlo.jev.adaptiveRecent": "Additional recent candidates"
 }

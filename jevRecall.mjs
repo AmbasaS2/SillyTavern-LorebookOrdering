@@ -223,6 +223,82 @@ export function selectAdaptiveJevMode(prepared,{threshold=DEFAULT_JEV_ADAPTIVE_T
         reason:over?(vectorAvailable?'above-threshold':'vector-unavailable'):'within-threshold'};
 }
 
+// Candidate coverage only: never auto-activate a cue or assign it a relevance score.
+// Broad positive cues deliberately err toward more full-text Jev assessments.
+// They are not a multilingual semantic model and cannot prove completeness.
+const DURABLE_RECALL_CUE = /\b(?:promis\w*|vow\w*|pledge\w*|oath\w*|swore|sworn|agre(?:ed|ement)|habit\w*|ritual\w*|routine\w*|tradition\w*|customary|always|never|whenever|every (?:morning|night|evening|day|time)|used to|boundary|boundaries|consent|forbid\w*|secret\w*|confid(?:ed|ential)|only .{1,50} knows|kept .{1,50} from|nickname\w*|inside joke\w*|code word\w*|safe word\w*)\b|약속|맹세|합의|습관|버릇|늘상|항상|매일|매번|절대|비밀|경계|동의|애칭|암호|約束|誓い|習慣|日課|いつも|毎日|秘密|同意|境界|愛称|承諾|承诺|约定|誓言|习惯|習慣|惯例|慣例|总是|總是|每天|秘密|界限|同意|昵称|暱稱|versprech|gewohnheit|vereinbar|geheimnis|grenz|zustimmung|promess|habitud|accord|secret|consentement|promes|costumbre|acuerdo|secreto|límite|consentimiento|janji|kebiasaan|kebias|rahasia|rahsia|persetujuan|sempadan|обещан|привыч|договор|секрет|тайн|границ|согласие/iu;
+
+// Scope is owned by the caller; no storage, polling or tokenization. Keep
+// exact content/title comparisons so even an in-place edit invalidates a hit.
+export function createAdaptiveCueCache({maxEntries=1024,maxChars=2000000}={}) {
+    const cache=new Map();
+    let chars=0;
+    return {
+        clear(){cache.clear();chars=0;},
+        matches(entry){
+            const key=jevEntryKey(entry);
+            const title=String(entry.comment??'');
+            const content=entry.content;
+            const old=cache.get(key);
+            if(old&&old.title===title&&old.content===content)return old.match;
+            if(old){cache.delete(key);chars-=old.size;}
+            const match=DURABLE_RECALL_CUE.test(title)||DURABLE_RECALL_CUE.test(content);
+            const size=title.length+content.length;
+            if(size>maxChars||maxEntries<1)return match;
+            while(cache.size>=maxEntries||chars+size>maxChars){
+                const first=cache.keys().next().value;
+                if(first===undefined)break;
+                chars-=cache.get(first).size;cache.delete(first);
+            }
+            cache.set(key,{title,content,size,match});chars+=size;
+            return match;
+        },
+    };
+}
+
+// Only compare explicit, valid message positions from the SAME chat. Manual
+// books and imported/branched histories may have no comparable chronology;
+// never guess from UID, array order, title number or insertion priority.
+function adaptiveSourceEnd(entry, chatId) {
+    if(!chatId||entry.STMB_chatId!==chatId)return null;
+    if(entry.STMB_sourceRanges!==undefined){
+        const ranges=entry.STMB_sourceRanges;
+        if(!Array.isArray(ranges)||!ranges.length)return null;
+        let end=-1;
+        for(const range of ranges){
+            if(!Array.isArray(range)||range.length!==2||!range.every(Number.isSafeInteger)||range[0]<0||range[1]<range[0])return null;
+            end=Math.max(end,range[1]);
+        }
+        return end;
+    }
+    return Number.isSafeInteger(entry.STMB_start)&&Number.isSafeInteger(entry.STMB_end)&&
+        entry.STMB_start>=0&&entry.STMB_end>=entry.STMB_start?entry.STMB_end:null;
+}
+
+export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId, cueCache=createAdaptiveCueCache()}={}) {
+    const eligible=new Set(),candidateKeys=new Set(),durable=new Set(),dated=[];
+    let nativeCount=0;
+    for(const entry of entries){
+        if(!isJevCandidate(entry,worlds))continue;
+        const key=jevEntryKey(entry);
+        if(eligible.has(key))continue;
+        eligible.add(key);
+        if(nativeKeys.has(key)){candidateKeys.add(key);nativeCount++;}
+        else if(cueCache.matches(entry)){candidateKeys.add(key);durable.add(key);}
+        const end=adaptiveSourceEnd(entry,chatId);
+        if(end!==null)dated.push({key,end});
+    }
+    // Keep at most three additional chronologically comparable scenes as
+    // candidates (not as automatic injections); retain ALL durable cues.
+    dated.sort((a,b)=>b.end-a.end);
+    let recentCount=0;
+    for(const {key} of dated.slice(0,3)){
+        if(!candidateKeys.has(key)){candidateKeys.add(key);recentCount++;}
+    }
+    return {candidateKeys,eligibleCount:eligible.size,nativeCount,
+        durableCount:durable.size,recentCount,supplementalCount:durable.size+recentCount};
+}
+
 export function splitJevBatch(batch) {
     const ids = [...batch.candidates.keys()];
     if (ids.length < 2) return [];

@@ -434,3 +434,50 @@ test('adaptive without World Info vectors or eligible native hits returns to the
     assert.equal(empty.report().candidates,3);
     assert.equal(empty.counters.jev,1);
 });
+
+test('adaptive coverage restores old durable memories before Jev without changing legacy filtered or full recall',async()=>{
+    const rule=entry('A',2,'The lantern must be blue.');
+    const promise=entry('B',8,'Long ago, Iona promised to keep the copper bell until reunion.',{key:[],comment:'Scene 1'});
+    const habit=entry('B',9,'Every morning Iona left a cup facing the window.',{key:[],comment:'Scene 2'});
+    const oversized=entry('A',1,'An unrelated massive item. '.repeat(300),{vectorized:true});
+    const fillers=Array.from({length:230},(_,i)=>entry('B',100+i,('The stone terrace and granite steps stood beneath clouds. ').repeat(40),{key:[],comment:'Scene '+(100+i)}));
+    const entries=[rule,promise,habit,oversized,...fillers,entry('B',90,'Core remains complete.',{constant:true}),entry('C',2,'Excluded secret.')];
+    const expected=[rule,promise,habit].map(recall.jevEntryKey);
+    const decisions=[...expected,recall.jevEntryKey(oversized)];
+    const run=async mode=>{
+        const h=harness({mode,adaptiveThreshold:1,entries,decisions,chatText:'Iona looks at the blue lantern. What now?'});
+        await h.generate();
+        assert.equal(h.counters.abort,0);
+        return h;
+    };
+    const all=await run('all'), filtered=await run('filtered'), adaptive=await run('adaptive');
+    const relevant=h=>h.activated().filter(e=>expected.includes(recall.jevEntryKey(e))).map(recall.jevEntryKey).sort();
+    assert.deepEqual(relevant(all),expected.slice().sort());
+    assert.deepEqual(relevant(filtered),[recall.jevEntryKey(rule)]);
+    assert.deepEqual(relevant(adaptive),expected.slice().sort());
+    assert.equal(all.report().candidates,234);
+    assert.equal(filtered.report().candidates,2);
+    assert.equal(adaptive.report().candidates,4);
+    assert.equal(adaptive.report().adaptiveNative,2);
+    assert.equal(adaptive.report().adaptiveDurable,2);
+    assert.equal(adaptive.report().adaptiveRecent,0);
+    assert.equal(adaptive.counters.vector,1);
+    assert.equal(adaptive.counters.preview,1);
+    assert.equal(adaptive.counters.jev,1);
+    assert.ok(adaptive.report().estimatedInputTokens<all.report().estimatedInputTokens);
+    assert.equal(adaptive.activated().some(e=>e.uid===1&&e.world==='A'),false);
+    assert.equal(adaptive.activated().find(e=>e.uid===90).content,'Core remains complete.');
+    assert.equal(promise.content,'Long ago, Iona promised to keep the copper bell until reunion.');
+});
+
+test('adaptive coverage reaching the full set is reported as full without a second search',async()=>{
+    const entries=[...raw,entry('B',3,'A forgotten promise.'),entry('B',4,'An old habit.')].filter(e=>!(e.world==='B'&&e.uid===1));
+    const h=harness({mode:'adaptive',adaptiveThreshold:1,entries});
+    await h.generate();
+    assert.equal(h.report().adaptiveReason,'coverage-all');
+    assert.equal(h.report().mode,'all');
+    assert.equal(h.report().candidates,4);
+    assert.equal(h.counters.vector,1);
+    assert.equal(h.counters.preview,1);
+    assert.equal(h.counters.jev,1);
+});

@@ -309,3 +309,37 @@ test('constants that cannot fit their own book or total cap do not reserve phant
     const huge = lore('Memory',3,'x'.repeat(12000),{constant:true});
     assert.deepEqual([...await fitJevRecall([huge,selected],new Set(['Memory']),[jevEntryKey(selected)],opts)],[[jevEntryKey(selected),0]]);
 });
+
+test('adaptive durable cues, explicit same-chat recency, eligibility and cache invalidation',async()=>{
+    const {createAdaptiveCueCache,coverAdaptiveJevCandidates}=await import('./jevRecall.mjs');
+    const worlds=new Set(['A','B']);
+    const native=lore('A',1,'a native match');
+    const promise=lore('A',2,'오래전 둘만의 약속을 했다.');
+    const habit=lore('B',2,'Their morning ritual was to read by the door.');
+    const secret=lore('B',3,'A secret only the captain knows.');
+    const recent=lore('B',10,'A stone arch.',{STMB_chatId:'chat-a',STMB_sourceRanges:[[5,6],[20,22]]});
+    const recent2=lore('A',9,'A path.',{STMB_chatId:'chat-a',STMB_start:15,STMB_end:16});
+    const recent3=lore('A',8,'A chair.',{STMB_chatId:'chat-a',STMB_start:8,STMB_end:10});
+    const older=lore('A',500,'A window.',{STMB_chatId:'chat-a',STMB_start:1,STMB_end:4});
+    const foreign=lore('A',501,'A gate.',{STMB_chatId:'chat-b',STMB_start:100,STMB_end:101});
+    const invalid=lore('A',502,'A road.',{STMB_chatId:'chat-a',STMB_sourceRanges:[[30,25]],STMB_start:100,STMB_end:101});
+    const disabled=lore('A',503,'A promise',{disable:true});
+    const special=lore('A',504,'A secret',{position:7});
+    const pinned=lore('A',505,'A habit',{constant:true});
+    const other=lore('C',506,'A promise');
+    const entries=[native,promise,habit,secret,recent,recent2,recent3,older,foreign,invalid,disabled,special,pinned,other,promise];
+    const cache=createAdaptiveCueCache({maxEntries:16,maxChars:2000});
+    const get=()=>coverAdaptiveJevCandidates(entries,worlds,new Set([jevEntryKey(native),jevEntryKey(disabled),jevEntryKey(other)]),{chatId:'chat-a',cueCache:cache});
+    const expected=[native,promise,habit,secret,recent,recent2,recent3].map(jevEntryKey);
+    assert.deepEqual([...get().candidateKeys].sort(),expected.sort());
+    assert.equal(get().nativeCount,1);
+    assert.equal(get().durableCount,3);
+    assert.equal(get().recentCount,3);
+    assert.equal(get().eligibleCount,10);
+    promise.content='A pebble.';
+    assert.equal(get().candidateKeys.has(jevEntryKey(promise)),false);
+    promise.comment='A vow';
+    assert.equal(get().candidateKeys.has(jevEntryKey(promise)),true);
+    cache.clear();
+    assert.equal(get().candidateKeys.has(jevEntryKey(promise)),true);
+});
