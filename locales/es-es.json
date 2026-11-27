@@ -197,6 +197,8 @@
   "stlo.jev.strict": "Estricto",
   "stlo.jev.balanced": "Equilibrado",
   "stlo.jev.generous": "Generoso",
+  "stlo.jev.bonus": "Extra",
+  "stlo.jev.bonusHelp": "Si queda presupuesto tras la selección habitual, Jev puede añadir un recuerdo inesperado que enriquezca la escena.",
   "stlo.jev.prompt": "Prompt de selección",
   "stlo.jev.promptHelp": "Edita los criterios de decisión, no el formato de respuesta estructurada. Los ajustes se comparten entre personajes.",
   "stlo.jev.reset": "Restaurar valores predeterminados",

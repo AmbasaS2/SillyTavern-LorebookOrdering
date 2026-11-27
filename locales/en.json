@@ -105,6 +105,8 @@
   "stlo.jev.strict": "Strict",
   "stlo.jev.balanced": "Balanced",
   "stlo.jev.generous": "Generous",
+  "stlo.jev.bonus": "Bonus",
+  "stlo.jev.bonusHelp": "Jev can add one unexpected memory that enriches the scene, if there is room after the usual selections.",
   "stlo.jev.prompt": "Selection prompt",
   "stlo.jev.promptHelp": "Edit decision criteria, not the structured response format. The settings are shared across characters.",
   "stlo.jev.reset": "Restore defaults",

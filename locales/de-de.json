@@ -197,6 +197,8 @@
   "stlo.jev.strict": "Streng",
   "stlo.jev.balanced": "Ausgewogen",
   "stlo.jev.generous": "Großzügig",
+  "stlo.jev.bonus": "Bonus",
+  "stlo.jev.bonusHelp": "Wenn nach der normalen Auswahl noch Budget übrig ist, kann Jev eine unerwartete Erinnerung hinzufügen, die die Szene bereichert.",
   "stlo.jev.prompt": "Auswahlprompt",
   "stlo.jev.promptHelp": "Entscheidungskriterien bearbeiten, nicht das strukturierte Antwortformat. Einstellungen gelten für alle Charaktere.",
   "stlo.jev.reset": "Standards wiederherstellen",

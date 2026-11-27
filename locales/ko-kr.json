@@ -106,6 +106,8 @@
   "stlo.jev.strict": "엄격",
   "stlo.jev.balanced": "균형",
   "stlo.jev.generous": "관대",
+  "stlo.jev.bonus": "보너스",
+  "stlo.jev.bonusHelp": "일반 선택을 마친 뒤 예산이 남으면, 장면에 의외의 재미를 더할 기억을 최대 1개 추가합니다.",
   "stlo.jev.prompt": "Jev 판정 프롬프트",
   "stlo.jev.promptHelp": "Jev의 선택 기준을 수정합니다. 기술적인 응답 형식은 코드가 유지합니다. 여러 캐릭터에서 공유하는 설정입니다.",
   "stlo.jev.reset": "기본값 복원",
