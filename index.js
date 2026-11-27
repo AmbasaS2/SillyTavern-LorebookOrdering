@@ -353,44 +353,64 @@ function metricUsageText(value,reported,successful){
     if(value===undefined||!reported)return translate('Unmeasured','stlo.metrics.unmeasured');
     return value+' ('+reported+'/'+successful+')';
 }
+function makeReportSection(panel,label,open=false){
+    const details=document.createElement('details');
+    details.className='stlo-report-section';
+    details.open=open;
+    const title=document.createElement('summary');
+    title.textContent=label;
+    const body=document.createElement('div');body.className='stlo-report-section-body';
+    details.append(title,body);panel.append(details);return body;
+}
+function reportLine(parent,label,value){
+    const row=document.createElement('div');row.className='stlo-report-row';
+    const name=document.createElement('span');name.textContent=label;
+    const text=document.createElement('span');text.className='stlo-report-value';text.textContent=String(value);
+    row.append(name,text);parent.append(row);
+}
 function appendMemoryMetrics(panel,report){
     if(!report||report.metricsId===undefined)return;
     const unknown=translate('Unmeasured','stlo.metrics.unmeasured');
     const num=n=>Number.isFinite(n)?n.toLocaleString():unknown;
-    const section=label=>{
-        const details=document.createElement('details');
-        const title=document.createElement('summary');
-        title.textContent=label;details.append(title);panel.append(details);return details;
-    };
-    const line=(parent,value)=>{
-        const element=document.createElement('div');element.textContent=value;parent.append(element);
-    };
     const tr=(label,key)=>translate(label,'stlo.metrics.'+key);
+    const row=(parent,label,value)=>reportLine(parent,label,value);
+    const note=(parent,value)=>{
+        const element=document.createElement('small');element.className='stlo-report-note';element.textContent=value;parent.append(element);
+    };
+    const card=(parent,label)=>{
+        const element=document.createElement('div');element.className='stlo-report-book-card';
+        const name=document.createElement('strong');name.textContent=label;element.append(name);parent.append(element);return element;
+    };
+    const comparison=makeReportSection(panel,tr('Search and injection efficiency','efficiency'),true);
+    row(comparison,tr('Search input: provider / attempted estimate','searchInput'),(metricUsageText(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests)??unknown)+' / '+num(report.estimatedInputTokens));
+    row(comparison,tr('Activated Jev memory: full budget tokens (host estimate)','recallBudget'),num(report.finalRecallBudgetTokens)+(report.finalRecallBudgetUnknown?' ('+num(report.finalRecallBudgetKnown)+' + '+report.finalRecallBudgetUnknown+' '+unknown+')':''));
+    const rp=report.rpInjection;
+    if(rp)row(comparison,tr('RP confirmed / excluded / unknown','rpFunnel'),[rp.confirmed,rp.excluded,rp.unknown].map(num).join(' / '));
+    row(comparison,tr('Confirmed RP Jev memory: rendered individual tokens (host estimate)','rpTokens'),num(rp?.tokens)+(rp?' ('+rp.measured+'/'+rp.confirmed+' '+tr('measured','measured')+')':''));
+    note(comparison,tr('Provider usage and host estimates are different units; cached tokens are not added again. Actual billing and unreported usage are unknown.','units'));
+    if(!rp)note(comparison,tr('Final RP inclusion is unmeasured unless a compatible viewer provides evidence. Activation is not proof of injection.','rpUnavailable'));
     if(report.bookBudgets){
-        const budgets=section(tr('Per-book budget use (host estimate, full text)','budgets'));
-        if(!report.bookBudgetObserved)line(budgets,tr('Provisional final scan; actual activation not confirmed.','provisional'));
-        if(report.sharedJevBudget!==undefined)line(budgets,tr('Shared Jev budget / used / remaining','sharedBudget')+': '+[report.sharedJevBudget,report.sharedJevUsed,report.sharedJevRemaining].map(num).join(' / '));
-        for(const row of report.bookBudgets){
-            line(budgets,row.world+' · '+tr('Cap','cap')+': '+(row.capKnown?(row.cap===null?tr('Shared / no separate cap','noCap'):num(row.cap)):unknown));
-            line(budgets,tr('Used / remaining','usedRemaining')+': '+num(row.budgetUsedKnown)+(row.budgetUnknown?' + '+row.budgetUnknown+' '+unknown:'')+' / '+(row.remaining===null?unknown:num(row.remaining))+
-                ' · '+tr('Ignored budget entries','ignored')+': '+row.ignored+' · '+tr('Activated','activated')+': '+row.activated);
+        const budgets=makeReportSection(panel,tr('Per-book budget use (host estimate, full text)','budgets'));
+        if(!report.bookBudgetObserved)note(budgets,tr('Provisional final scan; actual activation not confirmed.','provisional'));
+        if(report.sharedJevBudget!==undefined)row(budgets,tr('Shared Jev budget / used / remaining','sharedBudget'),[report.sharedJevBudget,report.sharedJevUsed,report.sharedJevRemaining].map(num).join(' / '));
+        for(const book of report.bookBudgets){
+            const item=card(budgets,book.world);
+            row(item,tr('Cap','cap'),book.capKnown?(book.cap===null?tr('Shared / no separate cap','noCap'):num(book.cap)):unknown);
+            row(item,tr('Used / remaining','usedRemaining'),num(book.budgetUsedKnown)+(book.budgetUnknown?' + '+book.budgetUnknown+' '+unknown:'')+' / '+(book.capKnown&&book.cap===null?'—':num(book.remaining)));
+            if(book.over>0)row(item,tr('Over budget','over'),num(book.over));
+            row(item,tr('Ignored budget entries','ignored'),book.ignored);
+            row(item,tr('Activated','activated'),book.activated);
         }
     }
-    const comparison=section(tr('Search and injection efficiency','efficiency'));
-    line(comparison,tr('Search input: provider / attempted estimate','searchInput')+': '+(metricUsageText(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests)??unknown)+' / '+num(report.estimatedInputTokens));
-    line(comparison,tr('Activated Jev memory: full budget tokens (host estimate)','recallBudget')+': '+num(report.finalRecallBudgetTokens)+(report.finalRecallBudgetUnknown?' ('+num(report.finalRecallBudgetKnown)+' + '+report.finalRecallBudgetUnknown+' '+unknown+')':''));
-    const rp=report.rpInjection;
-    if(rp)line(comparison,tr('RP confirmed / excluded / unknown','rpFunnel')+': '+[rp.confirmed,rp.excluded,rp.unknown].map(num).join(' / '));
-    line(comparison,tr('Confirmed RP Jev memory: rendered individual tokens (host estimate)','rpTokens')+': '+num(rp?.tokens)+(rp?' ('+rp.measured+'/'+rp.confirmed+' '+tr('measured','measured')+')':''));
-    line(comparison,tr('Provider usage and host estimates are different units; cached tokens are not added again. Actual billing and unreported usage are unknown.','units'));
-    if(!rp)line(comparison,tr('Final RP inclusion is unmeasured unless a compatible viewer provides evidence. Activation is not proof of injection.','rpUnavailable'));
     if(metricsHistory.length){
-        const recent=section(tr('Recent runs (this chat, session only)','recent'));
-        for(const row of metricsHistory){
-            line(recent,new Date(row.time).toLocaleTimeString()+' · '+row.mode+' · '+row.phase);
-            line(recent,tr('Candidates / assessed / selected / accepted / activated','funnel')+': '+[row.candidates,row.assessed,row.selected,row.accepted,row.activated].map(num).join(' / '));
-            line(recent,tr('Input / output / cache read (provider reported)','historyUsage')+': '+[metricUsageText(row.actualInputTokens,row.usageReportedBatches,row.successfulRequests),metricUsageText(row.actualOutputTokens,row.outputUsageBatches,row.successfulRequests),metricUsageText(row.cacheReadTokens,row.cacheReadBatches,row.successfulRequests)].map(x=>x??unknown).join(' / ')+
-                ' · '+tr('Estimated input','estimated')+': '+num(row.estimatedInputTokens)+' · '+tr('RP tokens','rpShort')+': '+num(row.rpTokens)+' · '+tr('Request ms','requestTime')+': '+num(row.requestMs));
+        const recent=makeReportSection(panel,tr('Recent runs (this chat, session only)','recent'));
+        for(const run of metricsHistory){
+            const item=card(recent,new Date(run.time).toLocaleTimeString()+' · '+run.mode+' · '+jevStatusLabel(run.phase));
+            row(item,tr('Candidates / assessed / selected / accepted / activated','funnel'),[run.candidates,run.assessed,run.selected,run.accepted,run.activated].map(num).join(' / '));
+            row(item,tr('Input / output / cache read (provider reported)','historyUsage'),[metricUsageText(run.actualInputTokens,run.usageReportedBatches,run.successfulRequests),metricUsageText(run.actualOutputTokens,run.outputUsageBatches,run.successfulRequests),metricUsageText(run.cacheReadTokens,run.cacheReadBatches,run.successfulRequests)].map(x=>x??unknown).join(' / '));
+            row(item,tr('Estimated input','estimated'),num(run.estimatedInputTokens));
+            row(item,tr('RP tokens','rpShort'),num(run.rpTokens));
+            row(item,tr('Request ms','requestTime'),num(run.requestMs));
         }
     }
 }
@@ -398,11 +418,12 @@ function appendMemoryMetrics(panel,report){
 function openJevReport() {
     const report = currentJevReport();
     const panel = document.createElement('div');
+    panel.className='stlo-jev-report';
     const heading = document.createElement('h3');
     heading.textContent = translate('Latest Jev recall', 'stlo.jev.report');
     panel.append(heading);
     const fields = report ? [
-        [translate('Status', 'stlo.jev.status'), jevStatusLabel(report.phase)],
+        [translate('Status', 'stlo.jev.status'), jevStatusLabel(report.phase),'overview'],
         [translate('Adaptive full-plan estimate', 'stlo.jev.adaptiveEstimate'), report.adaptiveEstimate],
         [translate('Adaptive estimate cache hits / new calculations', 'stlo.jev.adaptivePlanCache'), report.adaptivePlanCacheHits===undefined?undefined:report.adaptivePlanCacheHits+' / '+report.adaptivePlanCacheMisses],
         [translate('Candidate route', 'stlo.jev.adaptiveRoute'), report.requestedMode==='adaptive'?
@@ -413,60 +434,79 @@ function openJevReport() {
                 'above-threshold':'Above the estimated input threshold','vector-unavailable':'World Info vector recall unavailable; assessed all',
                 'empty-filter':'No native hits; assessed all','coverage-all':'Candidate coverage includes every eligible entry'})[report.adaptiveReason],
                 'stlo.jev.adaptiveReason.'+report.adaptiveReason):undefined],
-        [translate('Eligible candidates before filtering', 'stlo.jev.adaptiveEligible'), report.adaptiveEligible],
         [translate('Native hits', 'stlo.jev.adaptiveNative'), report.adaptiveNative],
         [translate('Additional durable-memory candidates', 'stlo.jev.adaptiveDurable'), report.adaptiveDurable],
         [translate('Additional concise memories', 'stlo.jev.adaptiveCompact'), report.adaptiveCompact],
         [translate('Additional long-term / NPC records', 'stlo.jev.adaptiveRoles'), report.adaptiveRoles],
         [translate('Additional metadata matches', 'stlo.jev.adaptiveAnchors'), report.adaptiveAnchors],
         [translate('Additional recent candidates', 'stlo.jev.adaptiveRecent'), report.adaptiveRecent],
-        [translate('Eligible before candidate selection', 'stlo.metrics.eligible'), report.eligibleEntries],
-        [translate('Candidates', 'stlo.jev.candidates'), report.candidates],
-        [translate('Assessed candidates', 'stlo.metrics.assessed'), report.assessed],
-        [translate('Model selected', 'stlo.jev.selected'), report.selected],
-        [translate('Successful excerpt questions', 'stlo.jev.partialQuestions'), report.partialQuestions],
-        [translate('Confident excerpt selections', 'stlo.jev.partialSelected'), report.partialSelected],
-        [translate('Excerpts applied to final scan', 'stlo.jev.partialApplied'), report.partialApplied],
-        [translate('Characters removed from final scan (not tokens)', 'stlo.jev.partialSavedChars'), report.partialSavedChars],
-        [translate('Within budget', 'stlo.jev.accepted'), report.accepted],
-        [translate('Actually activated', 'stlo.jev.injected'), report.activationObserved===false?translate('Unmeasured','stlo.metrics.unmeasured'):report.injected],
+        [translate('Eligible before candidate selection', 'stlo.metrics.eligible'), report.eligibleEntries??report.adaptiveEligible],
+        [translate('Candidates', 'stlo.jev.candidates'), report.candidates,'overview'],
+        [translate('Assessed candidates', 'stlo.metrics.assessed'), report.assessed,'overview'],
+        [translate('Model selected', 'stlo.jev.selected'), report.selected,'overview'],
+        [translate('Successful excerpt questions', 'stlo.jev.partialQuestions'), report.partialQuestions,'partial'],
+        [translate('Confident excerpt selections', 'stlo.jev.partialSelected'), report.partialSelected,'partial'],
+        [translate('Excerpts applied to final scan', 'stlo.jev.partialApplied'), report.partialApplied,'partial'],
+        [translate('Characters removed from final scan (not tokens)', 'stlo.jev.partialSavedChars'), report.partialSavedChars,'partial'],
+        [translate('Within budget', 'stlo.jev.accepted'), report.accepted,'overview'],
+        [translate('Actually activated', 'stlo.jev.injected'), report.activationObserved===false?translate('Unmeasured','stlo.metrics.unmeasured'):report.injected,'overview'],
         [translate('Accepted but not activated (other/unknown reason)', 'stlo.metrics.otherNotActivated'), report.otherNotActivated??undefined],
         [translate('Final scan budget exclusions (book / Jev / world)', 'stlo.metrics.scanExclusions'), report.scanBudgetBook===undefined?undefined:[report.scanBudgetBook,report.scanBudgetJev,report.scanBudgetWorld].join(' / ')],
         [translate('Book budget rejected', 'stlo.jev.rejectedBook'), report.rejectedBook],
         [translate('Jev budget rejected', 'stlo.jev.rejectedJev'), report.rejectedJev],
         [translate('World Info budget rejected', 'stlo.jev.rejectedWorld'), report.rejectedWorld],
-        [translate('Jev requests', 'stlo.jev.requests'), report.requests],
-        [translate('Planned batches', 'stlo.jev.plannedBatches'), report.plannedBatches],
-        [translate('Completed batches', 'stlo.jev.completedBatches'), report.completedBatches],
-        [translate('Unassessed candidates', 'stlo.jev.unassessed'), report.unassessed],
+        [translate('Jev requests', 'stlo.jev.requests'), report.requests,'request'],
+        [translate('Planned batches', 'stlo.jev.plannedBatches'), report.plannedBatches,'request'],
+        [translate('Completed batches', 'stlo.jev.completedBatches'), report.completedBatches,'request'],
+        [translate('Unassessed candidates', 'stlo.jev.unassessed'), report.unassessed,'request'],
         [translate('Shared background entries', 'stlo.jev.sharedEntries'), report.sharedEntries],
         [translate('Messages shortened by reading limit', 'stlo.jev.truncatedMessages'), report.truncatedMessages],
         [translate('Lore entries shortened by reading limit', 'stlo.jev.truncatedLore'), report.truncatedLore],
-        [translate('Estimated input tokens (attempted requests)', 'stlo.jev.estimatedInputTokens'), report.estimatedInputTokens],
-        [translate('Reported input tokens (successful requests)', 'stlo.jev.actualInputTokens'), report.actualInputTokens],
-        [translate('Batches reporting token usage', 'stlo.jev.usageReportedBatches'), report.usageReportedBatches],
-        [translate('Provider output tokens (reported batches only)', 'stlo.metrics.output'), metricUsageText(report.actualOutputTokens,report.outputUsageBatches,report.successfulRequests)],
-        [translate('Provider cache-read tokens (reported batches only)', 'stlo.metrics.cacheRead'), metricUsageText(report.cacheReadTokens,report.cacheReadBatches,report.successfulRequests)],
-        [translate('Provider cache-write tokens (reported batches only)', 'stlo.metrics.cacheWrite'), metricUsageText(report.cacheWriteTokens,report.cacheWriteBatches,report.successfulRequests)],
-        [translate('Native vector interceptor time (ms)', 'stlo.metrics.nativeTime'), report.nativeVectorMs],
-        [translate('Native candidate scan time (ms)', 'stlo.metrics.previewTime'), report.previewMs],
-        [translate('Request characters (not tokens)', 'stlo.jev.inputChars'), report.inputChars],
-        [translate('Request time (ms)', 'stlo.jev.requestMs'), report.requestMs],
-        [translate('Elapsed time (ms)', 'stlo.jev.elapsedMs'), report.elapsedMs],
-    ] : [[translate('Status', 'stlo.jev.status'), jevStatusLabel()]];
-    for (const [name, value] of fields) {
-        if (value === undefined) continue;
-        const line = document.createElement('div');
-        line.textContent = name + ': ' + value;
-        panel.append(line);
+        [translate('Estimated input tokens (attempted requests)', 'stlo.jev.estimatedInputTokens'), report.estimatedInputTokens,'request'],
+        [translate('Reported input tokens (successful requests)', 'stlo.jev.actualInputTokens'), report.actualInputTokens,'request'],
+        [translate('Batches reporting token usage', 'stlo.jev.usageReportedBatches'), report.usageReportedBatches,'request'],
+        [translate('Provider output tokens (reported batches only)', 'stlo.metrics.output'), metricUsageText(report.actualOutputTokens,report.outputUsageBatches,report.successfulRequests),'request'],
+        [translate('Provider cache-read tokens (reported batches only)', 'stlo.metrics.cacheRead'), metricUsageText(report.cacheReadTokens,report.cacheReadBatches,report.successfulRequests),'request'],
+        [translate('Provider cache-write tokens (reported batches only)', 'stlo.metrics.cacheWrite'), metricUsageText(report.cacheWriteTokens,report.cacheWriteBatches,report.successfulRequests),'request'],
+        [translate('Native vector interceptor time (ms)', 'stlo.metrics.nativeTime'), report.nativeVectorMs,'request'],
+        [translate('Native candidate scan time (ms)', 'stlo.metrics.previewTime'), report.previewMs,'request'],
+        [translate('Request characters (not tokens)', 'stlo.jev.inputChars'), report.inputChars,'request'],
+        [translate('Request time (ms)', 'stlo.jev.requestMs'), report.requestMs,'request'],
+        [translate('Elapsed time (ms)', 'stlo.jev.elapsedMs'), report.elapsedMs,'request'],
+    ] : [[translate('Status', 'stlo.jev.status'), jevStatusLabel(),'overview']];
+    const overview=document.createElement('div');overview.className='stlo-report-overview';
+    panel.append(overview);
+    const detailRows=[];
+    const overviewRows=[];
+    for(const [name,value,group] of fields){
+        if(value===undefined)continue;
+        if(group==='overview')overviewRows.push([name,value]);
+        else detailRows.push([name,value,group??'selection']);
+    }
+    for(const [name,value] of overviewRows){
+        const item=document.createElement('div');item.className='stlo-report-summary-card';
+        const label=document.createElement('small');label.textContent=name;
+        const number=document.createElement('strong');number.textContent=value===null?translate('Unmeasured','stlo.metrics.unmeasured'):String(value);
+        item.append(label,number);overview.append(item);
     }
     appendMemoryMetrics(panel,report);
+    const sectionLabels={
+        selection:translate('Candidate and budget decisions','stlo.metrics.selectionDetails'),
+        partial:translate('Partial injection details','stlo.metrics.partialDetails'),
+        request:translate('Requests, usage and timing','stlo.metrics.requestDetails'),
+    };
+    for(const group of ['selection','partial','request']){
+        const rows=detailRows.filter(row=>row[2]===group);
+        if(!rows.length)continue;
+        const section=makeReportSection(panel,sectionLabels[group]);
+        for(const [name,value] of rows)reportLine(section,name,value===null?translate('Unmeasured','stlo.metrics.unmeasured'):value);
+    }
     if (report?.error) {
         const line = document.createElement('p');
         line.textContent = report.error;
         panel.append(line);
     }
-    return new Popup(panel, POPUP_TYPE.TEXT, '', { okButton: translate('Close', 'stlo.jev.close'), leftAlign: true }).show();
+    return new Popup(panel, POPUP_TYPE.TEXT, '', { okButton: translate('Close', 'stlo.jev.close'), leftAlign: true, allowVerticalScrolling: true }).show();
 }
 function syncJevTopBar() {
     const bar = document.getElementById('extensionTopBar');
@@ -833,6 +873,25 @@ function installStloModalStyles() {
     const style = document.createElement('style');
     style.id = 'stlo-modal-styles';
     style.textContent = `
+        .stlo-jev-report { width:100%; min-width:0; display:flex; flex-direction:column; gap:8px; text-align:start; box-sizing:border-box; }
+        .stlo-jev-report h3 { margin:0 0 3px; line-height:1.35; }
+        .stlo-report-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+        .stlo-report-summary-card,.stlo-report-book-card { border:1px solid var(--SmartThemeBorderColor); border-radius:7px; padding:8px; min-width:0; box-sizing:border-box; display:flex; flex-direction:column; gap:3px; }
+        .stlo-report-summary-card small { line-height:1.35; overflow-wrap:anywhere; }
+        .stlo-report-summary-card strong { font-size:1.06em; font-variant-numeric:tabular-nums; line-height:1.35; overflow-wrap:anywhere; }
+        .stlo-report-section { border:1px solid var(--SmartThemeBorderColor); border-radius:7px; box-sizing:border-box; min-width:0; width:100%; }
+        .stlo-report-section > summary { cursor:pointer; font-weight:600; padding:8px; line-height:1.4; overflow-wrap:anywhere; }
+        .stlo-report-section-body { display:flex; flex-direction:column; gap:6px; padding:0 8px 8px; min-width:0; box-sizing:border-box; }
+        .stlo-report-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:.92em; line-height:1.45; min-width:0; flex-wrap:wrap; }
+        .stlo-report-row > span:first-child { flex:1 1 55%; min-width:0; overflow-wrap:anywhere; }
+        .stlo-report-value { flex:0 1 auto; min-width:0; text-align:end; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; font-weight:600; }
+        .stlo-report-note { opacity:.85; line-height:1.45; overflow-wrap:anywhere; }
+        .stlo-report-book-card > strong { overflow-wrap:anywhere; line-height:1.35; }
+        @media (max-width:480px) {
+            .stlo-report-summary-card,.stlo-report-book-card { padding:6px; }
+            .stlo-report-row { gap:3px 6px; }
+            .stlo-report-value { text-align:start; }
+        }
         .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%; min-width: 0; box-sizing: border-box; text-align: left; }
         .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-width: 0; margin: 0; padding: 0 0 10px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
         .stlo-modal-ui .stlo-section:last-child { padding-bottom: 0; border-bottom: none; }

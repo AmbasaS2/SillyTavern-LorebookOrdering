@@ -289,5 +289,9 @@
   "stlo.metrics.rpFunnel": "RP confirmed / excluded / unknown",
   "stlo.jev.adaptivePlanCache": "Adaptive estimate cache hits / new calculations",
   "stlo.jev.adaptiveRoles": "Additional long-term / NPC records",
-  "stlo.jev.adaptiveAnchors": "Additional title / key matches"
+  "stlo.jev.adaptiveAnchors": "Additional title / key matches",
+  "stlo.metrics.selectionDetails": "Candidate and budget decisions",
+  "stlo.metrics.partialDetails": "Partial injection details",
+  "stlo.metrics.requestDetails": "Requests, usage and timing",
+  "stlo.metrics.over": "Over budget"
 }

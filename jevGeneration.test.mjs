@@ -43,7 +43,8 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     elements.set('extensionTopBar',makeNode());
     const doc={getElementById:id=>elements.get(id)||null,createElement:makeNode};
     const popupResponses=[...responses];
-    class Popup { constructor(_panel,_type,_input,opts){this.opts=opts;} async show(){counters.popup++;return popupResponses.shift()??0;} async completeCancelled(){} }
+    let lastPopupPanel=null;
+    class Popup { constructor(_panel,_type,_input,opts){this.opts=opts;lastPopupPanel=_panel;} async show(){counters.popup++;return popupResponses.shift()??0;} async completeCancelled(){} }
     const sandbox={
         ...recall,...metrics,Map,Set,Array,Object,Promise,URL,AbortController,AbortSignal,structuredClone,performance,
         main_api:'openai',stloTokenizers:{getTokenizerModel:()=> 'fixture-tokenizer'},
@@ -114,7 +115,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLDINFO_FORCE_ACTIVATE,hits);
     };
     const code=source.replace(/^import .*?;\s*$/gm,'').replace('import.meta.url',JSON.stringify('file:///stlo/index.js'));
-    runInNewContext(code+'\nsetupEventHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration,setCharacterJevRecall};',sandbox);
+    runInNewContext(code+'\nsetupEventHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration,setCharacterJevRecall,openJevReport};',sandbox);
     async function generate({dryRun=false}={}){
         await eventSource.emit(events.GENERATION_STARTED,'normal',{},dryRun);
         if(!dryRun)companionCache.clear();
@@ -141,7 +142,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,companionStats:()=>({calls:companionCalls,tokenizations:companionTokenizations}),companionCount:text=>sandbox.STWII?.loreTokenCountV1?.count(text),setSpeaker:id=>eventSource.emit(events.GROUP_MEMBER_DRAFTED,id),bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,companionStats:()=>({calls:companionCalls,tokenizations:companionTokenizations}),companionCount:text=>sandbox.STWII?.loreTokenCountV1?.count(text),setSpeaker:id=>eventSource.emit(events.GROUP_MEMBER_DRAFTED,id),bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),openReport:async()=>{await sandbox.testApi.openJevReport();return lastPopupPanel;},elements};
 }
 
 test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
@@ -654,4 +655,22 @@ test('report and measurement handle do not leak to a different drafted group spe
     await h.setSpeaker(1);
     assert.equal(h.bridge().context(),null);
     assert.equal(h.report(),null);
+});
+
+test('existing report opens with compact overview and collapsible decision/usage sections, without extra work',async()=>{
+    const h=harness();
+    await h.generate();
+    const counters={token:h.counters.token,jev:h.counters.jev,vector:h.counters.vector,sorted:h.counters.sorted};
+    const before=JSON.stringify(h.settings.stlo);
+    const panel=await h.openReport();
+    const walk=node=>[node,...(node.children??[]).flatMap(walk)];
+    const nodes=walk(panel);
+    assert.equal(panel.className,'stlo-jev-report');
+    assert.ok(nodes.some(n=>n.className==='stlo-report-overview'));
+    assert.equal(nodes.filter(n=>n.className==='stlo-report-summary-card').length,6);
+    const sections=nodes.filter(n=>n.className==='stlo-report-section');
+    assert.ok(sections.length>=3);
+    assert.equal(sections.filter(n=>n.open).length,1);
+    assert.deepEqual({token:h.counters.token,jev:h.counters.jev,vector:h.counters.vector,sorted:h.counters.sorted},counters);
+    assert.equal(JSON.stringify(h.settings.stlo),before);
 });

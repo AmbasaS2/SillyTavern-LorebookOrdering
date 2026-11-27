@@ -290,5 +290,9 @@
   "stlo.metrics.rpFunnel": "RP 포함 확인 / 제외 / 미확인",
   "stlo.jev.adaptivePlanCache": "적응형 추정 캐시 재사용 / 새 계산",
   "stlo.jev.adaptiveRoles": "추가 장기 기억 / NPC 기록",
-  "stlo.jev.adaptiveAnchors": "추가 제목 / 키워드 일치"
+  "stlo.jev.adaptiveAnchors": "추가 제목 / 키워드 일치",
+  "stlo.metrics.selectionDetails": "후보·예산 판정 상세",
+  "stlo.metrics.partialDetails": "부분 주입 상세",
+  "stlo.metrics.requestDetails": "요청·사용량·소요 시간",
+  "stlo.metrics.over": "예산 초과량"
 }
