@@ -450,7 +450,7 @@ function appendReportOverview(panel,report,budgetOnly){
     const hero=reportNode(overview,'div','stlo-report-hero');
     const activated=budgetOnly?(report.activationObserved===true?report.totalActivated:null):reportActivation(report);
     reportNode(hero,'strong','',reportNum(activated));
-    reportNode(hero,'span','',budgetOnly?translate('All activated lore entries','stlo.metrics.allActivated'):reportLabel('activated','Memories activated'));
+    reportNode(hero,'span','',budgetOnly?translate('All activated lore entries','stlo.metrics.allActivated'):Number.isFinite(activated)?reportLabel('activated','Memories activated'):reportLabel('activatedShort','Activated'));
     if(!budgetOnly&&Number.isFinite(report.candidates))
         reportNote(hero,'/ '+reportNum(report.candidates)+' '+reportLabel('candidates','candidates'));
     if(budgetOnly){
@@ -570,7 +570,7 @@ function appendMemoryMetrics(panel,report){
                 row(item,tr('All STLO scan budget exclusions','allScanExclusions'),num(run.totalScanDropped));
                 continue;
             }
-            row(item,reportLabel('activated','Memories activated'),num(run.activated)+' / '+num(run.candidates));
+            row(item,reportLabel('activatedShort','Activated'),num(run.activated)+' / '+num(run.candidates));
             row(item,reportLabel('input','Input tokens'),metricUsageText(run.actualInputTokens,run.usageReportedBatches,run.successfulRequests)??unknown);
             row(item,reportLabel('output','Output tokens'),metricUsageText(run.actualOutputTokens,run.outputUsageBatches,run.successfulRequests)??unknown);
             row(item,reportLabel('requestTime','AI request time'),reportSeconds(run.requestMs));

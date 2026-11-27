@@ -1,0 +1,81 @@
+name: Verify readable Jev report
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  ui:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'dev/jev-readable-report'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Render actual report code in isolated Chrome
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const s=fs.readFileSync('index.js','utf8');
+          const start=s.indexOf('function jevStatusLabel('),end=s.indexOf('function syncJevTopBar()',start);
+          const cssStart=s.indexOf('        .stlo-jev-report {'),cssEnd=s.indexOf('        .stlo-modal-ui {',cssStart);
+          if(start<0||end<start||cssStart<0||cssEnd<cssStart)throw Error('Missing report boundaries');
+          const code=s.slice(start,end),css=s.slice(cssStart,cssEnd);
+          const book={world:'Chatcity',capKnown:true,cap:null,budgetUsedKnown:1522,budgetUnknown:0,remaining:null,ignored:0,activated:4,recalled:4,recalledBudgetKnown:1522,recalledBudgetUnknown:0,scanDropped:0};
+          const report={phase:'done',mode:'all',metricsId:1,activationObserved:true,bookBudgetObserved:true,candidates:71,assessed:71,selected:4,accepted:4,injected:4,totalActivated:4,totalScanDropped:0,eligibleEntries:71,rejectedBook:0,rejectedJev:0,rejectedWorld:0,scanBudgetBook:0,scanBudgetJev:0,scanBudgetWorld:0,otherNotActivated:0,sharedJevBudget:10000,sharedJevUsed:1522,sharedJevRemaining:8478,finalRecallBudgetTokens:1522,bookBudgets:[book],requests:2,successfulRequests:2,actualInputTokens:56494,usageReportedBatches:2,actualOutputTokens:2127,outputUsageBatches:2,estimatedInputTokens:94218,plannedBatches:2,completedBatches:2,unassessed:0,inputChars:216027,requestMs:3473,elapsedMs:3755,nativeVectorMs:5,rpInjection:{confirmed:0,excluded:0,unknown:4,tokens:null,measured:0,complete:false}};
+          const test=String.raw`
+          const q=s=>document.querySelector(s),all=s=>Array.from(document.querySelectorAll(s));
+          const check=(v,m)=>{if(!v)throw Error(m)};
+          const overflow=()=>{const p=q('.stlo-jev-report');return p.scrollWidth>p.clientWidth+1||document.documentElement.scrollWidth>document.documentElement.clientWidth+1};
+          try{
+              openJevReport();
+              const p=q('.stlo-jev-report'),text=p.innerText;
+              const sections=all('.stlo-report-section');
+              check(sections.length>=4,'details present');
+              check(sections.every(d=>!d.open),'all details closed');
+              check(q('.stlo-report-hero strong').textContent==='4','activation count');
+              check(q('.stlo-report-funnel').children.length===4,'four stage funnel');
+              check(q('.stlo-report-budget-bar').max===10000&&q('.stlo-report-budget-bar').value===1522,'budget values');
+              check(text.includes('56,494')&&text.includes('2,127')&&text.includes('15.2%'),'summary numbers');
+              check(!text.includes('94,218'),'estimate only in details');
+              check(!overflow(),'closed overflow');
+              const before=all('.stlo-report-section');
+              for(const d of sections){d.querySelector('summary').click();check(d.open,'native open');}
+              check(p.innerText.includes('94,218'),'estimate available in detail');
+              check(!overflow(),'expanded overflow');
+              check(before.every((n,i)=>n===all('.stlo-report-section')[i]),'stable DOM nodes');
+              for(const d of sections){d.querySelector('summary').click();check(!d.open,'native close');}
+              document.body.dataset.smoke='PASS';
+          }catch(e){document.body.dataset.smoke='FAIL';document.body.dataset.error=e.message;}
+          `;
+          for(const width of [390,1280])for(const lang of ['ko-kr','en'])for(const theme of ['light','dark']){
+              const locale=JSON.parse(fs.readFileSync('locales/'+lang+'.json','utf8'));
+              const color=theme==='dark'?'#e8e6df':'#333',bg=theme==='dark'?'#1c222c':'#f3f3f0';
+              const file='/tmp/stlo-report-'+lang+'-'+width+'-'+theme+'.html';
+              fs.writeFileSync(file,'<!doctype html><html lang="'+lang+'"><meta charset="utf-8"><style>:root{--SmartThemeBodyColor:'+color+';--SmartThemeBorderColor:#888;--SmartThemeQuoteColor:#8aa4b8}body{margin:0;width:'+width+'px;background:'+bg+';color:'+color+';font:14px Arial,sans-serif}#fixture{width:min(calc(100% - 36px),560px);margin:12px auto}'+css+'</style><div id="fixture"></div><script>const locale='+JSON.stringify(locale)+';const translate=(fallback,key)=>locale[key]??fallback;const report='+JSON.stringify(report)+';const metricsHistory=[{...report,time:0,activated:4,rpTokens:null}];const currentJevReport=()=>report;const POPUP_TYPE={TEXT:1};class Popup{constructor(panel){this.panel=panel}show(){document.querySelector("#fixture").append(this.panel)}}\n'+code+'\n'+test+'</script>');
+          }
+          NODE
+          pids=()
+          for width in 390 1280; do
+            for lang in ko-kr en; do
+              for theme in light dark; do
+                (
+                  output="/tmp/stlo-report-result-$lang-$width-$theme"
+                  google-chrome --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --no-first-run --disable-background-networking --user-data-dir="$output-profile" --window-size="$width,900" --dump-dom "file:///tmp/stlo-report-$lang-$width-$theme.html" >"$output" 2>"$output-chrome"
+                  if ! grep -q 'data-smoke="PASS"' "$output"; then
+                    grep -o 'data-smoke="[^"]*"\|data-error="[^"]*"' "$output" || true
+                    exit 1
+                  fi
+                  echo "PASS $lang $width $theme"
+                ) &
+                pids+=($!)
+              done
+            done
+          done
+          failed=0
+          for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
+          exit "$failed"
