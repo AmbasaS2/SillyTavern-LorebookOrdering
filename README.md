@@ -267,7 +267,7 @@ Save your settings and continue roleplaying. Open the latest recall report when 
 - All detailed sections start closed: per-book budgets, recent runs, candidate/budget decisions, partial injection (if used), and technical diagnostics with the original request/usage estimates and timing.
 - The report keeps up to eight recent completed/cancelled runs in this chat/session as numeric summaries. No persistent prompt history, extra AI request or token count just for opening the report.
 
-<p align="left"><img src="assets/readme/mobile/ui-jev-report.svg" alt="최근 Jev 실행 / Latest Jev recall" width="480" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-jev-report.svg" alt="Jev 검색 결과 / Jev search result" width="480" /></p>
 
 With Jev **off**, the same report action opens the latest lorebook budget report when a native budget-run record exists. It shows observed activations and STLO scan budget exclusions, per-book full-text cap/use/remaining and recent budget runs, not Jev or confirmed RP metrics.
 
@@ -472,7 +472,7 @@ It updates on generation events only. No new DOM observer, polling or repeated U
 - STLO 2.x no longer requires the older “evenly” insertion strategy check; the inherited older README and guides may describe earlier behavior. This fork does not enforce that check.
 - Book settings are stored in the lorebook's existing `stlo` data; Protect Always-On, character-specific Jev switches, the shared Jev budget and connection profile ID are stored in extension settings. Settings are applied with the Save button. If a previously configured book unexpectedly opens with default values, load it in the World Info editor first and reopen the settings before saving.
 - Do not enable upstream and this fork simultaneously. Back up your lorebook files before switching. To return to upstream, disable/remove this fork and enable only upstream.
-- Earlier diagrams illustrate 2.2.4-ambasa.6 at [b4b8449](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/b4b84499dc4234858ef80e650450c0b88be15d65); the report layout was refreshed in [PR #4](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/pull/4) for 2.2.4-ambasa.7. Adaptive and partial injection are experimental and opt-in. They are not a claim of compatibility testing on every SillyTavern version, browser, or extension combination.
+- Earlier setup diagrams illustrate 2.2.4-ambasa.6 at [b4b8449](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/b4b84499dc4234858ef80e650450c0b88be15d65); the report layout was refreshed in [PR #4](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/pull/4) for 2.2.4-ambasa.7. Adaptive and partial injection are experimental and opt-in. They are not a claim of compatibility testing on every SillyTavern version, browser, or extension combination.
 
 ## 🧩 Works well with
 
@@ -689,7 +689,7 @@ Jev는 선택 기능입니다. 원본 STLO의 책별 우선순위와 예산 관�
 - 별도 벡터 인덱스나 서버 플러그인은 필요 없습니다.
 - 새 기억을 만들거나 기존 로어를 요약·수정하지 않습니다.
 
-기존 Jev 출처 표시(월드인포인포 .4 / STLO .1부터 호환)는 유지되며, 최신 월드인포인포 .13 / STLO .6에서는 주입 확인·계측 연동까지 지원합니다. 표시를 위해 별도 검색·AI 호출이 발생하지 않으며 두 확장은 단독 사용도 가능해요.
+기존 Jev 출처 표시(월드인포인포 .4 / STLO .1부터 호환)는 유지되며, 최신 월드인포인포 .14 / STLO .7에서는 주입 확인·계측 연동까지 지원합니다. 표시를 위해 별도 검색·AI 호출이 발생하지 않으며 두 확장은 단독 사용도 가능해요.
 
 #### 사용 설정
 
@@ -780,7 +780,7 @@ Timeline/Scene/Result 형식의 적격 긴 기억에서만, 내장 판정 프롬
 - Jev 공통 예산 사용량과 발동 기억 전문 토큰 추정치를 검색 AI의 공급자 보고 입력/출력 토큰·요청 횟수·요청 소요 시간과 분리합니다. 최종 RP 프롬프트 포함 여부는 별도로 표시하며, 미확인 발동을 실제 주입으로 간주하지 않습니다.
 - 로어북별 예산, 최근 실행 비교, 후보·예산 상세, 부분 주입 상세(사용 시), 기술 진단 정보는 기본 접힘입니다. 기존 추정치·캐시·사용량·시간의 상세 수치를 유지합니다.
 
-<p align="left"><img src="assets/readme/mobile/ui-jev-report.svg" alt="최근 Jev 실행 / Latest Jev recall" width="480" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-jev-report.svg" alt="Jev 검색 결과 / Jev search result" width="480" /></p>
 
 **Jev를 끄고 예산 관리만 쓴다면?**
 
@@ -994,7 +994,7 @@ Jev OFF: 기존 검색 방식 유지. 저장된 벡터·로어·발동 설정은
 - STLO 2.x부터 이전 버전의 '균등 정렬' 강제 확인은 제거되었습니다. 기존 가이드에는 이전 버전의 동작이 설명되어 있을 수 있습니다.
 - 로어북별 설정은 기존 로어북의 `stlo` 데이터에 저장하고, 상시 주입 우선 보호, 캐릭터별 Jev 사용 여부, Jev 전체 주입 예산과 연결 프로필 ID는 확장 설정에 저장합니다. 설정 저장 버튼을 눌러 변경 사항을 반영합니다. 전에 설정한 책이 기본값으로 열린다면 바로 저장하지 말고 월드 정보 편집기에서 책을 불러온 후 다시 확인하세요.
 - 원본과 포크를 동시에 활성화하지 마세요. 전환 전 로어북 파일을 백업하세요.
-- 기존 안내 그림은 2.2.4-ambasa.6의 [b4b8449](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/b4b84499dc4234858ef80e650450c0b88be15d65) 기준입니다. 2.2.4-ambasa.7에서 [PR #4](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/pull/4)로 실행 결과창의 표시를 정리했습니다. 적응형과 부분 주입은 선택적인 실험 기능입니다. 모든 기기와 확장 조합의 호환성을 검증했다는 의미는 아닙니다.
+- 기존 설정 안내 그림은 2.2.4-ambasa.6의 [b4b8449](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/commit/b4b84499dc4234858ef80e650450c0b88be15d65) 기준입니다. 2.2.4-ambasa.7에서 [PR #4](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering/pull/4)로 실행 결과창의 표시를 정리했습니다. 적응형과 부분 주입은 선택적인 실험 기능입니다. 모든 기기와 확장 조합의 호환성을 검증했다는 의미는 아닙니다.
 
 ---
 
