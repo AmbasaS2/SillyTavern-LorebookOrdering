@@ -2,6 +2,11 @@
 
 **← [Back to README](README.md)**
 
+## 2.2.4-ambasa.7 — Readable Jev report (2026-11-27)
+- Group activation, shared budget usage, provider-reported search usage and final RP evidence into separate readable summaries; show elapsed time in seconds and known budget usage as a progress bar.
+- Keep book, recent-run, candidate, partial-injection and technical details in closed native disclosures with consistent alignment. Preserve missing and provisional values, and do not equate activation with confirmed final RP inclusion.
+- Report-only presentation and localization (11 languages); no change to recall, settings, budget logic, measurement contracts or other extensions. No new observers, polling, token measurements or AI requests. 83 Node tests, syntax check and eight isolated Chrome layout checks passed.
+
 ## 2.2.4-ambasa.4 — UI localization
 - Localize the remaining Korean-only menu and vector/budget help labels using the existing 11 locale files; resolve base locale aliases and keep English fallback. No saved settings or recall behavior changes.
 
