@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { withSlothLorebookWriteLane } from './slothWriteLane.js';
 
 const source = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
 function extract(start, end) {
@@ -22,6 +23,7 @@ function harness({ failWrite = false, failVerify = false } = {}) {
     const writes = [], reads = [];
     const state = { scanWorldSettings: new Map([['Book', {}]]), scanBudgetWorlds: new Set(['Book']), scanHasExplicitBudgets: true };
     const vm = {
+        withSlothLorebookWriteLane, structuredClone,
         EXTENSION_NAME: 'stlo', EXTENSION_STATE: state, world_names: ['Book'], worldInfoCache: cache,
         loadWorldInfo: async name => structuredClone(cache.get(name) ?? disk.get(name)),
         saveWorldInfo: async (name, data, immediately) => {
@@ -35,7 +37,7 @@ function harness({ failWrite = false, failVerify = false } = {}) {
             assert.equal(route, '/api/worldinfo/get');
             const name = JSON.parse(opts.body).name;
             reads.push(name);
-            return { ok: !failVerify && disk.has(name), json: async () => structuredClone(disk.get(name)) };
+            return { ok: (!failVerify || reads.length === 1) && disk.has(name), json: async () => structuredClone(disk.get(name)) };
         },
         console: { error() {} },
     };
@@ -58,7 +60,7 @@ test('verified native save patches only changed STLO values, preserves lore and 
     assert.deepEqual(h.disk.get('Book').entries, h.original.entries);
     assert.deepEqual(h.disk.get('Book').stlo, { ...h.original.stlo, budget: 6000 });
     assert.deepEqual(h.writes, ['Book']);
-    assert.deepEqual(h.reads, ['Book']);
+    assert.deepEqual(h.reads, ['Book', 'Book']);
     assert.equal(h.state.scanWorldSettings.size, 0);
     assert.equal(h.state.scanHasExplicitBudgets, false);
 });
@@ -83,4 +85,34 @@ test('missing books are not recreated by manager save', async () => {
     assert.equal(await h.setLorebookSettings('Missing', { budget: 6000 }), false);
     assert.deepEqual(h.writes, []);
     assert.deepEqual(h.reads, []);
+});
+
+test('Ordering waits for a same-page memory write and reads the fresh book inside the lane', async () => {
+    const h = harness();
+    let release, started;
+    const gate = new Promise(resolve => { release = resolve; });
+    const ready = new Promise(resolve => { started = resolve; });
+    const memoryLane = (await import('./slothWriteLane.js?memory-books')).withSlothLorebookWriteLane;
+    const memory = memoryLane('Book', async () => {
+        started(); await gate;
+        const next = structuredClone(h.disk.get('Book'));
+        next.entries[1] = { uid: 1, content: 'new memory' };
+        h.disk.set('Book', next); h.cache.set('Book', structuredClone(next));
+    });
+    await ready;
+    const ordering = h.setLorebookSettings('Book', { budget: 4000 });
+    await Promise.resolve();
+    assert.deepEqual(h.reads, []);
+    release(); await memory;
+    assert.equal(await ordering, true);
+    assert.equal(h.disk.get('Book').entries[1].content, 'new memory');
+    assert.equal(h.disk.get('Book').stlo.budget, 4000);
+});
+test('pending native edits are rejected without erasing the cache or writing', async () => {
+    const h = harness();
+    h.cache.get('Book').entries[0].content = 'unsaved native edit';
+    assert.equal(await h.setLorebookSettings('Book', { budget: 4000 }), false);
+    assert.deepEqual(h.writes, []);
+    assert.equal(h.cache.get('Book').entries[0].content, 'unsaved native edit');
+    assert.deepEqual(h.disk.get('Book'), h.original);
 });

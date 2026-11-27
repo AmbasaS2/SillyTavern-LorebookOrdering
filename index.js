@@ -1,3 +1,4 @@
+import { withSlothLorebookWriteLane } from './slothWriteLane.js';
 import { event_types, eventSource } from '../../../events.js';
 import { getTokenCountAsync } from '../../../tokenizers.js';
 import * as stloTokenizers from '../../../tokenizers.js';
@@ -1944,41 +1945,64 @@ function equalBookSetting(a, b) {
     return keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && equalBookSetting(a[key], b[key]));
 }
 
-async function setLorebookSettings(worldName, settings) {
-    try {
-        if (!world_names.includes(worldName)) throw Error('Lorebook is no longer available.');
-        const loaded = await loadWorldInfo(worldName);
-        if (!loaded) throw Error('Could not load the selected lorebook.');
-        const existing = loaded[EXTENSION_NAME] || {};
-        // Merge only changed STLO fields into the current book. Never edit
-        // lore entries or character associations from this settings manager.
-        const worldData = { ...loaded, [EXTENSION_NAME]: { ...existing, ...settings } };
-        await saveWorldInfo(worldName, worldData, true);
-        // The native save emits WORLDINFO_UPDATED itself. Do not emit again.
-        const response = await fetch('/api/worldinfo/get', {
-            method: 'POST', headers: getRequestHeaders(),
-            body: JSON.stringify({ name: worldName }), cache: 'no-cache',
-        });
-        if (!response.ok) throw Error('Could not verify the saved lorebook.');
-        const persisted = await response.json();
-        if (!persisted || typeof persisted !== 'object') throw Error('Could not verify the saved lorebook.');
-        worldInfoCache.set(worldName, persisted);
-        const actual = persisted[EXTENSION_NAME] || {};
-        if (!Object.entries(settings).every(([key, value]) => equalBookSetting(actual[key], value))) {
-            throw Error('Saved values do not match.');
-        }
-        return true;
-    } catch (error) {
-        // Native ST updates its cache before saving. Never leave an
-        // unverified value cached as though the write had succeeded.
-        worldInfoCache.delete(worldName);
-        console.error('🦥 STLO', '[STLO] Error saving or verifying lorebook settings:', worldName, error);
-        return false;
-    } finally {
-        EXTENSION_STATE.scanWorldSettings = new Map();
-        EXTENSION_STATE.scanBudgetWorlds = new Set();
-        EXTENSION_STATE.scanHasExplicitBudgets = false;
+async function readLorebookSettingsFile(worldName) {
+    const response = await fetch('/api/worldinfo/get', {
+        method: 'POST', headers: getRequestHeaders(),
+        body: JSON.stringify({ name: worldName }), cache: 'no-store',
+    });
+    if (!response.ok) throw Error('Could not read the selected lorebook.');
+    const data = await response.json();
+    if (!data?.entries || typeof data.entries !== 'object' || Array.isArray(data.entries)) {
+        throw Error('Invalid lorebook data.');
     }
+    // ST can return an empty object for a missing file. Check the list only
+    // for that ambiguous response, so a deleted book is not recreated.
+    if (Object.keys(data).length === 1 && !Object.keys(data.entries).length) {
+        const list = await fetch('/api/worldinfo/list', {
+            method: 'POST', headers: getRequestHeaders(), body: '{}', cache: 'no-store',
+        });
+        if (!list.ok || !(await list.json()).some(book => book.file_id === worldName)) {
+            throw Error('Lorebook is no longer available.');
+        }
+    }
+    return data;
+}
+
+async function setLorebookSettings(worldName, settings) {
+    return withSlothLorebookWriteLane(worldName, async () => {
+        let optimistic;
+        try {
+            if (!world_names.includes(worldName)) throw Error('Lorebook is no longer available.');
+            // Read only after the shared lane is acquired; never overwrite a
+            // pending native editor change with an older disk snapshot.
+            const loaded = await readLorebookSettingsFile(worldName);
+            if (!world_names.includes(worldName)) throw Error('Lorebook is no longer available.');
+            if (worldInfoCache.has(worldName) && !equalBookSetting(worldInfoCache.get(worldName), loaded)) {
+                throw Error('Lorebook changed in another editor. Save or reload it before retrying.');
+            }
+            const existing = loaded[EXTENSION_NAME] || {};
+            const worldData = { ...loaded, [EXTENSION_NAME]: { ...existing, ...settings } };
+            optimistic = structuredClone(worldData);
+            await saveWorldInfo(worldName, worldData, true);
+            const persisted = await readLorebookSettingsFile(worldName);
+            if (!equalBookSetting(persisted, optimistic)) throw Error('Saved lorebook does not match.');
+            // Do not replace a newer native cache edit while verification was pending.
+            if (!worldInfoCache.has(worldName) || equalBookSetting(worldInfoCache.get(worldName), optimistic)) {
+                worldInfoCache.set(worldName, persisted);
+            }
+            return true;
+        } catch (error) {
+            if (optimistic && worldInfoCache.has(worldName) && equalBookSetting(worldInfoCache.get(worldName), optimistic)) {
+                worldInfoCache.delete(worldName);
+            }
+            console.error('🦥 STLO', '[STLO] Error saving or verifying lorebook settings:', worldName, error);
+            return false;
+        } finally {
+            EXTENSION_STATE.scanWorldSettings = new Map();
+            EXTENSION_STATE.scanBudgetWorlds = new Set();
+            EXTENSION_STATE.scanHasExplicitBudgets = false;
+        }
+    });
 }
 
 /**
