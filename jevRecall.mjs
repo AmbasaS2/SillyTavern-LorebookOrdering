@@ -489,9 +489,26 @@ const DURABLE_RECALL_CUE = /\b(?:promis\w*|vow\w*|pledge\w*|oath\w*|swore|sworn|
 // exact content/title comparisons so even an in-place edit invalidates a hit.
 export function createAdaptiveCueCache({maxEntries=1024,maxChars=2000000}={}) {
     const cache=new Map();
-    let chars=0;
+    const metadataCache=new Map();
+    let chars=0,metadataChars=0;
     return {
-        clear(){cache.clear();chars=0;},
+        clear(){cache.clear();metadataCache.clear();chars=0;metadataChars=0;},
+        metadata(entry){
+            const key=jevEntryKey(entry);
+            const title=String(entry.comment??'').slice(0,512);
+            const keys=(Array.isArray(entry.key)?entry.key:[]).slice(0,12).map(x=>String(x).slice(0,128));
+            const text=[title,...keys].join(' ');
+            const old=metadataCache.get(key);
+            if(old?.text===text)return old.terms;
+            if(old){metadataCache.delete(key);metadataChars-=old.text.length;}
+            const terms=normalizedAnchorTerms(text);
+            // Cache at most the existing entry limit and a separate small
+            // text allowance. Oversized/missing entries still get a decision.
+            if(metadataCache.size<maxEntries&&metadataChars+text.length<=Math.min(maxChars,256000)){
+                metadataCache.set(key,{text,terms});metadataChars+=text.length;
+            }
+            return terms;
+        },
         matches(entry){
             const key=jevEntryKey(entry);
             const title=String(entry.comment??'');
@@ -540,10 +557,13 @@ function normalizedAnchorTerms(value){
     const text=String(value??'').slice(0,4000).normalize('NFKC').toLowerCase();
     const result=new Set();
     let words;
-    try{
-        const segmenter=adaptiveAnchorSegmenter??(adaptiveAnchorSegmenter=new Intl.Segmenter(undefined,{granularity:'word'}));
-        words=[...segmenter.segment(text)].filter(x=>x.isWordLike).map(x=>x.segment);
-    }catch{words=text.match(/\p{L}[\p{L}\p{M}\p{N}'’_-]*/gu)??[];}
+    if(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u.test(text)){
+        try{
+            const segmenter=adaptiveAnchorSegmenter??(adaptiveAnchorSegmenter=new Intl.Segmenter(undefined,{granularity:'word'}));
+            words=[...segmenter.segment(text)].filter(x=>x.isWordLike).map(x=>x.segment);
+        }catch{/* Use the simple fallback below. */}
+    }
+    words??=text.match(/\p{L}[\p{L}\p{M}\p{N}'’_-]*/gu)??[];
     for(const term of words){
         if(!/\p{L}/u.test(term)||ANCHOR_STOP.has(term))continue;
         const nonLatin=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u.test(term);
@@ -568,12 +588,10 @@ function recentAnchorTerms(messages){
     for(const name of names)terms.delete(name);
     return terms;
 }
-function hasMetadataAnchors(entry,terms){
+function hasMetadataAnchors(entry,terms,cache){
     if(terms.size<2)return false;
-    const title=String(entry.comment??'').slice(0,512);
-    const keys=(Array.isArray(entry.key)?entry.key:[]).slice(0,12).map(x=>String(x).slice(0,128));
     let count=0;
-    for(const term of normalizedAnchorTerms([title,...keys].join(' '))){
+    for(const term of cache.metadata(entry)){
         if(terms.has(term)&&++count>=2)return true;
     }
     return false;
@@ -600,7 +618,7 @@ export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId,
         // Never infer roles from filenames, UIDs or AU chat IDs.
         else if(entry.STMB_slothNexusKind==='lt'||entry.STMB_slothNexusKind==='npc'){
             candidateKeys.add(key);roleCount++;sources.set(key,'adaptive-role');
-        }else if(hasMetadataAnchors(entry,anchors)){
+        }else if(hasMetadataAnchors(entry,anchors,cueCache)){
             candidateKeys.add(key);anchorCount++;sources.set(key,'adaptive-anchors');
         }
         const end=adaptiveSourceEnd(entry,chatId);

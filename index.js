@@ -143,7 +143,7 @@ function updateJevReport(run, changes = {}) {
     } catch (error) { stloDebug('Jev report UI:', error); }
 }
 function currentJevReport() {
-    if(lastJevReport?.chatId!==getCurrentChatId())return null;
+    if(!lastJevReport||lastJevReport.chatId!==getCurrentChatId())return null;
     if(lastJevReport.metricsScope!==undefined&&lastJevReport.metricsScope!==metricsScope())return null;
     return lastJevReport;
 }
@@ -797,6 +797,7 @@ function setupEventHandlers() {
             const characterName = (character?.avatar?.replace(/\.[^/.]+$/, '') || character?.name || null);
             EXTENSION_STATE.currentSpeakingCharacter = characterName;
         }
+        syncJevTopBar();
     };
 
     eventSource.on(event_types.CHAT_CHANGED, chatChangedHandler);

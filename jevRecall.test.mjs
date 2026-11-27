@@ -536,7 +536,8 @@ test('partial offers are skipped when local saving cannot cover extra input, and
 });
 
 
-test('adaptive metadata lanes recover long implicit memories without names alone or inactive books',()=>{
+test('adaptive metadata lanes recover long implicit memories without names alone or inactive books',async()=>{
+    const {coverAdaptiveJevCandidates}=await import('./jevRecall.mjs');
     const long='The room was painted blue and its windows faced a courtyard. '.repeat(24);
     const make=(uid,comment,extra={})=>({world:'W',uid,comment,content:long,key:[],...extra});
     const native=make(1,'Other');
@@ -560,4 +561,20 @@ test('adaptive metadata lanes recover long implicit memories without names alone
     assert.equal(result.sources.get(jevEntryKey(titled)),'adaptive-anchors');
     assert.equal(result.supplementalCount,4);
     assert.deepEqual(entries.map(e=>e.content),Array(entries.length).fill(long));
+});
+
+test('metadata anchor cache notices title and keyword edits without touching full lore',async()=>{
+    const {coverAdaptiveJevCandidates,createAdaptiveCueCache}=await import('./jevRecall.mjs');
+    const cache=createAdaptiveCueCache();
+    const entry=lore('W',1,'Plain walls and a tiled floor. '.repeat(30),{comment:'Golden lantern',key:[]});
+    const entries=[entry];
+    const get=()=>coverAdaptiveJevCandidates(entries,new Set(['W']),new Set(),{cueCache:cache,messages:[{mes:'Golden lantern beside the river.'}]});
+    assert.equal(get().anchorCount,1);
+    entry.comment='Blue stone';
+    assert.equal(get().anchorCount,0);
+    entry.key=['golden','lantern'];
+    assert.equal(get().anchorCount,1);
+    assert.equal(entry.content,'Plain walls and a tiled floor. '.repeat(30));
+    cache.clear();
+    assert.equal(get().anchorCount,1);
 });
