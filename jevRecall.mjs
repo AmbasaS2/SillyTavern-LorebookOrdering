@@ -1,4 +1,5 @@
 export const DEFAULT_JEV_BUDGET = 10000;
+export const DEFAULT_JEV_ADAPTIVE_THRESHOLD = 56000;
 const NANO_JEV_ENDPOINT = 'https://nano-gpt.com/api/subscription/v1';
 
 export function normalizeJevBudget(value) {
@@ -64,7 +65,8 @@ export function normalizeJevOptions(options = {}) {
         ? 0 : integer(value, 0, 100, 20000);
     return {
         inputVersion: 2,
-        mode: options.mode === 'filtered' ? 'filtered' : 'all',
+        mode: ['filtered','adaptive'].includes(options.mode) ? options.mode : 'all',
+        ...(options.mode==='adaptive'||options.adaptiveThreshold!=null?{adaptiveThreshold:integer(options.adaptiveThreshold,DEFAULT_JEV_ADAPTIVE_THRESHOLD,1,100000000)}:{}),
         recent: legacy && Number(options.recent) === 6 ? 20 : integer(options.recent, 20, 1, 100),
         messageLength: limit(options.messageLength, 1400),
         loreLength: limit(options.loreLength, 960),
@@ -203,6 +205,22 @@ export function planJevRequests(prepared, requestTarget = JEV_REQUEST_TARGET, qu
     }
     if (ids.length) batches.push(makeJevBatch(prepared, ids, sharedEstimate, costs));
     return batches;
+}
+
+// Estimate the full plan, including repeated shared state in each batch.
+// This is an opt-in routing decision, not a guarantee of recall quality.
+export function selectAdaptiveJevMode(prepared,{threshold=DEFAULT_JEV_ADAPTIVE_THRESHOLD,vectorAvailable=false}={}){
+    if(!prepared)return {mode:'all',estimatedTokens:0,reason:'empty'};
+    let estimatedTokens=null,oversized=false;
+    try{
+        estimatedTokens=planJevRequests(prepared).reduce((n,b)=>n+b.estimatedTokens,0);
+    }catch(error){
+        if(!(error instanceof JevInputLimitError))throw error;
+        oversized=true;
+    }
+    const over=oversized||estimatedTokens>threshold;
+    return {mode:over&&vectorAvailable?'filtered':'all',estimatedTokens,
+        reason:over?(vectorAvailable?'above-threshold':'vector-unavailable'):'within-threshold'};
 }
 
 export function splitJevBatch(batch) {

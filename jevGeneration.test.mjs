@@ -15,7 +15,7 @@ const raw = [
 ];
 const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
-function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false}={}) {
+function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false}={}) {
     const listeners=new Map();
     const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0};
     const events=new Proxy({}, {get:(_,key)=>key});
@@ -25,7 +25,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         off(k,f){listeners.set(k,(listeners.get(k)||[]).filter(x=>x!==f));},
         async emit(k,...args){for(const fn of [...(listeners.get(k)||[])])await fn(...args);},
     };
-    const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode},jevProfileId:'nano',jevBudget:1000},
+    const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode,adaptiveThreshold},jevProfileId:'nano',jevBudget:1000},
         connectionManager:{profiles:[profile]},vectors:{enabled_world_info:vectors,enabled_chats:extraVectors,enabled_files:extraVectors},disabledExtensions:[]};
     const books=new Map([['A',{stlo:{}}],['B',{stlo:{}}],['C',{stlo:{jevExclude:true}}]]);
     const ctx={groupId:null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
@@ -64,7 +64,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         checkWorldInfo:async()=>{
             counters.preview++;
             const entries=await sandbox.getSortedEntries();
-            const matches=entries.filter(e=>e.constant||e.uid===2&&e.world==='A'||force.has(recall.jevEntryKey(e))||e.world==='C');
+            const matches=entries.filter(e=>e.constant||(!emptyHits&&(e.uid===2&&e.world==='A'||force.has(recall.jevEntryKey(e))))||e.world==='C');
             ctx.extensionPrompts.note.value='preview-modified';
             ctx.chatMetadata.timedWorldInfo={sticky:{preview:1}};
             await eventSource.emit(events.WORLDINFO_SCAN_DONE,{new:{all:matches},activated:{entries:new Map()},state:{next:0}});
@@ -402,4 +402,35 @@ test('disabled/dry-run/cancelled Jev does not publish receipts and receiver fail
     const baseline=harness(); const a=await baseline.generate();
     const failed=harness({receiptMode:'throw'}); const b=await failed.generate();
     assert.deepEqual(a,b); assert.equal(failed.report().injected,baseline.report().injected);
+});
+
+test('adaptive preserves all assessment below threshold, selects native hits above it, and never needs an extra vector pass',async()=>{
+    const low=harness({mode:'adaptive',adaptiveThreshold:1000000});
+    await low.generate();
+    assert.equal(low.report().requestedMode,'adaptive');
+    assert.equal(low.report().mode,'all');
+    assert.equal(low.report().candidates,3);
+    assert.equal(low.counters.preview,0);
+    assert.equal(low.counters.jev,1);
+    const high=harness({mode:'adaptive',adaptiveThreshold:1});
+    await high.generate();
+    assert.equal(high.report().mode,'filtered');
+    assert.equal(high.report().candidates,2);
+    assert.equal(high.counters.preview,1);
+    assert.equal(high.counters.vector,1);
+    assert.equal(high.counters.jev,1);
+});
+test('adaptive without World Info vectors or eligible native hits returns to the entire candidate set',async()=>{
+    const off=harness({mode:'adaptive',adaptiveThreshold:1,vectors:false});
+    await off.generate();
+    assert.equal(off.report().mode,'all');
+    assert.equal(off.report().adaptiveReason,'vector-unavailable');
+    assert.equal(off.report().candidates,3);
+    assert.equal(off.counters.preview,0);
+    const empty=harness({mode:'adaptive',adaptiveThreshold:1,emptyHits:true});
+    await empty.generate();
+    assert.equal(empty.report().mode,'all');
+    assert.equal(empty.report().adaptiveReason,'empty-filter');
+    assert.equal(empty.report().candidates,3);
+    assert.equal(empty.counters.jev,1);
 });

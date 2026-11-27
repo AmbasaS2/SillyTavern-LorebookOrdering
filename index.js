@@ -11,7 +11,7 @@ import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../.
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate, selectAdaptiveJevMode, DEFAULT_JEV_ADAPTIVE_THRESHOLD } from './jevRecall.mjs';
 
 import { createJevPromptLibrary, mountJevPromptLibrary } from './jevPromptLibrary.mjs';
 
@@ -157,6 +157,15 @@ function openJevReport() {
     panel.append(heading);
     const fields = report ? [
         [translate('Status', 'stlo.jev.status'), jevStatusLabel(report.phase)],
+        [translate('Adaptive full-plan estimate', 'stlo.jev.adaptiveEstimate'), report.adaptiveEstimate],
+        [translate('Candidate route', 'stlo.jev.adaptiveRoute'), report.requestedMode==='adaptive'?
+            translate(report.mode==='filtered'?'Vector / keyword search candidates':'All eligible lorebook entries (default)',
+                report.mode==='filtered'?'stlo.jev.modeFiltered':'stlo.jev.modeAll'):undefined],
+        [translate('Adaptive decision', 'stlo.jev.adaptiveDecision'), report.adaptiveReason?
+            translate(({empty:'No eligible candidates','within-threshold':'Within the estimated input threshold',
+                'above-threshold':'Above the estimated input threshold','vector-unavailable':'World Info vector recall unavailable; assessed all',
+                'empty-filter':'No native hits; assessed all'})[report.adaptiveReason],
+                'stlo.jev.adaptiveReason.'+report.adaptiveReason):undefined],
         [translate('Candidates', 'stlo.jev.candidates'), report.candidates],
         [translate('Model selected', 'stlo.jev.selected'), report.selected],
         [translate('Within budget', 'stlo.jev.accepted'), report.accepted],
@@ -302,6 +311,22 @@ async function stloJevInterceptor(chat, contextSize, abort, type) {
         }
         updateJevReport(run, { phase: 'preparing', mode: run.options.mode });
         const nativeAvailable = hasEnabledVectorRecall() && guardNativeVectorInterceptor();
+        if(run.options.mode==='adaptive'){
+            const entries=await getSortedEntries();
+            if(!isCurrentJev(run)){abort(true);return;}
+            const settings=new Map(EXTENSION_STATE.scanWorldSettings);
+            const active=new Set(entries.map(entry=>entry.world));
+            const worlds=new Set([...getJevWorlds(settings,run.characterRecall)].filter(world=>active.has(world)));
+            const full=prepareJevRecall(entries,worlds,chat??getContext().chat??[],run.options);
+            // Chat/file vectors alone cannot provide World Info candidates.
+            const worldVectors=Boolean(nativeAvailable&&extension_settings.vectors?.enabled_world_info&&
+                entries.some(entry=>isJevCandidate(entry,worlds)&&(entry.vectorized||extension_settings.vectors?.enabled_for_all)));
+            const route=selectAdaptiveJevMode(full,{threshold:run.options.adaptiveThreshold,vectorAvailable:worldVectors});
+            run.requestedMode='adaptive';
+            run.options={...run.options,mode:route.mode};
+            if(route.mode==='all')run.adaptiveSnapshot={entries,settings};
+            updateJevReport(run,{requestedMode:'adaptive',mode:route.mode,adaptiveEstimate:route.estimatedTokens??undefined,adaptiveReason:route.reason});
+        }
         if (run.options.mode === 'filtered' && nativeAvailable) {
             run.awaitingVector = true;
             return;
@@ -1153,13 +1178,23 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         const preview = run.options.mode === 'filtered'
             ? await collectNativeJevCandidates(run, chat, contextSize, type)
             : null;
-        const entries = preview?.entries ?? await getSortedEntries();
+        const snapshot=run.adaptiveSnapshot;
+        run.adaptiveSnapshot=null;
+        const entries = preview?.entries ?? snapshot?.entries ?? await getSortedEntries();
         if (!isCurrentJev(run)) { abort(true); return; }
-        const settings = preview?.settings ?? new Map(EXTENSION_STATE.scanWorldSettings);
+        const settings = preview?.settings ?? snapshot?.settings ?? new Map(EXTENSION_STATE.scanWorldSettings);
         const active = new Set(entries.map(entry => entry.world));
         const worlds = new Set([...getJevWorlds(settings, run.characterRecall)].filter(world => active.has(world)));
         const budget = normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget);
-        const candidateKeys = preview?.candidates ?? null;
+        let candidateKeys = preview?.candidates ?? null;
+        if(run.requestedMode==='adaptive'&&candidateKeys&&
+            !entries.some(entry=>isJevCandidate(entry,worlds)&&candidateKeys.has(jevEntryKey(entry)))){
+            // A missing index or zero native matches must not turn adaptive
+            // recall into a silent empty result. Retain the native hit replay
+            // path even though this assessment uses all candidates.
+            candidateKeys=null;
+            updateJevReport(run,{mode:'all',adaptiveReason:'empty-filter'});
+        }
         if (!isCurrentJev(run)) { abort(true); return; }
         const messages = chat ?? getContext().chat ?? [];
         const hasCandidate = entries.some(entry => isJevCandidate(entry, worlds) && (!candidateKeys || candidateKeys.has(jevEntryKey(entry))));
@@ -1446,6 +1481,11 @@ async function openJevSettings() {
                 <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All: assess every eligible entry instead of ordinary vector recall for Jev books. Filtered: assess only keyword/vector hits. Other vector recall is retained.')}</div>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="all" ${jevOptions.mode === "all" ? "checked" : ""}><span data-i18n="stlo.jev.modeAll">All eligible lorebook entries (default)</span></label>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="filtered" ${jevOptions.mode === "filtered" ? "checked" : ""}><span data-i18n="stlo.jev.modeFiltered">Vector / keyword search candidates</span></label>
+                <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="adaptive" ${jevOptions.mode === "adaptive" ? "checked" : ""}><span data-i18n="stlo.jev.modeAdaptive">Adaptive (experimental)</span></label>
+                <div class="stlo-jev-field" id="stlo-jev-adaptive-field" ${jevOptions.mode==='adaptive'?'':'hidden'}>
+                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Full-plan input threshold (estimated tokens)</label>${infoHelp('stlo.jev.adaptiveHelp','Assess all entries below the threshold; above it, use native World Info vector/keyword hits. Without World Info vectors or with no hits, assess all. The threshold is an estimate, not an injection budget.')}</div>
+                    <input type="number" id="stlo-jev-adaptive-threshold" class="text_pole textarea_compact" min="1" max="100000000" step="1" value="${jevOptions.adaptiveThreshold??DEFAULT_JEV_ADAPTIVE_THRESHOLD}">
+                </div>
                 </div>
                 <div class="world_entry_form_control stlo-section">
                 <details class="stlo-jev-advanced"><summary data-i18n="stlo.jev.advanced">Advanced Jev settings</summary><div class="stlo-jev-advanced-body">
@@ -1502,13 +1542,14 @@ async function openJevSettings() {
                         const opts = {
                             inputVersion: 2,
                             mode: document.querySelector('input[name="stlo-jev-mode"]:checked')?.value,
+                            adaptiveThreshold: val('stlo-jev-adaptive-threshold'),
                             recent: val('stlo-jev-recent'),
                             messageLength: val('stlo-jev-message-length'),
                             loreLength: val('stlo-jev-lore-length'),
                             preset: promptState.preset,
                             prompt: promptState.prompt,
                         };
-                        const numeric = [[opts.recent, 1, 100, false], [opts.messageLength, 100, 20000, true], [opts.loreLength, 100, 20000, true]];
+                        const numeric = [[opts.recent, 1, 100, false], [opts.messageLength, 100, 20000, true], [opts.loreLength, 100, 20000, true],[opts.adaptiveThreshold,1,100000000,false]];
                         if (numeric.some(([value, min, max, allowZero]) => !String(value ?? '').trim() || !Number.isSafeInteger(Number(value)) || (!(allowZero && Number(value) === 0) && (Number(value) < min || Number(value) > max)))) {
                             toastr.error(translate('Check the Jev numeric settings and custom prompt.', 'stlo.jev.validation'), slothToastTitle());
                             return false;
@@ -1600,6 +1641,13 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
     }
     const ui = mountJevPromptLibrary({ target, model: promptModel, generosity: preset, Popup, POPUP_TYPE, tr,
         warn: message => toastr.warning(message, slothToastTitle()), isOpen });
+    const adaptiveField=document.getElementById('stlo-jev-adaptive-field');
+    const syncAdaptive=()=>{if(adaptiveField)adaptiveField.hidden=document.querySelector('input[name="stlo-jev-mode"]:checked')?.value!=='adaptive';};
+    for(const input of document.querySelectorAll('input[name="stlo-jev-mode"]')){
+        input.addEventListener('change',syncAdaptive);
+        modalEventListeners.push({element:input,event:'change',handler:syncAdaptive});
+    }
+    syncAdaptive();
     const messageLimit = document.getElementById('stlo-jev-message-length');
     const loreLimit = document.getElementById('stlo-jev-lore-length');
     const readingStatus = document.getElementById('stlo-jev-reading-status');
@@ -1620,6 +1668,8 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
         document.getElementById('stlo-jev-recent').value = String(defaults.recent);
         document.getElementById('stlo-jev-message-length').value = String(defaults.messageLength);
         document.getElementById('stlo-jev-lore-length').value = String(defaults.loreLength);
+        const threshold=document.getElementById('stlo-jev-adaptive-threshold');
+        if(threshold)threshold.value=String(DEFAULT_JEV_ADAPTIVE_THRESHOLD);
         syncReadingStatus();
         promptModel.chooseBuiltin('balanced');
         ui.render();
