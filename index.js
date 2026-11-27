@@ -374,61 +374,191 @@ function jevStatusLabel(phase) {
 }
 function metricUsageText(value,reported,successful){
     if(successful===undefined)return undefined;
-    if(value===undefined||!reported)return translate('Unmeasured','stlo.metrics.unmeasured');
-    return value+' ('+reported+'/'+successful+')';
+    if(!Number.isFinite(value)||!reported)return translate('Unmeasured','stlo.metrics.unmeasured');
+    return value.toLocaleString()+' ('+reported+'/'+successful+')';
+}
+function reportNode(parent,tag,className,text){
+    const node=document.createElement(tag);
+    if(className)node.className=className;
+    if(text!==undefined)node.textContent=String(text);
+    parent?.append(node);
+    return node;
 }
 function makeReportSection(panel,label,open=false){
-    const details=document.createElement('details');
-    details.className='stlo-report-section';
+    const details=reportNode(panel,'details','stlo-report-section');
     details.open=open;
-    const title=document.createElement('summary');
-    title.textContent=label;
-    const body=document.createElement('div');body.className='stlo-report-section-body';
-    details.append(title,body);panel.append(details);return body;
+    reportNode(details,'summary','',label);
+    return reportNode(details,'div','stlo-report-section-body');
 }
 function reportLine(parent,label,value){
-    const row=document.createElement('div');row.className='stlo-report-row';
-    const name=document.createElement('span');name.textContent=label;
-    const text=document.createElement('span');text.className='stlo-report-value';text.textContent=String(value);
-    row.append(name,text);parent.append(row);
+    const row=reportNode(parent,'div','stlo-report-row');
+    reportNode(row,'span','',label);
+    reportNode(row,'span','stlo-report-value',value);
+}
+function reportNum(value){
+    return Number.isFinite(value)?value.toLocaleString():translate('Unmeasured','stlo.metrics.unmeasured');
+}
+function reportSeconds(ms){
+    return Number.isFinite(ms)?(ms/1000).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' '+reportLabel('seconds','s'):reportNum(null);
+}
+function reportUsage(value,reported,successful){
+    return Number.isFinite(value)&&reported>0&&Number.isFinite(successful)?reportNum(value):reportNum(null);
+}
+function reportLabel(key,fallback){return translate(fallback,'stlo.report.'+key);}
+function reportNote(parent,text){return reportNode(parent,'small','stlo-report-note',text);}
+function reportIcon(parent,name){
+    const glyph=reportNode(parent,'i','fa-solid fa-'+name);
+    glyph.setAttribute('aria-hidden','true');
+}
+function reportHeading(parent,label,icon){
+    const row=reportNode(parent,'div','stlo-report-heading');
+    if(icon)reportIcon(row,icon);
+    reportNode(row,'h4','',label);
+    return row;
+}
+function reportStat(parent,label,value,caption){
+    const item=reportNode(parent,'div','stlo-report-stat');
+    reportNode(item,'small','',label);
+    reportNode(item,'strong','',value);
+    if(caption)reportNote(item,caption);
+    return item;
+}
+function reportBudgetBar(parent,cap,used){
+    // Never infer a percentage from an unknown or unlimited budget.
+    if(!Number.isFinite(cap)||cap<=0||!Number.isFinite(used)||used<0)return;
+    const bar=reportNode(parent,'progress','stlo-report-budget-bar');
+    bar.setAttribute('max',String(cap));
+    bar.setAttribute('value',String(Math.min(cap,used)));
+    bar.setAttribute('aria-label',reportLabel('budgetUse','Jev budget usage'));
+}
+function reportActivation(report){
+    return report?.activationObserved===true&&Number.isFinite(report.injected)?report.injected:null;
+}
+function reportZeroBudgetExclusions(report){
+    // Pre-admission and final scan counts are separate; do not sum uncertain
+    // or provisional counters and present them as observed exclusions.
+    const fields=['rejectedBook','rejectedJev','rejectedWorld','scanBudgetBook','scanBudgetJev','scanBudgetWorld'];
+    return report.activationObserved===true&&fields.every(key=>report[key]===0);
+}
+function appendReportOverview(panel,report,budgetOnly){
+    const status=budgetOnly?(report.phase==='cancelled'?jevStatusLabel('cancelled'):translate('Budget check complete','stlo.metrics.budgetComplete')):jevStatusLabel(report?.phase);
+    const overview=reportNode(panel,'section','stlo-report-overview');
+    const line=reportNode(overview,'div','stlo-report-status');
+    reportNode(line,'span','',status);
+    if(Number.isFinite(report?.elapsedMs))reportNode(line,'span','stlo-report-time',reportSeconds(report.elapsedMs));
+    if(!report)return;
+    const hero=reportNode(overview,'div','stlo-report-hero');
+    const activated=budgetOnly?(report.activationObserved===true?report.totalActivated:null):reportActivation(report);
+    reportNode(hero,'strong','',reportNum(activated));
+    reportNode(hero,'span','',budgetOnly?translate('All activated lore entries','stlo.metrics.allActivated'):Number.isFinite(activated)?reportLabel('activated','Memories activated'):reportLabel('activatedShort','Activated'));
+    if(!budgetOnly&&Number.isFinite(report.candidates))
+        reportNote(hero,'/ '+reportNum(report.candidates)+' '+reportLabel('candidates','candidates'));
+    if(budgetOnly){
+        reportNote(overview,translate('Jev is off. Only existing lore budget checks are reported.','stlo.metrics.budgetOnlyHelp'));
+        reportLine(overview,translate('All STLO scan budget exclusions','stlo.metrics.allScanExclusions'),reportNum(report.totalScanDropped));
+        return;
+    }
+    const funnel=reportNode(overview,'div','stlo-report-funnel');
+    const stages=[
+        [reportLabel('assessed','Assessed'),report.assessed],
+        [reportLabel('chosen','AI selected'),report.selected],
+        [reportLabel('accepted','Within budget'),report.accepted],
+        [reportLabel('activatedShort','Activated'),activated],
+    ];
+    for(const [label,value] of stages)reportStat(funnel,label,reportNum(value));
+    if(reportZeroBudgetExclusions(report))reportNote(overview,reportLabel('noBudgetExclusions','No budget exclusions'));
+    else if(report.activationObserved===false)reportNote(overview,translate('Provisional final scan; actual activation not confirmed.','stlo.metrics.provisional'));
+}
+function appendReportBudget(panel,report,budgetOnly){
+    if(!report||report.metricsId===undefined)return;
+    const tr=(label,key)=>translate(label,'stlo.metrics.'+key);
+    if(!budgetOnly){
+        const block=reportNode(panel,'section','stlo-report-primary');
+        reportHeading(block,reportLabel('budgetUse','Jev budget usage'),'gauge-high');
+        const value=reportNode(block,'div','stlo-report-hero stlo-report-budget-number');
+        reportNode(value,'strong','',reportNum(report.sharedJevUsed));
+        if(Number.isFinite(report.sharedJevBudget))reportNode(value,'span','','/ '+reportNum(report.sharedJevBudget)+' '+reportLabel('tokens','tokens'));
+        if(Number.isFinite(report.sharedJevBudget)&&report.sharedJevBudget>0&&Number.isFinite(report.sharedJevUsed)&&report.sharedJevUsed>=0){
+            reportNote(value,(100*report.sharedJevUsed/report.sharedJevBudget).toLocaleString(undefined,{maximumFractionDigits:1})+'%');
+        }
+        reportBudgetBar(block,report.sharedJevBudget,report.sharedJevUsed);
+        if(Number.isFinite(report.sharedJevRemaining))reportLine(block,reportLabel('remaining','Remaining budget'),reportNum(report.sharedJevRemaining));
+        const known=report.finalRecallBudgetUnknown?' ('+reportNum(report.finalRecallBudgetKnown)+' + '+report.finalRecallBudgetUnknown+' '+tr('Unmeasured','unmeasured')+')':'';
+        reportLine(block,reportLabel('recalledTokens','Activated memories · full-text tokens'),reportNum(report.finalRecallBudgetTokens)+known);
+        reportNote(block,reportLabel('budgetBasis','Host estimates from full text, not final RP tokens.'));
+        if(!report.bookBudgetObserved&&report.bookBudgets)reportNote(block,tr('Provisional final scan; actual activation not confirmed.','provisional'));
+        if(report.bookBudgetObserved&&report.bookBudgets){
+            for(const book of report.bookBudgets.filter(book=>book.recalled>0)){
+                const row=reportNode(block,'div','stlo-report-book-preview');
+                reportIcon(row,'book-open');
+                reportNode(row,'span','stlo-report-book-name',book.world);
+                reportNode(row,'span','stlo-report-value',reportNum(book.recalled)+' · '+reportNum(book.recalledBudgetUnknown?null:book.recalledBudgetKnown)+' '+reportLabel('tokens','tokens'));
+            }
+        }
+    }
+}
+function appendReportSearch(panel,report){
+    if(!report||report.mode==='budget-only')return;
+    const block=reportNode(panel,'section','stlo-report-primary');
+    reportHeading(block,reportLabel('searchUsage','AI search usage'),'magnifying-glass');
+    const grid=reportNode(block,'div','stlo-report-search-grid');
+    const coverage=(reported,total)=>Number.isFinite(reported)&&Number.isFinite(total)&&reported<total?reportLabel('reportedRequests','Reported requests')+': '+reported+'/'+total:null;
+    reportStat(grid,reportLabel('input','Input tokens'),reportUsage(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests),coverage(report.usageReportedBatches,report.successfulRequests));
+    reportStat(grid,reportLabel('output','Output tokens'),reportUsage(report.actualOutputTokens,report.outputUsageBatches,report.successfulRequests),coverage(report.outputUsageBatches,report.successfulRequests));
+    reportStat(grid,reportLabel('requests','AI requests'),reportNum(report.requests));
+    reportStat(grid,reportLabel('requestTime','AI request time'),reportSeconds(report.requestMs));
+    reportNote(block,reportLabel('providerBasis','Provider-reported token usage; cache and estimates are in diagnostics.'));
+}
+function appendReportRP(panel,report){
+    if(!report||report.mode==='budget-only')return;
+    const block=reportNode(panel,'section','stlo-report-primary stlo-report-rp');
+    reportHeading(block,reportLabel('rpInclusion','RP prompt inclusion'),'circle-info');
+    const rp=report.rpInjection,activated=reportActivation(report);
+    if(!rp){
+        if(Number.isFinite(activated))reportLine(block,reportLabel('unknown','Unconfirmed'),reportNum(activated));
+        reportNote(block,translate('Final RP inclusion is unmeasured unless a compatible viewer provides evidence. Activation is not proof of injection.','stlo.metrics.rpUnavailable'));
+        return;
+    }
+    if(rp.confirmed===0&&rp.excluded===0&&rp.unknown>0){
+        reportLine(block,reportLabel('unknown','Unconfirmed'),reportNum(rp.unknown));
+    }else{
+        const grid=reportNode(block,'div','stlo-report-rp-grid');
+        for(const [label,value] of [[reportLabel('confirmed','Confirmed'),rp.confirmed],[reportLabel('excluded','Excluded'),rp.excluded],[reportLabel('unknown','Unconfirmed'),rp.unknown]])
+            reportStat(grid,label,reportNum(value));
+    }
+    if(rp.unknown>0||rp.complete!==true)reportNote(block,reportLabel('rpPending','Activation alone does not confirm final RP inclusion.'));
+    if(rp.confirmed>0||rp.complete===true){
+        reportLine(block,reportLabel('rpTokens','Confirmed RP memory tokens'),reportNum(rp.tokens));
+        if(rp.measured!==rp.confirmed)reportNote(block,reportLabel('rpMeasured','Measured entries')+': '+reportNum(rp.measured)+' / '+reportNum(rp.confirmed));
+    }
 }
 function appendMemoryMetrics(panel,report){
     if(!report||report.metricsId===undefined)return;
     const unknown=translate('Unmeasured','stlo.metrics.unmeasured');
-    const num=n=>Number.isFinite(n)?n.toLocaleString():unknown;
+    const num=reportNum;
     const tr=(label,key)=>translate(label,'stlo.metrics.'+key);
-    const row=(parent,label,value)=>reportLine(parent,label,value);
-    const note=(parent,value)=>{
-        const element=document.createElement('small');element.className='stlo-report-note';element.textContent=value;parent.append(element);
-    };
+    const row=reportLine,note=reportNote;
     const card=(parent,label)=>{
-        const element=document.createElement('div');element.className='stlo-report-book-card';
-        const name=document.createElement('strong');name.textContent=label;element.append(name);parent.append(element);return element;
+        const element=reportNode(parent,'div','stlo-report-book-card');
+        reportNode(element,'strong','',label);
+        return element;
     };
     const budgetOnly=report.mode==='budget-only';
-    if(!budgetOnly){
-    const comparison=makeReportSection(panel,tr('Search and injection efficiency','efficiency'),true);
-    row(comparison,tr('Search input: provider / attempted estimate','searchInput'),(metricUsageText(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests)??unknown)+' / '+num(report.estimatedInputTokens));
-    row(comparison,tr('Activated Jev memory: full budget tokens (host estimate)','recallBudget'),num(report.finalRecallBudgetTokens)+(report.finalRecallBudgetUnknown?' ('+num(report.finalRecallBudgetKnown)+' + '+report.finalRecallBudgetUnknown+' '+unknown+')':''));
-    const rp=report.rpInjection;
-    if(rp)row(comparison,tr('RP confirmed / excluded / unknown','rpFunnel'),[rp.confirmed,rp.excluded,rp.unknown].map(num).join(' / '));
-    row(comparison,tr('Confirmed RP Jev memory: rendered individual tokens (host estimate)','rpTokens'),num(rp?.tokens)+(rp?' ('+rp.measured+'/'+rp.confirmed+' '+tr('measured','measured')+')':''));
-    note(comparison,tr('Provider usage and host estimates are different units; cached tokens are not added again. Actual billing and unreported usage are unknown.','units'));
-    if(!rp)note(comparison,tr('Final RP inclusion is unmeasured unless a compatible viewer provides evidence. Activation is not proof of injection.','rpUnavailable'));
-    }
     if(report.bookBudgets){
-        const budgets=makeReportSection(panel,tr('Per-book budget use (host estimate, full text)','budgets'),budgetOnly);
+        const budgets=makeReportSection(panel,reportLabel('bookDetails','Book budgets'));
         if(budgetOnly)note(budgets,tr('Jev is off. Only existing lore budget checks are reported.','budgetOnlyHelp'));
         if(!report.bookBudgetObserved)note(budgets,tr('Provisional final scan; actual activation not confirmed.','provisional'));
+        note(budgets,reportLabel('budgetBasis','Host estimates from full text, not final RP tokens.'));
         if(report.sharedJevBudget!==undefined)row(budgets,tr('Shared Jev budget / used / remaining','sharedBudget'),[report.sharedJevBudget,report.sharedJevUsed,report.sharedJevRemaining].map(num).join(' / '));
         for(const book of report.bookBudgets){
             const item=card(budgets,book.world);
             row(item,tr('Cap','cap'),book.capKnown?(book.cap===null?tr('Shared / no separate cap','noCap'):num(book.cap)):unknown);
+            if(book.capKnown&&book.cap!==null&&book.budgetUnknown===0)reportBudgetBar(item,book.cap,book.budgetUsedKnown);
             row(item,tr('Used / remaining','usedRemaining'),num(book.budgetUsedKnown)+(book.budgetUnknown?' + '+book.budgetUnknown+' '+unknown:'')+' / '+(book.capKnown&&book.cap===null?'—':num(book.remaining)));
             if(book.over>0)row(item,tr('Over budget','over'),num(book.over));
-            row(item,tr('Ignored budget entries','ignored'),book.ignored);
-            row(item,tr('Activated','activated'),book.activated);
-            row(item,tr('Removed by STLO scan budget','scanDropped'),book.scanDropped);
+            row(item,tr('Ignored budget entries','ignored'),num(book.ignored));
+            row(item,tr('Activated','activated'),num(book.activated));
+            row(item,tr('Removed by STLO scan budget','scanDropped'),num(book.scanDropped));
         }
     }
     if(metricsHistory.length){
@@ -440,23 +570,28 @@ function appendMemoryMetrics(panel,report){
                 row(item,tr('All STLO scan budget exclusions','allScanExclusions'),num(run.totalScanDropped));
                 continue;
             }
-            row(item,tr('Candidates / assessed / selected / accepted / activated','funnel'),[run.candidates,run.assessed,run.selected,run.accepted,run.activated].map(num).join(' / '));
-            row(item,tr('Input / output / cache read (provider reported)','historyUsage'),[metricUsageText(run.actualInputTokens,run.usageReportedBatches,run.successfulRequests),metricUsageText(run.actualOutputTokens,run.outputUsageBatches,run.successfulRequests),metricUsageText(run.cacheReadTokens,run.cacheReadBatches,run.successfulRequests)].map(x=>x??unknown).join(' / '));
-            row(item,tr('Estimated input','estimated'),num(run.estimatedInputTokens));
-            row(item,tr('RP tokens','rpShort'),num(run.rpTokens));
-            row(item,tr('Request ms','requestTime'),num(run.requestMs));
+            row(item,reportLabel('activatedShort','Activated'),num(run.activated)+' / '+num(run.candidates));
+            row(item,reportLabel('input','Input tokens'),metricUsageText(run.actualInputTokens,run.usageReportedBatches,run.successfulRequests)??unknown);
+            row(item,reportLabel('output','Output tokens'),metricUsageText(run.actualOutputTokens,run.outputUsageBatches,run.successfulRequests)??unknown);
+            row(item,reportLabel('requestTime','AI request time'),reportSeconds(run.requestMs));
+            const detail=makeReportSection(item,reportLabel('historyDetails','Run details'));
+            row(detail,tr('Candidates / assessed / selected / accepted / activated','funnel'),[run.candidates,run.assessed,run.selected,run.accepted,run.activated].map(num).join(' / '));
+            row(detail,tr('Provider cache-read tokens (reported batches only)','cacheRead'),metricUsageText(run.cacheReadTokens,run.cacheReadBatches,run.successfulRequests)??unknown);
+            row(detail,tr('Estimated input','estimated'),num(run.estimatedInputTokens));
+            row(detail,tr('RP tokens','rpShort'),num(run.rpTokens));
         }
     }
 }
-
 function openJevReport() {
-    const report = currentJevReport();
-    const panel = document.createElement('div');
-    panel.className='stlo-jev-report';
-    const heading = document.createElement('h3');
+    const report=currentJevReport();
+    const panel=reportNode(null,'div','stlo-jev-report');
     const budgetOnly=report?.mode==='budget-only';
-    heading.textContent = budgetOnly?translate('Latest lorebook budget report','stlo.metrics.budgetReport'):translate('Latest Jev recall', 'stlo.jev.report');
-    panel.append(heading);
+    reportNode(panel,'h3','',budgetOnly?translate('Latest lorebook budget report','stlo.metrics.budgetReport'):reportLabel('title','Jev search result'));
+    appendReportOverview(panel,report,budgetOnly);
+    appendReportBudget(panel,report,budgetOnly);
+    appendReportSearch(panel,report);
+    appendReportRP(panel,report);
+    appendMemoryMetrics(panel,report);
     const fields = budgetOnly ? [
         [translate('Status','stlo.jev.status'),report.phase==='cancelled'?jevStatusLabel('cancelled'):translate('Budget check complete','stlo.metrics.budgetComplete'),'overview'],
         [translate('All activated lore entries','stlo.metrics.allActivated'),report.totalActivated??null,'overview'],
@@ -516,39 +651,33 @@ function openJevReport() {
         [translate('Request time (ms)', 'stlo.jev.requestMs'), report.requestMs,'request'],
         [translate('Elapsed time (ms)', 'stlo.jev.elapsedMs'), report.elapsedMs,'request'],
     ] : [[translate('Status', 'stlo.jev.status'), jevStatusLabel(),'overview']];
-    const overview=document.createElement('div');overview.className='stlo-report-overview';
-    panel.append(overview);
+
     const detailRows=[];
-    const overviewRows=[];
     for(const [name,value,group] of fields){
-        if(value===undefined)continue;
-        if(group==='overview')overviewRows.push([name,value]);
-        else detailRows.push([name,value,group??'selection']);
+        if(value===undefined||group==='overview')continue;
+        detailRows.push([name,value,group??'selection']);
     }
-    for(const [name,value] of overviewRows){
-        const item=document.createElement('div');item.className='stlo-report-summary-card';
-        const label=document.createElement('small');label.textContent=name;
-        const number=document.createElement('strong');number.textContent=value===null?translate('Unmeasured','stlo.metrics.unmeasured'):String(value);
-        item.append(label,number);overview.append(item);
-    }
-    appendMemoryMetrics(panel,report);
     const sectionLabels={
         selection:translate('Candidate and budget decisions','stlo.metrics.selectionDetails'),
         partial:translate('Partial injection details','stlo.metrics.partialDetails'),
-        request:translate('Requests, usage and timing','stlo.metrics.requestDetails'),
+        request:reportLabel('diagnostics','Technical diagnostics'),
     };
     for(const group of ['selection','partial','request']){
         const rows=detailRows.filter(row=>row[2]===group);
         if(!rows.length)continue;
         const section=makeReportSection(panel,sectionLabels[group]);
-        for(const [name,value] of rows)reportLine(section,name,value===null?translate('Unmeasured','stlo.metrics.unmeasured'):value);
+        for(const [name,value] of rows)reportLine(section,name,typeof value==='number'||value===null?reportNum(value):value);
+        if(group==='request'&&!budgetOnly){
+            reportNote(section,translate('Provider usage and host estimates are different units; cached tokens are not added again. Actual billing and unreported usage are unknown.','stlo.metrics.units'));
+            if(report?.rpInjection){
+                const rp=report.rpInjection;
+                reportLine(section,translate('RP confirmed / excluded / unknown','stlo.metrics.rpFunnel'),[rp.confirmed,rp.excluded,rp.unknown].map(reportNum).join(' / '));
+                reportLine(section,translate('Confirmed RP Jev memory: rendered individual tokens (host estimate)','stlo.metrics.rpTokens'),reportNum(rp.tokens)+' ('+rp.measured+'/'+rp.confirmed+' '+translate('measured','stlo.metrics.measured')+')');
+            }
+        }
     }
-    if (report?.error) {
-        const line = document.createElement('p');
-        line.textContent = report.error;
-        panel.append(line);
-    }
-    return new Popup(panel, POPUP_TYPE.TEXT, '', { okButton: translate('Close', 'stlo.jev.close'), leftAlign: true, allowVerticalScrolling: true }).show();
+    if(report?.error)reportNode(panel,'p','stlo-report-error',report.error);
+    return new Popup(panel,POPUP_TYPE.TEXT,'',{okButton:translate('Close','stlo.jev.close'),leftAlign:true,allowVerticalScrolling:true}).show();
 }
 function syncJevTopBar() {
     const bar = document.getElementById('extensionTopBar');
@@ -938,24 +1067,61 @@ function installStloModalStyles() {
     const style = document.createElement('style');
     style.id = 'stlo-modal-styles';
     style.textContent = `
-        .stlo-jev-report { width:100%; min-width:0; display:flex; flex-direction:column; gap:8px; text-align:start; box-sizing:border-box; }
-        .stlo-jev-report h3 { margin:0 0 3px; line-height:1.35; }
-        .stlo-report-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
-        .stlo-report-summary-card,.stlo-report-book-card { border:1px solid var(--SmartThemeBorderColor); border-radius:7px; padding:8px; min-width:0; box-sizing:border-box; display:flex; flex-direction:column; gap:3px; }
-        .stlo-report-summary-card small { line-height:1.35; overflow-wrap:anywhere; }
-        .stlo-report-summary-card strong { font-size:1.06em; font-variant-numeric:tabular-nums; line-height:1.35; overflow-wrap:anywhere; }
-        .stlo-report-section { border:1px solid var(--SmartThemeBorderColor); border-radius:7px; box-sizing:border-box; min-width:0; width:100%; }
-        .stlo-report-section > summary { cursor:pointer; font-weight:600; padding:8px; line-height:1.4; overflow-wrap:anywhere; }
-        .stlo-report-section-body { display:flex; flex-direction:column; gap:6px; padding:0 8px 8px; min-width:0; box-sizing:border-box; }
-        .stlo-report-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:.92em; line-height:1.45; min-width:0; flex-wrap:wrap; }
-        .stlo-report-row > span:first-child { flex:1 1 55%; min-width:0; overflow-wrap:anywhere; }
-        .stlo-report-value { flex:0 1 auto; min-width:0; text-align:end; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; font-weight:600; }
-        .stlo-report-note { opacity:.85; line-height:1.45; overflow-wrap:anywhere; }
-        .stlo-report-book-card > strong { overflow-wrap:anywhere; line-height:1.35; }
-        @media (max-width:480px) {
-            .stlo-report-summary-card,.stlo-report-book-card { padding:6px; }
-            .stlo-report-row { gap:3px 6px; }
-            .stlo-report-value { text-align:start; }
+        .stlo-jev-report {
+            width:100%; min-width:0; display:flex; flex-direction:column; gap:11px; text-align:start; box-sizing:border-box;
+            --stlo-report-rule:color-mix(in srgb,var(--SmartThemeBodyColor) 21%,transparent);
+            --stlo-report-tint:color-mix(in srgb,var(--SmartThemeBodyColor) 5%,transparent);
+        }
+        .stlo-jev-report *, .stlo-jev-report *::before { box-sizing:border-box; }
+        .stlo-jev-report h3 { margin:0; font-size:1.15em; line-height:1.35; text-align:start; }
+        .stlo-jev-report h4 { margin:0; font-size:.98em; line-height:1.4; text-align:start; }
+        .stlo-report-overview { display:grid; gap:7px; min-width:0; }
+        .stlo-report-status { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:5px; font-size:.86em; opacity:.85; }
+        .stlo-report-time { font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .stlo-report-hero { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 7px; min-width:0; }
+        .stlo-report-hero > strong { font-size:1.85em; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+        .stlo-report-hero > span { font-size:.9em; font-weight:600; }
+        .stlo-report-hero > small { flex:0 1 auto; }
+        .stlo-report-funnel,.stlo-report-rp-grid,.stlo-report-search-grid { display:grid; gap:6px; min-width:0; }
+        .stlo-report-funnel { grid-template-columns:repeat(4,minmax(0,1fr)); padding:8px 5px; border-radius:8px; background:var(--stlo-report-tint); }
+        .stlo-report-rp-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+        .stlo-report-search-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 12px; }
+        .stlo-report-stat { display:grid; align-content:start; gap:3px; min-width:0; text-align:start; }
+        .stlo-report-stat small { font-size:.79em; line-height:1.35; opacity:.78; overflow-wrap:anywhere; }
+        .stlo-report-stat strong { font-size:1.22em; font-variant-numeric:tabular-nums; line-height:1.3; overflow-wrap:anywhere; }
+        .stlo-report-funnel .stlo-report-stat,.stlo-report-rp-grid .stlo-report-stat { text-align:center; }
+        .stlo-report-funnel .stlo-report-stat { border-inline-end:1px solid var(--stlo-report-rule); }
+        .stlo-report-funnel .stlo-report-stat:last-child { border:0; }
+        .stlo-report-primary { display:grid; gap:7px; min-width:0; padding-block-start:11px; border-top:1px solid var(--stlo-report-rule); }
+        .stlo-report-heading { display:flex; align-items:center; gap:7px; min-width:0; }
+        .stlo-report-heading i { flex:none; width:16px; text-align:center; opacity:.78; }
+        .stlo-report-budget-number > strong { font-size:1.5em; }
+        .stlo-report-budget-bar { display:block; width:100%; height:7px; border:0; border-radius:5px; overflow:hidden; accent-color:var(--SmartThemeQuoteColor,var(--SmartThemeEmColor)); }
+        .stlo-report-book-preview { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px; font-size:.88em; min-width:0; }
+        .stlo-report-book-preview i { flex:none; opacity:.65; }
+        .stlo-report-book-name { flex:1 1 40%; min-width:0; overflow-wrap:anywhere; }
+        .stlo-report-note { display:block; opacity:.77; font-size:.79em; line-height:1.45; overflow-wrap:anywhere; }
+        .stlo-report-section { border:1px solid var(--stlo-report-rule); border-radius:8px; margin:0; min-width:0; width:100%; }
+        .stlo-report-section > summary { display:flex; align-items:center; gap:8px; min-width:0; list-style:none; cursor:pointer; font-weight:600; padding:9px 10px; line-height:1.4; overflow-wrap:anywhere; }
+        .stlo-report-section > summary::-webkit-details-marker { display:none; }
+        .stlo-report-section > summary::before { content:""; flex:none; border-inline-start:6px solid currentColor; border-block:4px solid transparent; opacity:.75; }
+        .stlo-report-section[open] > summary::before { transform:rotate(90deg); }
+        .stlo-report-section > summary:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+        .stlo-report-section-body { display:grid; gap:3px; padding:3px 10px 10px; min-width:0; }
+        .stlo-report-section[open] > .stlo-report-section-body { border-top:1px solid var(--stlo-report-rule); }
+        .stlo-report-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,42%); align-items:baseline; gap:8px; padding-block:4px; font-size:.88em; line-height:1.4; min-width:0; }
+        .stlo-report-row > span:first-child { min-width:0; overflow-wrap:anywhere; }
+        .stlo-report-value { min-width:0; text-align:end; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; font-weight:600; }
+        .stlo-report-book-card { display:grid; gap:2px; min-width:0; padding:8px 0; border-bottom:1px solid var(--stlo-report-rule); }
+        .stlo-report-book-card:last-child { border-bottom:0; }
+        .stlo-report-book-card > strong { overflow-wrap:anywhere; line-height:1.4; margin-bottom:3px; }
+        .stlo-report-book-card > .stlo-report-section { border:0; background:var(--stlo-report-tint); }
+        .stlo-report-book-card > .stlo-report-section > summary { font-size:.83em; font-weight:500; padding:5px 7px; }
+        .stlo-report-error { overflow-wrap:anywhere; }
+        @media (max-width:360px) {
+            .stlo-report-funnel { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .stlo-report-funnel .stlo-report-stat:nth-child(2n) { border:0; }
+            .stlo-report-row { gap:6px; }
         }
         .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%; min-width: 0; box-sizing: border-box; text-align: left; }
         .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-width: 0; margin: 0; padding: 0 0 10px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
