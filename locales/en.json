@@ -233,7 +233,7 @@
   "stlo.budget.recursionHelp": "With recursive scanning, lore excluded from the final prompt can still have activated other lore.",
   "stlo.jev.modeAdaptive": "Adaptive (experimental)",
   "stlo.jev.adaptiveThreshold": "Full-plan input threshold (estimated tokens)",
-  "stlo.jev.adaptiveHelp": "Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues, concise entries, and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.",
+  "stlo.jev.adaptiveHelp": "Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues, concise entries, explicit long-term/NPC records, concrete title/key matches, and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.",
   "stlo.jev.adaptiveEstimate": "Adaptive full-plan estimate",
   "stlo.jev.adaptiveRoute": "Candidate route",
   "stlo.jev.adaptiveCoverageRoute": "Native hits + memory coverage",
@@ -287,5 +287,7 @@
   "stlo.metrics.provisional": "Provisional final scan; actual activation not confirmed.",
   "stlo.metrics.sharedBudget": "Shared Jev budget / used / remaining",
   "stlo.metrics.rpFunnel": "RP confirmed / excluded / unknown",
-  "stlo.jev.adaptivePlanCache": "Adaptive estimate cache hits / new calculations"
+  "stlo.jev.adaptivePlanCache": "Adaptive estimate cache hits / new calculations",
+  "stlo.jev.adaptiveRoles": "Additional long-term / NPC records",
+  "stlo.jev.adaptiveAnchors": "Additional title / key matches"
 }

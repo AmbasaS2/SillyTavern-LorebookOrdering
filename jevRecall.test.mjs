@@ -534,3 +534,30 @@ test('partial offers are skipped when local saving cannot cover extra input, and
     assert.equal(only.length,1);
     assert.equal(only[0].partialPlans,undefined);
 });
+
+
+test('adaptive metadata lanes recover long implicit memories without names alone or inactive books',()=>{
+    const long='The room was painted blue and its windows faced a courtyard. '.repeat(24);
+    const make=(uid,comment,extra={})=>({world:'W',uid,comment,content:long,key:[],...extra});
+    const native=make(1,'Other');
+    const lt=make(2,'An old encounter',{STMB_slothNexusKind:'lt'});
+    const npc=make(3,'A visitor',{STMB_slothNexusKind:'npc'});
+    const titled=make(4,'Silver compass');
+    const japanese=make(5,'銀色 羅針盤');
+    const nameOnly=make(6,'Alice compass');
+    const wrong=make(7,'Silver compass',{world:'AU'});
+    const disabled=make(8,'Silver compass',{disable:true});
+    const protectedRecord=make(9,'Silver compass',{constant:true});
+    const single=make(10,'Compass');
+    const entries=[native,lt,npc,titled,japanese,nameOnly,wrong,disabled,protectedRecord,single];
+    const result=coverAdaptiveJevCandidates(entries,new Set(['W']),new Set([jevEntryKey(native)]),{
+        messages:[{name:'Alice',mes:'Alice examined the silver compass. 銀色 羅針盤'}],
+    });
+    assert.deepEqual([...result.candidateKeys], [native,lt,npc,titled,japanese].map(jevEntryKey));
+    assert.equal(result.roleCount,2);
+    assert.equal(result.anchorCount,2);
+    assert.equal(result.sources.get(jevEntryKey(lt)),'adaptive-role');
+    assert.equal(result.sources.get(jevEntryKey(titled)),'adaptive-anchors');
+    assert.equal(result.supplementalCount,4);
+    assert.deepEqual(entries.map(e=>e.content),Array(entries.length).fill(long));
+});

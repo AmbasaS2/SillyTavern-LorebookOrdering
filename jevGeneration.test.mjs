@@ -16,7 +16,7 @@ const raw = [
 ];
 const endpoint='https://nano-gpt.com/api/subscription/v1';
 const profile={id:'nano',api:'custom','api-url':endpoint,'secret-id':'test-only'};
-function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false,partialInjection=false,partialAnswers,jevBudget=1000}={}) {
+function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,failures=0,sizeFailures=0,failAt=0,entries=raw,chatText='lantern',extraVectors=false,strategy=0,wiBudget=10000,scores={},receiptMode=false,adaptiveThreshold,emptyHits=false,partialInjection=false,partialAnswers,jevBudget=1000,companionMode,group=false}={}) {
     const listeners=new Map();
     const counters={jev:0,vector:0,preview:0,sorted:0,abort:0,stop:0,popup:0,domWrites:0,token:0};
     const events=new Proxy({}, {get:(_,key)=>key});
@@ -29,7 +29,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     const settings={stlo:{jevByCharacter:{'avatar.png':enabled},jevOptions:{mode,adaptiveThreshold,partialInjection},jevProfileId:'nano',jevBudget},
         connectionManager:{profiles:[profile]},vectors:{enabled_world_info:vectors,enabled_chats:extraVectors,enabled_files:extraVectors},disabledExtensions:[]};
     const books=new Map([['A',{stlo:{}}],['B',{stlo:{}}],['C',{stlo:{jevExclude:true}}]]);
-    const ctx={groupId:null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
+    const ctx={groupId:group?'group-one':null,chatMetadata:{timedWorldInfo:{sticky:{a:1}}},extensionPrompts:{'3_vectors':{value:'old'},'4_vectors_data_bank':{value:'old'},note:{value:'original'}},chat:[{name:'User',mes:chatText}]};
     const force=new Map();
     const batches=[], vectorKeys=[], receipts=[];
     let activated=[];
@@ -48,7 +48,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         ...recall,...metrics,Map,Set,Array,Object,Promise,URL,AbortController,AbortSignal,structuredClone,performance,
         main_api:'openai',stloTokenizers:{getTokenizerModel:()=> 'fixture-tokenizer'},
         eventSource,event_types:events,extension_settings:settings,document:doc,Popup,POPUP_TYPE:{CONFIRM:2,TEXT:1},NOTE_MODULE_NAME:'note',
-        characters:[{avatar:'avatar.png'}],this_chid:0,getCurrentChatId:()=> 'chat1',getContext:()=>ctx,
+        characters:[{avatar:'avatar.png'},{avatar:'other.png'}],this_chid:0,getCurrentChatId:()=> 'chat1',getContext:()=>ctx,
         getTokenCountAsync:async s=>{counters.token++;return s.length;},getRequestHeaders:()=>({}),getMaxContextSize:()=>10000,world_info_character_strategy:strategy,world_info_insertion_strategy:{evenly:0,character_first:1,global_first:2},
         getCharacterCardFields:()=>({}),world_info:{},getCharaFilename:()=> 'avatar',world_info_budget:100,world_info_budget_cap:0,world_info_include_names:false,
         worldInfoCache:books,world_names:[...books.keys()],selected_world_info:[...books.keys()],power_user:{},METADATA_KEY:'world',
@@ -93,6 +93,14 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         receipts.push({lists,keys:[...keys]});
         if (receiptMode==='throw') throw Error('optional viewer failed');
     }};
+    const companionCache=new Map();let companionCalls=0,companionTokenizations=0;
+    if(companionMode)sandbox.STWII={...(sandbox.STWII??{}),loreTokenCountV1:{apiVersion:companionMode==='incompatible'?2:1,async count(text){
+        companionCalls++;
+        if(companionMode==='throw')throw Error('viewer failed');
+        if(companionMode==='null')return null;
+        if(!companionCache.has(text)){companionTokenizations++;companionCache.set(text,text.length);}
+        return companionCache.get(text);
+    }}};
     sandbox.vectors_rearrangeChat=async()=>{
         if(!vectors)return;
         counters.vector++;
@@ -109,6 +117,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
     runInNewContext(code+'\nsetupEventHandlers(); registerPerLoopBudgetTrimmer();\n globalThis.testApi={startJevGeneration,currentJevReport,stopJevGeneration,setCharacterJevRecall};',sandbox);
     async function generate({dryRun=false}={}){
         await eventSource.emit(events.GENERATION_STARTED,'normal',{},dryRun);
+        if(!dryRun)companionCache.clear();
         if(dryRun)return;
         const abort=()=>{counters.abort++;};
         await sandbox.stlo_jevInterceptor(ctx.chat,10000,abort,'normal');
@@ -132,7 +141,7 @@ function harness({mode='all',enabled=true,vectors=true,responses=[1],decisions,f
         await eventSource.emit(events.WORLD_INFO_ACTIVATED,activated);
         return entries;
     }
-    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
+    return {generate,counters,ctx,force,settings,books,batches,vectorKeys,receipts,companionStats:()=>({calls:companionCalls,tokenizations:companionTokenizations}),companionCount:text=>sandbox.STWII?.loreTokenCountV1?.count(text),setSpeaker:id=>eventSource.emit(events.GROUP_MEMBER_DRAFTED,id),bridge:()=>sandbox.STLOMemoryMetrics,end:()=>eventSource.emit(events.GENERATION_ENDED),stop:()=>eventSource.emit(events.GENERATION_STOPPED),hostActivation:entries=>eventSource.emit(events.WORLD_INFO_ACTIVATED,entries),setTokenizer:model=>{sandbox.stloTokenizers.getTokenizerModel=()=>model;},activated:()=>activated,setChoice:(avatar,choice)=>sandbox.testApi.setCharacterJevRecall(settings.stlo,avatar,choice),report:()=>sandbox.testApi.currentJevReport(),elements};
 }
 
 test('all-mode replaces managed world-vector collections while preserving native vector pass',async()=>{
@@ -600,4 +609,49 @@ test('metrics invalidate on cancellation and tokenizer changes; mismatched host 
     await h.stop();
     assert.equal(bridge.context(),null);
     assert.equal(bridge.lookup(descriptor),null);
+});
+
+
+test('current Lore Insight v1 reuses exact budget strings and fails safely when absent or unavailable',async()=>{
+    const standalone=harness();
+    await standalone.generate();
+    const expected=standalone.activated().map(e=>e.content);
+    assert.ok(standalone.counters.token>0);
+    const both=harness({companionMode:'ready'});
+    await both.generate();
+    assert.deepEqual(both.activated().map(e=>e.content),expected);
+    assert.equal(both.counters.token,0);
+    assert.ok(both.companionStats().tokenizations>0);
+    const active=both.activated().find(e=>e.world==='A'&&e.uid===1);
+    const before=both.companionStats().tokenizations;
+    assert.equal(await both.companionCount(active.content+'\n'),active.content.length+1);
+    assert.equal(both.companionStats().tokenizations,before);
+    const context=both.bridge().context();
+    const descriptor={...context,target:recall.jevEntryKey(active),text:active.content+'\n'};
+    assert.equal(await both.bridge().measure(descriptor),active.content.length+1);
+    assert.equal(both.companionStats().tokenizations,before);
+    const changed={...descriptor,text:active.content+'\n changed'};
+    assert.equal(await both.bridge().measure(changed),changed.text.length);
+    assert.equal(both.companionStats().tokenizations,before+1);
+    for(const mode of ['throw','null','incompatible']){
+        const h=harness({companionMode:mode});
+        await h.generate();
+        assert.deepEqual(h.activated().map(e=>e.content),expected);
+        assert.ok(h.counters.token>0);
+        assert.equal(h.counters.abort,0);
+    }
+});
+
+test('report and measurement handle do not leak to a different drafted group speaker',async()=>{
+    const h=harness({group:true});
+    h.books.get('A').stlo.jevRecall=true;
+    await h.setSpeaker(0);
+    await h.generate();
+    const old=h.bridge().context();
+    assert.ok(old);
+    assert.ok(h.report());
+    await h.end();
+    await h.setSpeaker(1);
+    assert.equal(h.bridge().context(),null);
+    assert.equal(h.report(),null);
 });

@@ -532,9 +532,57 @@ function adaptiveSourceEnd(entry, chatId) {
         entry.STMB_start>=0&&entry.STMB_end>=entry.STMB_start?entry.STMB_end:null;
 }
 
-export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId, cueCache=createAdaptiveCueCache()}={}) {
+// Metadata-only supplement. Two distinct concrete terms must overlap;
+// titles/keys are bounded and no additional entry-body scan is needed.
+const ANCHOR_STOP=new Set('about after again also another before being between could does from have here into just like made make more most much only other over said same should some such than that their them then there these they thing think this those through time upon very want were what when where which while will with would your yourself you are the and for not can how now scene timeline result memory archive record chapter moment current detail story conversation'.split(' '));
+let adaptiveAnchorSegmenter=null;
+function normalizedAnchorTerms(value){
+    const text=String(value??'').slice(0,4000).normalize('NFKC').toLowerCase();
+    const result=new Set();
+    let words;
+    try{
+        const segmenter=adaptiveAnchorSegmenter??(adaptiveAnchorSegmenter=new Intl.Segmenter(undefined,{granularity:'word'}));
+        words=[...segmenter.segment(text)].filter(x=>x.isWordLike).map(x=>x.segment);
+    }catch{words=text.match(/\p{L}[\p{L}\p{M}\p{N}'’_-]*/gu)??[];}
+    for(const term of words){
+        if(!/\p{L}/u.test(term)||ANCHOR_STOP.has(term))continue;
+        const nonLatin=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u.test(term);
+        if([...term].length<(nonLatin?2:4))continue;
+        result.add(term);
+        if(result.size>=128)break;
+    }
+    return result;
+}
+function recentAnchorTerms(messages){
+    const terms=new Set(),names=new Set();
+    let remaining=4,chars=4000;
+    for(let i=(messages?.length??0)-1;i>=0&&remaining>0&&chars>0;i--){
+        const message=messages[i];
+        if(message?.is_system||typeof message?.mes!=='string'||!message.mes.trim())continue;
+        remaining--;
+        const text=message.mes.slice(-chars);
+        chars-=text.length;
+        for(const term of normalizedAnchorTerms(text))terms.add(term);
+        for(const name of normalizedAnchorTerms(message.name))names.add(name);
+    }
+    for(const name of names)terms.delete(name);
+    return terms;
+}
+function hasMetadataAnchors(entry,terms){
+    if(terms.size<2)return false;
+    const title=String(entry.comment??'').slice(0,512);
+    const keys=(Array.isArray(entry.key)?entry.key:[]).slice(0,12).map(x=>String(x).slice(0,128));
+    let count=0;
+    for(const term of normalizedAnchorTerms([title,...keys].join(' '))){
+        if(terms.has(term)&&++count>=2)return true;
+    }
+    return false;
+}
+
+export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId, messages=[], cueCache=createAdaptiveCueCache()}={}) {
     const eligible=new Set(),candidateKeys=new Set(),durable=new Set(),dated=[];
-    let compactCount=0;
+    let compactCount=0,roleCount=0,anchorCount=0;
+    const anchors=recentAnchorTerms(messages);
     const sources=new Map();
     let nativeCount=0;
     for(const entry of entries){
@@ -548,6 +596,13 @@ export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId,
         // without any durable keyword. Read all such entries rather than guess.
         // This is a positive coverage lane, never an automatic activation.
         else if(entry.content.length<=512){candidateKeys.add(key);compactCount++;sources.set(key,'adaptive-concise');}
+        // Optional Memory Books metadata: only eligible LT/NPC records.
+        // Never infer roles from filenames, UIDs or AU chat IDs.
+        else if(entry.STMB_slothNexusKind==='lt'||entry.STMB_slothNexusKind==='npc'){
+            candidateKeys.add(key);roleCount++;sources.set(key,'adaptive-role');
+        }else if(hasMetadataAnchors(entry,anchors)){
+            candidateKeys.add(key);anchorCount++;sources.set(key,'adaptive-anchors');
+        }
         const end=adaptiveSourceEnd(entry,chatId);
         if(end!==null)dated.push({key,end});
     }
@@ -559,7 +614,7 @@ export function coverAdaptiveJevCandidates(entries, worlds, nativeKeys, {chatId,
         if(!candidateKeys.has(key)){candidateKeys.add(key);recentCount++;sources.set(key,'adaptive-recent');}
     }
     return {candidateKeys,sources,eligibleCount:eligible.size,nativeCount,
-        durableCount:durable.size,compactCount,recentCount,supplementalCount:durable.size+compactCount+recentCount};
+        durableCount:durable.size,compactCount,roleCount,anchorCount,recentCount,supplementalCount:durable.size+compactCount+roleCount+anchorCount+recentCount};
 }
 
 export function splitJevBatch(batch) {

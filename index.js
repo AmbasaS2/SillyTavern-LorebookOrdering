@@ -143,7 +143,9 @@ function updateJevReport(run, changes = {}) {
     } catch (error) { stloDebug('Jev report UI:', error); }
 }
 function currentJevReport() {
-    return lastJevReport?.chatId === getCurrentChatId() ? lastJevReport : null;
+    if(lastJevReport?.chatId!==getCurrentChatId())return null;
+    if(lastJevReport.metricsScope!==undefined&&lastJevReport.metricsScope!==metricsScope())return null;
+    return lastJevReport;
 }
 // Only share a known, stable host tokenizer identity. Remote/dynamic or
 // unavailable tokenizer identities fail closed (ordinary STLO still works).
@@ -152,7 +154,7 @@ function metricsTokenizer(){
         if(typeof main_api!=='string'||typeof stloTokenizers==='undefined')return null;
         if(main_api==='openai'){
             const model=stloTokenizers.getTokenizerModel?.();
-            return typeof model==='string'&&model?'st-1:openai:'+model:null;
+            return typeof model==='string'&&model?'st-1:openai:'+JSON.stringify([getContext()?.chatCompletionSettings?.chat_completion_source??null,model,power_user.tokenizer??null]):null;
         }
         const configured=Number(power_user.tokenizer);
         const resolved=configured===stloTokenizers.tokenizers?.BEST_MATCH?stloTokenizers.getTokenizerBestMatch?.(main_api):configured;
@@ -177,7 +179,7 @@ function beginMetrics(run){
         activated:null,pending:null,localCounts:new WeakMap(),active:false};
     metricsCurrent=metrics;
     run.metrics=metrics;
-    run.report={...run.report,metricsId:id,metricsTime:Date.now()};
+    run.report={...run.report,metricsId:id,metricsTime:Date.now(),metricsScope:scope};
 }
 function archiveMetrics(run){
     if(!run?.metrics?.active||run.report.metricsId!==run.metrics.id)return;
@@ -189,6 +191,26 @@ function observeBudgetCount(m,entry,text,count,tokenizer){
     if(Number.isSafeInteger(count)&&count>=0&&!(count===0&&text.trim()))
         m.localCounts.set(entry,{text,count,tokenizer});
 }
+const companionCountsInFlight=new Set();
+async function countWithLoreInsight(text,padding){
+    const companion=globalThis.STWII?.loreTokenCountV1;
+    const m=currentMetrics();
+    const tokenizer=metricsTokenizer();
+    // The companion v1 count shares exact strings only in known OpenAI
+    // contexts. Never substitute a measurement with different padding.
+    if(padding===undefined&&typeof main_api==='string'&&main_api==='openai'&&m&&tokenizer&&m.tokenizer===tokenizer&&
+        companion?.apiVersion===1&&typeof companion.count==='function'&&!companionCountsInFlight.has(text)){
+        companionCountsInFlight.add(text);
+        try{
+            const value=await companion.count(text);
+            if(currentMetrics()!==m||metricsTokenizer()!==tokenizer)return null;
+            if(Number.isSafeInteger(value)&&value>=0&&!(value===0&&text.trim()))return value;
+        }catch{/* Optional viewer must not change admission policy. */}
+        finally{companionCountsInFlight.delete(text);}
+        if(currentMetrics()!==m||metricsTokenizer()!==tokenizer)return null;
+    }
+    return padding===undefined?getTokenCountAsync(text):getTokenCountAsync(text,padding);
+}
 async function countBudgetEntry(entry){
     const m=currentMetrics();
     const content=typeof entry?.content==='string'?entry.content:'';
@@ -197,7 +219,7 @@ async function countBudgetEntry(entry){
     const tokenizer=metricsTokenizer();
     let count;
     if(tokenizer&&m.tokenizer===tokenizer){
-        count=await m.ledger.measure({target:jevEntryKey(entry),text,tokenizer},()=>getTokenCountAsync(text),
+        count=await m.ledger.measure({target:jevEntryKey(entry),text,tokenizer},()=>countWithLoreInsight(text),
             ()=>currentMetrics()===m&&metricsTokenizer()===tokenizer);
         count=count??0;
     }else{
@@ -280,8 +302,8 @@ function installMemoryMetricsBridge(){
         async measure({generation,tokenizer,target,text,padding}={}){
             const m=currentMetrics();
             const valid=()=>currentMetrics()===m&&m?.active&&m.handle===generation&&m.tokenizer===tokenizer&&metricsTokenizer()===tokenizer;
-            if(!valid()||typeof text!=='string'||typeof target!=='string')return null;
-            const result=await m.ledger.measure({target,text,tokenizer,padding},()=>getTokenCountAsync(text,padding),valid);
+            if(!valid()||typeof text!=='string'||typeof target!=='string'||companionCountsInFlight.has(text))return null;
+            const result=await m.ledger.measure({target,text,tokenizer,padding},()=>countWithLoreInsight(text,padding),valid);
             return valid()?result:null;
         },
         selection({generation,key}={}){
@@ -395,6 +417,8 @@ function openJevReport() {
         [translate('Native hits', 'stlo.jev.adaptiveNative'), report.adaptiveNative],
         [translate('Additional durable-memory candidates', 'stlo.jev.adaptiveDurable'), report.adaptiveDurable],
         [translate('Additional concise memories', 'stlo.jev.adaptiveCompact'), report.adaptiveCompact],
+        [translate('Additional long-term / NPC records', 'stlo.jev.adaptiveRoles'), report.adaptiveRoles],
+        [translate('Additional metadata matches', 'stlo.jev.adaptiveAnchors'), report.adaptiveAnchors],
         [translate('Additional recent candidates', 'stlo.jev.adaptiveRecent'), report.adaptiveRecent],
         [translate('Eligible before candidate selection', 'stlo.metrics.eligible'), report.eligibleEntries],
         [translate('Candidates', 'stlo.jev.candidates'), report.candidates],
@@ -1461,9 +1485,9 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         if(run.requestedMode==='adaptive'&&candidateKeys){
             const scope=JSON.stringify([run.chatId,getJevCharacterAvatar(),getContext().groupId,EXTENSION_STATE.currentSpeakingCharacter]);
             if(adaptiveCueScope!==scope){adaptiveCueCache.clear();adaptiveCueScope=scope;}
-            const coverage=coverAdaptiveJevCandidates(entries,worlds,candidateKeys,{chatId:run.chatId,cueCache:adaptiveCueCache});
+            const coverage=coverAdaptiveJevCandidates(entries,worlds,candidateKeys,{chatId:run.chatId,messages:chat??getContext().chat??[],cueCache:adaptiveCueCache});
             const report={adaptiveEligible:coverage.eligibleCount,adaptiveNative:coverage.nativeCount,
-                adaptiveDurable:coverage.durableCount,adaptiveCompact:coverage.compactCount,adaptiveRecent:coverage.recentCount};
+                adaptiveDurable:coverage.durableCount,adaptiveCompact:coverage.compactCount,adaptiveRoles:coverage.roleCount,adaptiveAnchors:coverage.anchorCount,adaptiveRecent:coverage.recentCount};
             if(!coverage.nativeCount||coverage.candidateKeys.size===coverage.eligibleCount){
                 // Preserve existing zero-hit fallback and vector replay. If
                 // coverage itself reaches the whole set, report it honestly.
@@ -1774,7 +1798,7 @@ async function openJevSettings() {
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="filtered" ${jevOptions.mode === "filtered" ? "checked" : ""}><span data-i18n="stlo.jev.modeFiltered">Vector / keyword search candidates</span></label>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="adaptive" ${jevOptions.mode === "adaptive" ? "checked" : ""}><span data-i18n="stlo.jev.modeAdaptive">Adaptive (experimental)</span></label>
                 <div class="stlo-jev-field" id="stlo-jev-adaptive-field" ${jevOptions.mode==='adaptive'?'':'hidden'}>
-                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Full-plan input threshold (estimated tokens)</label>${infoHelp('stlo.jev.adaptiveHelp','Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues, concise entries, and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.')}</div>
+                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Full-plan input threshold (estimated tokens)</label>${infoHelp('stlo.jev.adaptiveHelp','Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues, concise entries, explicit long-term/NPC records, concrete title/key matches, and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.')}</div>
                     <input type="number" id="stlo-jev-adaptive-threshold" class="text_pole textarea_compact" min="1" max="100000000" step="1" value="${jevOptions.adaptiveThreshold??DEFAULT_JEV_ADAPTIVE_THRESHOLD}">
                 </div>
                 </div>

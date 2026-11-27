@@ -234,7 +234,7 @@
   "stlo.budget.recursionHelp": "재귀 검색을 쓰면, 최종 주입에서 빠진 로어도 다른 로어를 불러오는 데 영향을 줄 수 있습니다.",
   "stlo.jev.modeAdaptive": "적응형 (실험)",
   "stlo.jev.adaptiveThreshold": "전체 판단 입력량 임계값 (추정 토큰)",
-  "stlo.jev.adaptiveHelp": "임계값 이하는 전체 판단, 초과 시 월드 인포 검색 결과에 장기 기억 단서, 짧은 기억, 같은 채팅의 출처 위치를 비교할 수 있는 최근 기억을 보강합니다. 월드 인포 벡터 또는 적격 검색 결과가 없으면 전체를 판단합니다. 실험 기능이며 회수를 보장하지 않습니다. 임계값은 입력량 추정치이며 주입 예산이 아닙니다.",
+  "stlo.jev.adaptiveHelp": "전체 판단 입력량이 기준 이하라면 모든 적격 항목을 판단합니다. 기준을 넘으면 기존 월드 인포 검색 결과에 장기 기억 단서, 짧은 항목, 명시적인 장기 기억/NPC 기록, 구체적인 제목·키워드 일치 및 출처 위치를 비교할 수 있는 최근 기억을 보강합니다. 벡터 검색이 불가능하거나 적격 결과가 없으면 전체를 판단합니다. 실험적 보강이며 완전한 회수를 보장하지 않습니다. 이 기준은 입력량 추정치이며 주입 예산이 아닙니다.",
   "stlo.jev.adaptiveEstimate": "전체 판단 예상 입력량",
   "stlo.jev.adaptiveRoute": "후보 경로",
   "stlo.jev.adaptiveCoverageRoute": "검색 후보 + 기억 보강",
@@ -288,5 +288,7 @@
   "stlo.metrics.provisional": "최종 스캔 잠정값 · 실제 발동은 아직 미확인",
   "stlo.metrics.sharedBudget": "공통 Jev 예산 / 사용 / 잔여",
   "stlo.metrics.rpFunnel": "RP 포함 확인 / 제외 / 미확인",
-  "stlo.jev.adaptivePlanCache": "적응형 추정 캐시 재사용 / 새 계산"
+  "stlo.jev.adaptivePlanCache": "적응형 추정 캐시 재사용 / 새 계산",
+  "stlo.jev.adaptiveRoles": "추가 장기 기억 / NPC 기록",
+  "stlo.jev.adaptiveAnchors": "추가 제목 / 키워드 일치"
 }
