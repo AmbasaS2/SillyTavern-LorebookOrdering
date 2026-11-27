@@ -493,8 +493,8 @@ test('adaptive coverage reaching the full set is reported as full without a seco
     assert.equal(h.counters.jev,1);
 });
 
-function excerptScene(){
-    const filler=n=>('The stone terrace displayed rows of painted tiles and marble carvings. '+n+' ').repeat(7);
+function excerptScene(repetitions=24){
+    const filler=n=>('The stone terrace displayed rows of painted tiles and marble carvings. '+n+' ').repeat(repetitions);
     return ['Timeline: Early spring, at the observatory.','Scene:\nIona found the copper bell beside the sealed gate.',
         filler(1),'Iona promised to keep the copper bell until they reunited. The captain accepted this condition.',filler(2),
         filler(3),filler(4),'The captain left the observatory and Iona carried the bell home.',
@@ -503,7 +503,7 @@ function excerptScene(){
 
 test('partial injection keeps the native scan and full budget intact, applies only at final activation, and has no additional request',async()=>{
     const scene=entry('A',1,excerptScene(),{vectorized:true});
-    const constant=entry('B',2,excerptScene(),{constant:true});
+    const constant=entry('B',2,'Always-on Core: the captain keeps the archive seal.',{constant:true});
     const entries=[scene,constant,entry('C',2,'Native unaffected')];
     const base=harness({entries,jevBudget:9000});
     await base.generate();

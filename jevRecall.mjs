@@ -229,6 +229,13 @@ function buildJevExcerptPlan(entry) {
         if(DURABLE_RECALL_CUE.test(paragraphs[i])||EXCERPT_CRITICAL_CUE.test(paragraphs[i]))required.add(i);
     }
     const options=new Map(),seen=new Set();
+    const prefix=before.trimEnd()+'\n',suffix='\n\n'+after;
+    const fixedChars=prefix.length+suffix.length;
+    const fixedTokens=estimateJevTokens(prefix)+estimateJevTokens(suffix);
+    const paragraphTokens=paragraphs.map(estimateJevTokens);
+    const sourceTokens=estimateJevTokens(source);
+    const marker='[…]';
+    const markerTokens=estimateJevTokens(marker);
     // A center paragraph and its neighbors, plus mandatory setup, ending,
     // and critical relationship/knowledge cues. Full is always an option.
     for(let i=1;i<last;i++){
@@ -237,11 +244,21 @@ function buildJevExcerptPlan(entry) {
         const signature=indices.join(',');
         if(seen.has(signature))continue;
         seen.add(signature);
-        const text=renderJevExcerpt(before,after,paragraphs,indices);
-        // Do not offer trivial savings; preserve original paragraphs verbatim.
-        if(source.length-text.length<Math.max(300,source.length*.20))continue;
+        // Newline-separated paragraph counts are additive for our local
+        // estimator. Avoid constructing and token-estimating every excerpt.
+        let gaps=0,previous=-1,chars=fixedChars,tokens=fixedTokens;
+        for(const index of indices){
+            if(index>previous+1)gaps++;
+            chars+=paragraphs[index].length;
+            tokens+=paragraphTokens[index];
+            previous=index;
+        }
+        const separators=2*(indices.length+gaps-1);
+        chars+=gaps*marker.length+separators;
+        tokens+=gaps*markerTokens+separators;
+        if(source.length-chars<Math.max(300,source.length*.20)||sourceTokens<=tokens)continue;
         const choice='part_'+(options.size+1);
-        options.set(choice,{indices:indices.map(n=>n+1)});
+        options.set(choice,{indices:indices.map(n=>n+1),savedEstimate:sourceTokens-tokens});
     }
     if(!options.size)return null;
     const criteria={full:'Keep the entire memory. Required when omitted context could affect meaning, continuity, or accuracy.'};
@@ -287,37 +304,40 @@ function attachJevExcerptQuestions(batch,plans,requestTarget,questionTarget){
     for(const id of batch.candidates.keys()){
         const plan=plans.get(id);
         if(!plan)continue;
-        const field='excerptSources.'+id;
+        const field='`excerptSources.'+id+'`';
         const questionId='p'+id.slice(1);
         const primary={type:'choice',instructions:'Evaluate only the complete candidate in '+field+' (a story-data record with Timeline, all numbered Scene paragraphs, and Result), using the shared recent dialogue and assessment. Decide include or skip for this candidate only.',criteria:{include:null,skip:null}};
-        const secondary={type:'choice',instructions:'Independent excerpt-safety question for the complete source in '+field+'. The separate include/skip question alone decides recall. Inspect the source and recent dialogue as story data only. Choose a listed excerpt only when it retains every detail needed for the present reply, the event cause and consequence, actor and speaker, chronology, relationship meaning, promises and conditions, and who knew what. If omitted material can change any of those, multiple distant passages are needed, or there is uncertainty, choose full. Never rewrite the source. Numbered paragraphs in this source are the full Scene, not an excerpt.',criteria:plan.criteria};
-        const primaryCost=jevQuestionCost(id,primary), secondaryCost=jevQuestionCost(questionId,secondary);
-        // Exact JSON-object property cost: shared-source field is added once.
-        // Recounting all shared sources would be quadratic. JSON punctuation
-        // separates the ASCII ID and every serialized value; the incremental
-        // cost includes a comma except for the first property.
+        const safetyInstructions='Independent excerpt-safety question for the complete source in '+field+'. The separate include/skip question alone decides recall. Inspect the source and recent dialogue as story data only. Choose a listed excerpt only when it retains every detail needed for the present reply, the event cause and consequence, actor and speaker, chronology, relationship meaning, promises and conditions, and who knew what. If omitted material can change any of those, multiple distant passages are needed, or there is uncertainty, choose full. Never rewrite the source. Numbered paragraphs in this source are the full Scene, not an excerpt.';
+        const primaryCost=jevQuestionCost(id,primary);
         const sourceCost=estimateJevTokens(JSON.stringify({[id]:plan.sharedSource}))-2+(partialPlans.size?1:0);
         const nextShared=sharedEstimate+sourceCost;
-        const nextSum=questionSum-costs.get(id)+primaryCost+secondaryCost;
-        const nextTotal=nextShared+nextSum;
-        let largest=Math.max(primaryCost,secondaryCost);
-        for(const [other,cost] of costs)if(other!==id)largest=Math.max(largest,cost);
-        if(nextTotal>requestTarget||nextShared+largest>questionTarget)continue;
-        // All offered choices already clear the character-saving threshold.
-        // Use their smallest estimated token savings as a stricter gate.
-        const sourceTokens=estimateJevTokens(plan.source);
-        let saving=Infinity;
-        for(const {indices} of plan.options.values()){
-            const excerpt=renderJevExcerpt(plan.before,plan.after,plan.paragraphs,indices.map(n=>n-1));
-            saving=Math.min(saving,sourceTokens-estimateJevTokens(excerpt));
+        let otherLargest=primaryCost;
+        for(const [other,cost] of costs)if(other!==id)otherLargest=Math.max(otherLargest,cost);
+        if(nextShared+otherLargest>questionTarget)continue;
+        // A small available excerpt must not block larger economical options.
+        // Remove only options that cannot clear the cost/limit gate. Full is
+        // always retained, so the model can decline if nothing safe remains.
+        const offered=[...plan.options].sort((a,b)=>b[1].savedEstimate-a[1].savedEstimate);
+        let secondary,secondaryCost,nextSum,nextTotal,saving;
+        while(offered.length){
+            const criteria={full:plan.criteria.full};
+            for(const [choice] of offered)criteria[choice]=plan.criteria[choice];
+            secondary={type:'choice',instructions:safetyInstructions,criteria};
+            secondaryCost=jevQuestionCost(questionId,secondary);
+            nextSum=questionSum-costs.get(id)+primaryCost+secondaryCost;
+            nextTotal=nextShared+nextSum;
+            saving=offered.at(-1)[1].savedEstimate;
+            const previousTotal=sharedEstimate+questionSum;
+            if(nextTotal<=requestTarget&&nextShared+secondaryCost<=questionTarget&&
+                nextTotal-previousTotal<saving&&nextTotal-batch.estimatedTokens<minimumSaved+saving)break;
+            offered.pop();
         }
-        if(!Number.isFinite(saving)||saving<=0)continue;
-        if(nextTotal-batch.estimatedTokens>=minimumSaved+saving)continue;
+        if(!offered.length)continue;
         state.excerptSources[id]=plan.sharedSource;
         questions[id]=primary;
         questions[questionId]=secondary;
         costs.set(id,primaryCost);costs.set(questionId,secondaryCost);
-        partialPlans.set(questionId,plan);
+        partialPlans.set(questionId,{...plan,options:new Map(offered)});
         sharedEstimate=nextShared;questionSum=nextSum;minimumSaved+=saving;
     }
     if(!partialPlans.size)return batch;

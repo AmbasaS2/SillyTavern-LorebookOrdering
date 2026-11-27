@@ -344,8 +344,8 @@ test('adaptive durable cues, explicit same-chat recency, eligibility and cache i
     assert.equal(get().candidateKeys.has(jevEntryKey(promise)),true);
 });
 
-function excerptScene(){
-    const filler=n=>('The stone terrace displayed rows of painted tiles and marble carvings. '+n+' ').repeat(7);
+function excerptScene(repetitions=24){
+    const filler=n=>('The stone terrace displayed rows of painted tiles and marble carvings. '+n+' ').repeat(repetitions);
     return ['Timeline: Early spring, at the observatory.','Scene:\nIona found the copper bell beside the sealed gate.',
         filler(1),'Iona promised to keep the copper bell until they reunited. The captain accepted this condition.',filler(2),
         filler(3),filler(4),'The captain left the observatory and Iona carried the bell home.',
@@ -355,7 +355,7 @@ function excerptScene(){
 test('partial questions preserve binary decisions, fit existing batches, and fail open to full text',async()=>{
     const {applyJevExcerpts,normalizeJevOptions}=await import('./jevRecall.mjs');
     const e=lore('A',1,excerptScene());
-    const pinned=lore('A',2,excerptScene(),{constant:true});
+    const pinned=lore('A',2,'Always-on Core: the captain keeps the archive seal.',{constant:true});
     const worlds=new Set(['A']);
     const messages=[{mes:'The captain returns. Iona reaches for the bell.'}];
     const base=prepareJevRecall([e,pinned],worlds,messages,{});
@@ -501,4 +501,36 @@ test('excerpt shared state sends the complete source once and respects all exist
     const tight=planJevRequests(prepared,JEV_REQUEST_TARGET,baseMax);
     assert.equal(tight.length,1);
     assert.deepEqual(tight[0].body,base.body);
+    const sourcePlan=prepared.partialPlans.get('e1');
+    for(const [choice,option] of batch.partialPlans.get('p1').options){
+        assert.equal(option.savedEstimate,sourcePlan.options.get(choice).savedEstimate);
+        assert.ok(option.savedEstimate>batch.excerptAddedEstimate);
+    }
+});
+
+test('partial offers are skipped when local saving cannot cover extra input, and estimates match actual rendered option',async()=>{
+    const worlds=new Set(['A']);
+    const small=lore('A',1,excerptScene(7));
+    const full=planJevRequests(prepareJevRecall([small],worlds,[{mes:'The captain returns.'}]))[0];
+    const partial=planJevRequests(prepareJevRecall([small],worlds,[{mes:'The captain returns.'}],{partialInjection:true}))[0];
+    // Whether a large enough safe option remains depends on the actual
+    // estimated overhead; either route must respect the cost gate.
+    if(partial.partialPlans){
+        assert.ok(partial.excerptAddedEstimate<partial.excerptMinimumEstimatedSaving);
+        for(const [choice,option] of partial.partialPlans.get('p1').options){
+            const result=await requestJevRecall(partial,connection,{},undefined,async()=>response({answers:{
+                e1:{choice:'include',probabilities:{include:.95}},
+                p1:{choice,probabilities:{[choice]:.95}}}}));
+            assert.equal(option.savedEstimate,estimateJevTokens(small.content)-estimateJevTokens(result.decisions[0].excerpt.text));
+        }
+    }else assert.deepEqual(partial.body,full.body);
+    // A high fixed overhead relative to short disposable paragraphs must not
+    // create an optional question or increase the base batch count.
+    const marginal=lore('A',2,['Timeline: Evening.','Scene:\n'+('The captain found the bell. ').repeat(30),
+        'She waited.', 'A carved door. '.repeat(10), 'The stone hall. '.repeat(10),
+        'The lantern shone. '.repeat(10), 'The captain kept the bell. '.repeat(25),'Result: The bell was secured.'].join('\n\n'));
+    const prepared=prepareJevRecall([marginal],worlds,[{mes:'Bell.'}],{partialInjection:true});
+    const only=planJevRequests(prepared);
+    assert.equal(only.length,1);
+    assert.equal(only[0].partialPlans,undefined);
 });
