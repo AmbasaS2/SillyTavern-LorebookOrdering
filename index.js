@@ -1,8 +1,9 @@
 import { event_types, eventSource } from '../../../events.js';
 import { getTokenCountAsync } from '../../../tokenizers.js';
+import * as stloTokenizers from '../../../tokenizers.js';
 import { getStringHash, getCharaFilename } from '../../../utils.js';
 import { extension_settings, getContext } from '../../../extensions.js';
-import { characters, this_chid, getCurrentChatId, getMaxContextSize, getRequestHeaders, saveSettingsDebounced, stopGeneration, getCharacterCardFields } from '../../../../script.js';
+import { characters, this_chid, main_api, getCurrentChatId, getMaxContextSize, getRequestHeaders, saveSettingsDebounced, stopGeneration, getCharacterCardFields } from '../../../../script.js';
 import { loadWorldInfo, saveWorldInfo, worldInfoCache, world_info, world_info_character_strategy, world_info_insertion_strategy, world_info_budget, world_info_budget_cap, world_names, selected_world_info, METADATA_KEY, getSortedEntries, checkWorldInfo, world_info_include_names } from '../../../world-info.js';
 import { power_user } from '../../../power-user.js';
 import { NOTE_MODULE_NAME } from '../../../authors-note.js';
@@ -11,9 +12,10 @@ import { addLocaleData, getCurrentLocale, translate, t, applyLocale } from '../.
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { ARGUMENT_TYPE, SlashCommandArgument } from '../../../slash-commands/SlashCommandArgument.js';
-import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate } from './jevRecall.mjs';
+import { applyJevRecall, fitJevRecall, getNanoJevConnection, jevEntryKey, normalizeJevBudget, prepareJevRecall, requestJevRecall, getJevWorlds, normalizeJevOptions, planJevRequests, splitJevBatch, rankJevDecisions, JEV_PRESETS, isJevCandidate, selectAdaptiveJevMode, DEFAULT_JEV_ADAPTIVE_THRESHOLD, createAdaptiveCueCache, coverAdaptiveJevCandidates, applyJevExcerpts, createAdaptivePlanCache, estimateAdaptiveJevPlan, routeAdaptiveJevEstimate } from './jevRecall.mjs';
 
 import { createJevPromptLibrary, mountJevPromptLibrary } from './jevPromptLibrary.mjs';
+import { METRICS_VERSION, createUsageTracker, createTokenLedger, summarizeBookBudgets, summarizeFunnel, summarizeInjection, historyRow } from './jevMetrics.mjs';
 
 function slothToastTitle() {
     const locale = String(getCurrentLocale() || '').toLowerCase();
@@ -66,6 +68,13 @@ let jevGeneration = null;
 let nativeVectorPasses = 0;
 let guardedVectorInterceptor = null;
 let lastJevReport = null;
+let metricsCurrent=null;
+let metricsSerial=0;
+let metricsHistory=[];
+const adaptiveCueCache = createAdaptiveCueCache();
+const adaptivePlanCache = createAdaptivePlanCache();
+let adaptivePlanScope = null;
+let adaptiveCueScope = null;
 
 function getCachedLorebook(world) {
     // Read cached metadata without cloning the entries in StructuredCloneMap.get().
@@ -134,8 +143,198 @@ function updateJevReport(run, changes = {}) {
     } catch (error) { stloDebug('Jev report UI:', error); }
 }
 function currentJevReport() {
-    return lastJevReport?.chatId === getCurrentChatId() ? lastJevReport : null;
+    if(!lastJevReport||lastJevReport.chatId!==getCurrentChatId())return null;
+    if(lastJevReport.metricsScope!==undefined&&lastJevReport.metricsScope!==metricsScope())return null;
+    return lastJevReport;
 }
+// Only share a known, stable host tokenizer identity. Remote/dynamic or
+// unavailable tokenizer identities fail closed (ordinary STLO still works).
+function metricsTokenizer(){
+    try{
+        if(typeof main_api!=='string'||typeof stloTokenizers==='undefined')return null;
+        if(main_api==='openai'){
+            const model=stloTokenizers.getTokenizerModel?.();
+            return typeof model==='string'&&model?'st-1:openai:'+JSON.stringify([getContext()?.chatCompletionSettings?.chat_completion_source??null,model,power_user.tokenizer??null]):null;
+        }
+        const configured=Number(power_user.tokenizer);
+        const resolved=configured===stloTokenizers.tokenizers?.BEST_MATCH?stloTokenizers.getTokenizerBestMatch?.(main_api):configured;
+        return Number.isSafeInteger(resolved)&&resolved>0&&![6,9,10,99].includes(resolved)?'st-1:'+main_api+':'+resolved:null;
+    }catch{return null;}
+}
+function metricsScope(){
+    const context=getContext();
+    return JSON.stringify([getCurrentChatId(),getJevCharacterAvatar(context),context.groupId??null,EXTENSION_STATE.currentSpeakingCharacter??null]);
+}
+function currentMetrics(){
+    try{return metricsCurrent&&metricsCurrent.scope===metricsScope()?metricsCurrent:null;}catch{return null;}
+}
+function beginMetrics(run){
+    // One latest generation ledger; history stores numeric snapshots only.
+    metricsCurrent?.ledger.clear();
+    const scope=metricsScope();
+    if(metricsHistory.length&&metricsHistory[0].scope!==scope)metricsHistory=[];
+    const id=++metricsSerial;
+    const metrics={id,scope,handle:Object.freeze({id}),tokenizer:metricsTokenizer(),ledger:createTokenLedger(),
+        usage:createUsageTracker(),limits:new Map(),trims:new Map(),selected:new Map(),accepted:new Set(),
+        activated:null,pending:null,localCounts:new WeakMap(),active:false};
+    metricsCurrent=metrics;
+    run.metrics=metrics;
+    run.report={...run.report,metricsId:id,metricsTime:Date.now(),metricsScope:scope};
+}
+function archiveMetrics(run){
+    if(!run?.metrics?.active||run.report.metricsId!==run.metrics.id)return;
+    const row={...historyRow(run.report),scope:run.metrics.scope};
+    metricsHistory=[row,...metricsHistory.filter(item=>item.id!==row.id&&item.scope===row.scope)].slice(0,8);
+}
+function observeBudgetCount(m,entry,text,count,tokenizer){
+    if(!m||currentMetrics()!==m||metricsTokenizer()!==tokenizer)return;
+    if(Number.isSafeInteger(count)&&count>=0&&!(count===0&&text.trim()))
+        m.localCounts.set(entry,{text,count,tokenizer});
+}
+const companionCountsInFlight=new Set();
+async function countWithLoreInsight(text,padding){
+    const companion=globalThis.STWII?.loreTokenCountV1;
+    const m=currentMetrics();
+    const tokenizer=metricsTokenizer();
+    // The companion v1 count shares exact strings only in known OpenAI
+    // contexts. Never substitute a measurement with different padding.
+    if(padding===undefined&&typeof main_api==='string'&&main_api==='openai'&&m&&tokenizer&&m.tokenizer===tokenizer&&
+        companion?.apiVersion===1&&typeof companion.count==='function'&&!companionCountsInFlight.has(text)){
+        companionCountsInFlight.add(text);
+        try{
+            const value=await companion.count(text);
+            if(currentMetrics()!==m||metricsTokenizer()!==tokenizer)return null;
+            if(Number.isSafeInteger(value)&&value>=0&&!(value===0&&text.trim()))return value;
+        }catch{/* Optional viewer must not change admission policy. */}
+        finally{companionCountsInFlight.delete(text);}
+        if(currentMetrics()!==m||metricsTokenizer()!==tokenizer)return null;
+    }
+    return padding===undefined?getTokenCountAsync(text):getTokenCountAsync(text,padding);
+}
+async function countBudgetEntry(entry){
+    const m=currentMetrics();
+    const content=typeof entry?.content==='string'?entry.content:'';
+    if(!m||jevGeneration?.metrics!==m||!isCurrentJev(jevGeneration)||!entry||typeof entry!=='object')return getEntryTokenCountCached(entry);
+    const text=content+'\n';
+    const tokenizer=metricsTokenizer();
+    let count;
+    if(tokenizer&&m.tokenizer===tokenizer){
+        count=await m.ledger.measure({target:jevEntryKey(entry),text,tokenizer},()=>countWithLoreInsight(text),
+            ()=>currentMetrics()===m&&metricsTokenizer()===tokenizer);
+        count=count??0;
+    }else{
+        // Unknown tokenizer cannot safely share across cloned entries.
+        count=await getEntryTokenCountCached(entry);
+    }
+    observeBudgetCount(m,entry,text,count,tokenizer);
+    return count;
+}
+function knownBudgetCount(m,entry){
+    const text=String(entry.content??'')+'\n';
+    const tokenizer=metricsTokenizer();
+    const local=m.localCounts.get(entry);
+    if(local?.text===text&&local.tokenizer===tokenizer)return local.count;
+    if(tokenizer&&m.tokenizer===tokenizer)return m.ledger.lookup({target:jevEntryKey(entry),text,tokenizer});
+    return null;
+}
+function publishScanMetrics(run, entries, observed){
+    try{
+        const m=run?.metrics;
+        if(!m?.active||!isCurrentJev(run))return;
+        const keys=new Set(entries.map(jevEntryKey));
+        if(observed)m.activated=keys;
+        else if(m.activated!==null)return;
+        const pending=m.pending;
+        const matches=!!pending&&keys.size===pending.keys.size&&[...keys].every(key=>pending.keys.has(key));
+        const funnel=summarizeFunnel(run.report,m.trims,observed?keys:null,m.accepted);
+        // A real activation event with different keys must not inherit an
+        // unrelated scan's budget total. Retain the observed funnel only.
+        if(!matches){
+            if(observed)updateJevReport(run,{phase:'done',...funnel,activationObserved:true,bookBudgetObserved:false,
+                bookBudgets:undefined,finalRecallBudgetTokens:null,finalRecallBudgetKnown:undefined,finalRecallBudgetUnknown:undefined,
+                sharedJevBudget:undefined,sharedJevUsed:undefined,sharedJevRemaining:undefined,
+                ...(run.enabled?{injected:funnel.activated}:{})});
+            return;
+        }
+        const rows=pending.rows;
+        const recalledUnknown=rows.reduce((n,row)=>n+row.recalledBudgetUnknown,0);
+        const known=rows.reduce((n,row)=>n+row.recalledBudgetKnown,0);
+        const jevKnown=rows.reduce((n,row)=>n+row.jevUsedKnown,0);
+        const jevUnknown=rows.reduce((n,row)=>n+row.jevUnknown,0);
+        const jevCap=run.selection?.budget;
+        updateJevReport(run,{phase:'done',...(run.enabled?{}:{mode:'budget-only'}),
+            ...funnel,activationObserved:observed,bookBudgetObserved:observed,bookBudgets:rows,
+            finalRecallBudgetKnown:observed?known:undefined,finalRecallBudgetUnknown:observed?recalledUnknown:undefined,
+            finalRecallBudgetTokens:observed&&!recalledUnknown?known:null,
+            sharedJevBudget:jevCap,sharedJevUsed:observed&&jevCap!==undefined&&!jevUnknown?jevKnown:null,
+            sharedJevRemaining:observed&&jevCap!==undefined&&!jevUnknown?Math.max(0,jevCap-jevKnown):null,
+            ...(run.enabled&&observed?{injected:funnel.activated}:{})});
+    }catch(error){stloDebug('Optional scan report:',error);}
+}
+function stageScanMetrics(run,entries,originallyIgnored){
+    try{
+        const m=run?.metrics;
+        if(!m||!isCurrentJev(run)||m.activated!==null)return;
+        m.active=true;
+        const list=[...entries];
+        const rows=summarizeBookBudgets(list,m.limits,entry=>knownBudgetCount(m,entry),jevEntryKey,originallyIgnored,
+            m.accepted,run.selection?.worlds??new Set());
+        m.pending={rows,keys:new Set(list.map(jevEntryKey))};
+        publishScanMetrics(run,list,false);
+    }catch(error){stloDebug('Optional scan measurement:',error);}
+}
+// Optional contract, consumed by STWII only on its existing generation and
+// measurement paths. Never ask it to measure and never scan its DOM or data.
+// The handle remains valid for the last completed generation, until a new
+// generation, chat/group switch or incompatible tokenizer invalidates it.
+function installMemoryMetricsBridge(){
+    globalThis.STLOMemoryMetrics=Object.freeze({
+        version:METRICS_VERSION,
+        context(){
+            const m=currentMetrics();const tokenizer=metricsTokenizer();
+            return m?.active&&tokenizer&&m.tokenizer===tokenizer?{generation:m.handle,tokenizer}:null;
+        },
+        lookup({generation,tokenizer,target,text,padding}={}){
+            const m=currentMetrics();
+            if(!m?.active||m.handle!==generation||m.tokenizer!==tokenizer||metricsTokenizer()!==tokenizer)return null;
+            return m.ledger.lookup({target,text,tokenizer,padding});
+        },
+        async measure({generation,tokenizer,target,text,padding}={}){
+            const m=currentMetrics();
+            const valid=()=>currentMetrics()===m&&m?.active&&m.handle===generation&&m.tokenizer===tokenizer&&metricsTokenizer()===tokenizer;
+            if(!valid()||typeof text!=='string'||typeof target!=='string'||companionCountsInFlight.has(text))return null;
+            const result=await m.ledger.measure({target,text,tokenizer,padding},()=>countWithLoreInsight(text,padding),valid);
+            return valid()?result:null;
+        },
+        selection({generation,key}={}){
+            const m=currentMetrics();
+            if(!m?.active||m.handle!==generation||typeof key!=='string')return null;
+            const selected=m.selected.get(key);
+            if(!selected)return null;
+            return {...selected,budget:m.accepted.has(key)?(m.trims.get(key)??'accepted'):(selected.budget??'not-accepted'),
+                activated:m.activated===null?null:m.activated.has(key)};
+        },
+        publishInjection({generation,tokenizer,records,complete}={}){
+            const m=currentMetrics();
+            if(!m?.active||m.handle!==generation||m.tokenizer!==tokenizer||metricsTokenizer()!==tokenizer||m.activated===null)return false;
+            // The companion owns final payload evidence. We aggregate only
+            // STLO-selected entries; ignore native-only entries on this side.
+            if(!Array.isArray(records))return false;
+            const expected=new Set([...m.accepted].filter(key=>m.activated.has(key)));
+            const relevant=records.filter(record=>expected.has(record?.key));
+            const summary=summarizeInjection(relevant,expected,m.ledger,tokenizer,complete);
+            if(!summary)return false;
+            const run=jevGeneration;
+            if(run?.metrics===m&&isCurrentJev(run))updateJevReport(run,{rpInjection:summary});
+            else if(lastJevReport?.metricsId===m.id&&lastJevReport.chatId===getCurrentChatId()){
+                lastJevReport={...lastJevReport,rpInjection:summary};
+                metricsHistory=metricsHistory.map(row=>row.id===m.id?{...row,rpTokens:summary.tokens,rpConfirmed:summary.confirmed}:row);
+            }else return false;
+            return true;
+        },
+    });
+}
+
 function jevStatusLabel(phase) {
     const names = {
         preparing: ['Preparing candidates', 'stlo.jev.status.preparing'],
@@ -149,47 +348,165 @@ function jevStatusLabel(phase) {
     const pair = names[phase] ?? ['No recall report yet', 'stlo.jev.status.none'];
     return translate(...pair);
 }
+function metricUsageText(value,reported,successful){
+    if(successful===undefined)return undefined;
+    if(value===undefined||!reported)return translate('Unmeasured','stlo.metrics.unmeasured');
+    return value+' ('+reported+'/'+successful+')';
+}
+function makeReportSection(panel,label,open=false){
+    const details=document.createElement('details');
+    details.className='stlo-report-section';
+    details.open=open;
+    const title=document.createElement('summary');
+    title.textContent=label;
+    const body=document.createElement('div');body.className='stlo-report-section-body';
+    details.append(title,body);panel.append(details);return body;
+}
+function reportLine(parent,label,value){
+    const row=document.createElement('div');row.className='stlo-report-row';
+    const name=document.createElement('span');name.textContent=label;
+    const text=document.createElement('span');text.className='stlo-report-value';text.textContent=String(value);
+    row.append(name,text);parent.append(row);
+}
+function appendMemoryMetrics(panel,report){
+    if(!report||report.metricsId===undefined)return;
+    const unknown=translate('Unmeasured','stlo.metrics.unmeasured');
+    const num=n=>Number.isFinite(n)?n.toLocaleString():unknown;
+    const tr=(label,key)=>translate(label,'stlo.metrics.'+key);
+    const row=(parent,label,value)=>reportLine(parent,label,value);
+    const note=(parent,value)=>{
+        const element=document.createElement('small');element.className='stlo-report-note';element.textContent=value;parent.append(element);
+    };
+    const card=(parent,label)=>{
+        const element=document.createElement('div');element.className='stlo-report-book-card';
+        const name=document.createElement('strong');name.textContent=label;element.append(name);parent.append(element);return element;
+    };
+    const comparison=makeReportSection(panel,tr('Search and injection efficiency','efficiency'),true);
+    row(comparison,tr('Search input: provider / attempted estimate','searchInput'),(metricUsageText(report.actualInputTokens,report.usageReportedBatches,report.successfulRequests)??unknown)+' / '+num(report.estimatedInputTokens));
+    row(comparison,tr('Activated Jev memory: full budget tokens (host estimate)','recallBudget'),num(report.finalRecallBudgetTokens)+(report.finalRecallBudgetUnknown?' ('+num(report.finalRecallBudgetKnown)+' + '+report.finalRecallBudgetUnknown+' '+unknown+')':''));
+    const rp=report.rpInjection;
+    if(rp)row(comparison,tr('RP confirmed / excluded / unknown','rpFunnel'),[rp.confirmed,rp.excluded,rp.unknown].map(num).join(' / '));
+    row(comparison,tr('Confirmed RP Jev memory: rendered individual tokens (host estimate)','rpTokens'),num(rp?.tokens)+(rp?' ('+rp.measured+'/'+rp.confirmed+' '+tr('measured','measured')+')':''));
+    note(comparison,tr('Provider usage and host estimates are different units; cached tokens are not added again. Actual billing and unreported usage are unknown.','units'));
+    if(!rp)note(comparison,tr('Final RP inclusion is unmeasured unless a compatible viewer provides evidence. Activation is not proof of injection.','rpUnavailable'));
+    if(report.bookBudgets){
+        const budgets=makeReportSection(panel,tr('Per-book budget use (host estimate, full text)','budgets'));
+        if(!report.bookBudgetObserved)note(budgets,tr('Provisional final scan; actual activation not confirmed.','provisional'));
+        if(report.sharedJevBudget!==undefined)row(budgets,tr('Shared Jev budget / used / remaining','sharedBudget'),[report.sharedJevBudget,report.sharedJevUsed,report.sharedJevRemaining].map(num).join(' / '));
+        for(const book of report.bookBudgets){
+            const item=card(budgets,book.world);
+            row(item,tr('Cap','cap'),book.capKnown?(book.cap===null?tr('Shared / no separate cap','noCap'):num(book.cap)):unknown);
+            row(item,tr('Used / remaining','usedRemaining'),num(book.budgetUsedKnown)+(book.budgetUnknown?' + '+book.budgetUnknown+' '+unknown:'')+' / '+(book.capKnown&&book.cap===null?'—':num(book.remaining)));
+            if(book.over>0)row(item,tr('Over budget','over'),num(book.over));
+            row(item,tr('Ignored budget entries','ignored'),book.ignored);
+            row(item,tr('Activated','activated'),book.activated);
+        }
+    }
+    if(metricsHistory.length){
+        const recent=makeReportSection(panel,tr('Recent runs (this chat, session only)','recent'));
+        for(const run of metricsHistory){
+            const item=card(recent,new Date(run.time).toLocaleTimeString()+' · '+run.mode+' · '+jevStatusLabel(run.phase));
+            row(item,tr('Candidates / assessed / selected / accepted / activated','funnel'),[run.candidates,run.assessed,run.selected,run.accepted,run.activated].map(num).join(' / '));
+            row(item,tr('Input / output / cache read (provider reported)','historyUsage'),[metricUsageText(run.actualInputTokens,run.usageReportedBatches,run.successfulRequests),metricUsageText(run.actualOutputTokens,run.outputUsageBatches,run.successfulRequests),metricUsageText(run.cacheReadTokens,run.cacheReadBatches,run.successfulRequests)].map(x=>x??unknown).join(' / '));
+            row(item,tr('Estimated input','estimated'),num(run.estimatedInputTokens));
+            row(item,tr('RP tokens','rpShort'),num(run.rpTokens));
+            row(item,tr('Request ms','requestTime'),num(run.requestMs));
+        }
+    }
+}
+
 function openJevReport() {
     const report = currentJevReport();
     const panel = document.createElement('div');
+    panel.className='stlo-jev-report';
     const heading = document.createElement('h3');
     heading.textContent = translate('Latest Jev recall', 'stlo.jev.report');
     panel.append(heading);
     const fields = report ? [
-        [translate('Status', 'stlo.jev.status'), jevStatusLabel(report.phase)],
-        [translate('Candidates', 'stlo.jev.candidates'), report.candidates],
-        [translate('Model selected', 'stlo.jev.selected'), report.selected],
-        [translate('Within budget', 'stlo.jev.accepted'), report.accepted],
-        [translate('Actually activated', 'stlo.jev.injected'), report.injected],
+        [translate('Status', 'stlo.jev.status'), jevStatusLabel(report.phase),'overview'],
+        [translate('Adaptive full-plan estimate', 'stlo.jev.adaptiveEstimate'), report.adaptiveEstimate],
+        [translate('Adaptive estimate cache hits / new calculations', 'stlo.jev.adaptivePlanCache'), report.adaptivePlanCacheHits===undefined?undefined:report.adaptivePlanCacheHits+' / '+report.adaptivePlanCacheMisses],
+        [translate('Candidate route', 'stlo.jev.adaptiveRoute'), report.requestedMode==='adaptive'?
+            translate(report.mode==='filtered'?'Native hits + memory coverage':'All eligible lorebook entries (default)',
+                report.mode==='filtered'?'stlo.jev.adaptiveCoverageRoute':'stlo.jev.modeAll'):undefined],
+        [translate('Adaptive decision', 'stlo.jev.adaptiveDecision'), report.adaptiveReason?
+            translate(({empty:'No eligible candidates','within-threshold':'Within the estimated input threshold',
+                'above-threshold':'Above the estimated input threshold','vector-unavailable':'World Info vector recall unavailable; assessed all',
+                'empty-filter':'No native hits; assessed all','coverage-all':'Candidate coverage includes every eligible entry'})[report.adaptiveReason],
+                'stlo.jev.adaptiveReason.'+report.adaptiveReason):undefined],
+        [translate('Native hits', 'stlo.jev.adaptiveNative'), report.adaptiveNative],
+        [translate('Additional durable-memory candidates', 'stlo.jev.adaptiveDurable'), report.adaptiveDurable],
+        [translate('Additional concise memories', 'stlo.jev.adaptiveCompact'), report.adaptiveCompact],
+        [translate('Additional long-term / NPC records', 'stlo.jev.adaptiveRoles'), report.adaptiveRoles],
+        [translate('Additional metadata matches', 'stlo.jev.adaptiveAnchors'), report.adaptiveAnchors],
+        [translate('Additional recent candidates', 'stlo.jev.adaptiveRecent'), report.adaptiveRecent],
+        [translate('Eligible before candidate selection', 'stlo.metrics.eligible'), report.eligibleEntries??report.adaptiveEligible],
+        [translate('Candidates', 'stlo.jev.candidates'), report.candidates,'overview'],
+        [translate('Assessed candidates', 'stlo.metrics.assessed'), report.assessed,'overview'],
+        [translate('Model selected', 'stlo.jev.selected'), report.selected,'overview'],
+        [translate('Successful excerpt questions', 'stlo.jev.partialQuestions'), report.partialQuestions,'partial'],
+        [translate('Confident excerpt selections', 'stlo.jev.partialSelected'), report.partialSelected,'partial'],
+        [translate('Excerpts applied to final scan', 'stlo.jev.partialApplied'), report.partialApplied,'partial'],
+        [translate('Characters removed from final scan (not tokens)', 'stlo.jev.partialSavedChars'), report.partialSavedChars,'partial'],
+        [translate('Within budget', 'stlo.jev.accepted'), report.accepted,'overview'],
+        [translate('Actually activated', 'stlo.jev.injected'), report.activationObserved===false?translate('Unmeasured','stlo.metrics.unmeasured'):report.injected,'overview'],
+        [translate('Accepted but not activated (other/unknown reason)', 'stlo.metrics.otherNotActivated'), report.otherNotActivated??undefined],
+        [translate('Final scan budget exclusions (book / Jev / world)', 'stlo.metrics.scanExclusions'), report.scanBudgetBook===undefined?undefined:[report.scanBudgetBook,report.scanBudgetJev,report.scanBudgetWorld].join(' / ')],
         [translate('Book budget rejected', 'stlo.jev.rejectedBook'), report.rejectedBook],
         [translate('Jev budget rejected', 'stlo.jev.rejectedJev'), report.rejectedJev],
         [translate('World Info budget rejected', 'stlo.jev.rejectedWorld'), report.rejectedWorld],
-        [translate('Jev requests', 'stlo.jev.requests'), report.requests],
-        [translate('Planned batches', 'stlo.jev.plannedBatches'), report.plannedBatches],
-        [translate('Completed batches', 'stlo.jev.completedBatches'), report.completedBatches],
-        [translate('Unassessed candidates', 'stlo.jev.unassessed'), report.unassessed],
+        [translate('Jev requests', 'stlo.jev.requests'), report.requests,'request'],
+        [translate('Planned batches', 'stlo.jev.plannedBatches'), report.plannedBatches,'request'],
+        [translate('Completed batches', 'stlo.jev.completedBatches'), report.completedBatches,'request'],
+        [translate('Unassessed candidates', 'stlo.jev.unassessed'), report.unassessed,'request'],
         [translate('Shared background entries', 'stlo.jev.sharedEntries'), report.sharedEntries],
         [translate('Messages shortened by reading limit', 'stlo.jev.truncatedMessages'), report.truncatedMessages],
         [translate('Lore entries shortened by reading limit', 'stlo.jev.truncatedLore'), report.truncatedLore],
-        [translate('Estimated input tokens (attempted requests)', 'stlo.jev.estimatedInputTokens'), report.estimatedInputTokens],
-        [translate('Reported input tokens (successful requests)', 'stlo.jev.actualInputTokens'), report.actualInputTokens],
-        [translate('Batches reporting token usage', 'stlo.jev.usageReportedBatches'), report.usageReportedBatches],
-        [translate('Request characters (not tokens)', 'stlo.jev.inputChars'), report.inputChars],
-        [translate('Request time (ms)', 'stlo.jev.requestMs'), report.requestMs],
-        [translate('Elapsed time (ms)', 'stlo.jev.elapsedMs'), report.elapsedMs],
-    ] : [[translate('Status', 'stlo.jev.status'), jevStatusLabel()]];
-    for (const [name, value] of fields) {
-        if (value === undefined) continue;
-        const line = document.createElement('div');
-        line.textContent = name + ': ' + value;
-        panel.append(line);
+        [translate('Estimated input tokens (attempted requests)', 'stlo.jev.estimatedInputTokens'), report.estimatedInputTokens,'request'],
+        [translate('Reported input tokens (successful requests)', 'stlo.jev.actualInputTokens'), report.actualInputTokens,'request'],
+        [translate('Batches reporting token usage', 'stlo.jev.usageReportedBatches'), report.usageReportedBatches,'request'],
+        [translate('Provider output tokens (reported batches only)', 'stlo.metrics.output'), metricUsageText(report.actualOutputTokens,report.outputUsageBatches,report.successfulRequests),'request'],
+        [translate('Provider cache-read tokens (reported batches only)', 'stlo.metrics.cacheRead'), metricUsageText(report.cacheReadTokens,report.cacheReadBatches,report.successfulRequests),'request'],
+        [translate('Provider cache-write tokens (reported batches only)', 'stlo.metrics.cacheWrite'), metricUsageText(report.cacheWriteTokens,report.cacheWriteBatches,report.successfulRequests),'request'],
+        [translate('Native vector interceptor time (ms)', 'stlo.metrics.nativeTime'), report.nativeVectorMs,'request'],
+        [translate('Native candidate scan time (ms)', 'stlo.metrics.previewTime'), report.previewMs,'request'],
+        [translate('Request characters (not tokens)', 'stlo.jev.inputChars'), report.inputChars,'request'],
+        [translate('Request time (ms)', 'stlo.jev.requestMs'), report.requestMs,'request'],
+        [translate('Elapsed time (ms)', 'stlo.jev.elapsedMs'), report.elapsedMs,'request'],
+    ] : [[translate('Status', 'stlo.jev.status'), jevStatusLabel(),'overview']];
+    const overview=document.createElement('div');overview.className='stlo-report-overview';
+    panel.append(overview);
+    const detailRows=[];
+    const overviewRows=[];
+    for(const [name,value,group] of fields){
+        if(value===undefined)continue;
+        if(group==='overview')overviewRows.push([name,value]);
+        else detailRows.push([name,value,group??'selection']);
+    }
+    for(const [name,value] of overviewRows){
+        const item=document.createElement('div');item.className='stlo-report-summary-card';
+        const label=document.createElement('small');label.textContent=name;
+        const number=document.createElement('strong');number.textContent=value===null?translate('Unmeasured','stlo.metrics.unmeasured'):String(value);
+        item.append(label,number);overview.append(item);
+    }
+    appendMemoryMetrics(panel,report);
+    const sectionLabels={
+        selection:translate('Candidate and budget decisions','stlo.metrics.selectionDetails'),
+        partial:translate('Partial injection details','stlo.metrics.partialDetails'),
+        request:translate('Requests, usage and timing','stlo.metrics.requestDetails'),
+    };
+    for(const group of ['selection','partial','request']){
+        const rows=detailRows.filter(row=>row[2]===group);
+        if(!rows.length)continue;
+        const section=makeReportSection(panel,sectionLabels[group]);
+        for(const [name,value] of rows)reportLine(section,name,value===null?translate('Unmeasured','stlo.metrics.unmeasured'):value);
     }
     if (report?.error) {
         const line = document.createElement('p');
         line.textContent = report.error;
         panel.append(line);
     }
-    return new Popup(panel, POPUP_TYPE.TEXT, '', { okButton: translate('Close', 'stlo.jev.close'), leftAlign: true }).show();
+    return new Popup(panel, POPUP_TYPE.TEXT, '', { okButton: translate('Close', 'stlo.jev.close'), leftAlign: true, allowVerticalScrolling: true }).show();
 }
 function syncJevTopBar() {
     const bar = document.getElementById('extensionTopBar');
@@ -229,6 +546,7 @@ function guardNativeVectorInterceptor() {
         const run = jevGeneration;
         if (!run?.enabled || !isCurrentJev(run)) return interceptor.call(this, chat, contextSize, abort, type);
         nativeVectorPasses++;
+        const vectorStarted=performance.now();
         try {
             await interceptor.call(this, chat, contextSize, abort, type);
         } catch (error) {
@@ -239,6 +557,7 @@ function guardNativeVectorInterceptor() {
             throw error;
         } finally {
             nativeVectorPasses--;
+            if(run?.metrics?.active&&isCurrentJev(run))updateJevReport(run,{nativeVectorMs:(run.report.nativeVectorMs??0)+Math.round(performance.now()-vectorStarted)});
         }
         // Native vector storage runs at its original loading order. Reuse its
         // results; never invoke the native interceptor ourselves or twice.
@@ -257,13 +576,16 @@ function stopJevGeneration() {
 }
 function finishJevGeneration() {
     const run = jevGeneration;
-    if (run?.selection && run.report.phase === 'ready') recordJevActivated([]);
+    if (run?.selection && run.report.phase === 'ready') recordJevActivated([],true);
+    archiveMetrics(run);
     stopJevGeneration();
 }
 function onJevStopped() {
     if (jevGeneration?.enabled && jevGeneration.report?.phase !== 'cancelled') {
         updateJevReport(jevGeneration, { phase: 'cancelled' });
     }
+    archiveMetrics(jevGeneration);
+    if(jevGeneration?.metrics===metricsCurrent){metricsCurrent?.ledger.clear();metricsCurrent=null;}
     stopJevGeneration();
 }
 function startJevGeneration(type, _options, dryRun) {
@@ -278,6 +600,7 @@ function startJevGeneration(type, _options, dryRun) {
             forced: new Map(), startedAt: performance.now(),
             report: { requests: 0, requestMs: 0 },
         };
+        beginMetrics(jevGeneration);
     }
 }
 function rememberForcedEntries(entries) {
@@ -300,8 +623,27 @@ async function stloJevInterceptor(chat, contextSize, abort, type) {
             syncJevTopBar();
             return;
         }
+        run.metrics.active=true;
         updateJevReport(run, { phase: 'preparing', mode: run.options.mode });
         const nativeAvailable = hasEnabledVectorRecall() && guardNativeVectorInterceptor();
+        if(run.options.mode==='adaptive'){
+            const entries=await getSortedEntries();
+            if(!isCurrentJev(run)){abort(true);return;}
+            const settings=new Map(EXTENSION_STATE.scanWorldSettings);
+            const active=new Set(entries.map(entry=>entry.world));
+            const worlds=new Set([...getJevWorlds(settings,run.characterRecall)].filter(world=>active.has(world)));
+            const scope=JSON.stringify([run.chatId,getJevCharacterAvatar(),getContext().groupId,EXTENSION_STATE.currentSpeakingCharacter,[...worlds].sort()]);
+            if(adaptivePlanScope!==scope){adaptivePlanCache.clear();adaptivePlanScope=scope;}
+            const full=estimateAdaptiveJevPlan(entries,worlds,chat??getContext().chat??[],run.options,adaptivePlanCache);
+            // Chat/file vectors alone cannot provide World Info candidates.
+            const worldVectors=Boolean(nativeAvailable&&extension_settings.vectors?.enabled_world_info&&
+                entries.some(entry=>isJevCandidate(entry,worlds)&&(entry.vectorized||extension_settings.vectors?.enabled_for_all)));
+            const route=routeAdaptiveJevEstimate(full,{threshold:run.options.adaptiveThreshold,vectorAvailable:worldVectors});
+            run.requestedMode='adaptive';
+            run.options={...run.options,mode:route.mode};
+            if(route.mode==='all')run.adaptiveSnapshot={entries,settings};
+            updateJevReport(run,{requestedMode:'adaptive',mode:route.mode,adaptiveEstimate:route.estimatedTokens??undefined,adaptiveReason:route.reason,adaptivePlanCacheHits:full.cacheHits,adaptivePlanCacheMisses:full.cacheMisses});
+        }
         if (run.options.mode === 'filtered' && nativeAvailable) {
             run.awaitingVector = true;
             return;
@@ -476,6 +818,11 @@ function setupEventHandlers() {
     const chatChangedHandler = () => {
         EXTENSION_STATE.currentSpeakingCharacter = null;  // Clear character override state on chat change
         stopJevGeneration();
+        adaptiveCueCache.clear();
+        adaptiveCueScope = null;
+        adaptivePlanCache.clear();
+        adaptivePlanScope=null;
+        metricsCurrent?.ledger.clear();metricsCurrent=null;metricsHistory=[];
         lastJevReport = null;
         syncJevTopBar();
     };
@@ -490,6 +837,7 @@ function setupEventHandlers() {
             const characterName = (character?.avatar?.replace(/\.[^/.]+$/, '') || character?.name || null);
             EXTENSION_STATE.currentSpeakingCharacter = characterName;
         }
+        syncJevTopBar();
     };
 
     eventSource.on(event_types.CHAT_CHANGED, chatChangedHandler);
@@ -501,6 +849,7 @@ function setupEventHandlers() {
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, recordJevActivated);
     eventSource.on(event_types.GENERATE_AFTER_DATA, guardUnpreparedJevReply);
     globalThis.stlo_jevInterceptor = stloJevInterceptor;
+    try{installMemoryMetricsBridge();}catch(error){stloDebug('Optional metrics bridge:',error);}
 
     // Track for cleanup
     eventListeners.push(
@@ -524,6 +873,25 @@ function installStloModalStyles() {
     const style = document.createElement('style');
     style.id = 'stlo-modal-styles';
     style.textContent = `
+        .stlo-jev-report { width:100%; min-width:0; display:flex; flex-direction:column; gap:8px; text-align:start; box-sizing:border-box; }
+        .stlo-jev-report h3 { margin:0 0 3px; line-height:1.35; }
+        .stlo-report-overview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+        .stlo-report-summary-card,.stlo-report-book-card { border:1px solid var(--SmartThemeBorderColor); border-radius:7px; padding:8px; min-width:0; box-sizing:border-box; display:flex; flex-direction:column; gap:3px; }
+        .stlo-report-summary-card small { line-height:1.35; overflow-wrap:anywhere; }
+        .stlo-report-summary-card strong { font-size:1.06em; font-variant-numeric:tabular-nums; line-height:1.35; overflow-wrap:anywhere; }
+        .stlo-report-section { border:1px solid var(--SmartThemeBorderColor); border-radius:7px; box-sizing:border-box; min-width:0; width:100%; }
+        .stlo-report-section > summary { cursor:pointer; font-weight:600; padding:8px; line-height:1.4; overflow-wrap:anywhere; }
+        .stlo-report-section-body { display:flex; flex-direction:column; gap:6px; padding:0 8px 8px; min-width:0; box-sizing:border-box; }
+        .stlo-report-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-size:.92em; line-height:1.45; min-width:0; flex-wrap:wrap; }
+        .stlo-report-row > span:first-child { flex:1 1 55%; min-width:0; overflow-wrap:anywhere; }
+        .stlo-report-value { flex:0 1 auto; min-width:0; text-align:end; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; font-weight:600; }
+        .stlo-report-note { opacity:.85; line-height:1.45; overflow-wrap:anywhere; }
+        .stlo-report-book-card > strong { overflow-wrap:anywhere; line-height:1.35; }
+        @media (max-width:480px) {
+            .stlo-report-summary-card,.stlo-report-book-card { padding:6px; }
+            .stlo-report-row { gap:3px 6px; }
+            .stlo-report-value { text-align:start; }
+        }
         .stlo-modal-ui { display: flex; flex-direction: column; align-items: stretch; gap: 7px; width: 100%; min-width: 0; box-sizing: border-box; text-align: left; }
         .stlo-modal-ui .stlo-section { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-width: 0; margin: 0; padding: 0 0 10px; border-bottom: 1px solid var(--SmartThemeBorderColor); text-align: left; box-sizing: border-box; }
         .stlo-modal-ui .stlo-section:last-child { padding-bottom: 0; border-bottom: none; }
@@ -920,7 +1288,7 @@ async function handleWorldInfoEntriesLoaded(eventData) {
         }
         if (HAS_WORLDINFO_SCAN_DONE && run?.selection?.worlds.size && !run.preparing && !run.preview && isCurrentJev(run)) {
             const receipt = globalThis.STWII?.recordStloJevRecall;
-            const appliedKeys = typeof receipt === 'function' ? new Set() : null;
+            const appliedKeys = typeof receipt === 'function'||run.selection.excerpts?.size ? new Set() : null;
             const arrays = loreArrays(eventData);
             const [global, character, chat, persona] = arrays;
             const strategy = typeof world_info_character_strategy === 'undefined' ? 0 : Number(world_info_character_strategy);
@@ -954,7 +1322,8 @@ async function handleWorldInfoEntriesLoaded(eventData) {
             }
             // Optional display receipt, bound to this scan payload. Never alter
             // injection or fail a reply because a viewer is unavailable.
-            if (appliedKeys) {
+            if(run.selection.excerpts?.size)run.selection.excerptAppliedKeys=appliedKeys;
+            if (typeof receipt==='function'&&appliedKeys) {
                 try { receipt(eventData, appliedKeys); } catch { /* display only */ }
             }
         }
@@ -1037,10 +1406,10 @@ async function abortJevPreparation(run, abort, error) {
 async function decideJevWithRetry(run, prepared, batches) {
     const queue = [...batches];
     const decisions = [];
+    let partialQuestions=0;
     let completed = 0;
     let assessed = 0;
-    let confirmedInput = 0;
-    let reportedUsage = 0;
+    const usage=run.metrics.usage;
     while (queue.length && isCurrentJev(run)) {
         const batch = queue[0];
         const connection = getJevConnection();
@@ -1061,22 +1430,24 @@ async function decideJevWithRetry(run, prepared, batches) {
             }
             if (!isCurrentJev(run)) return null;
             decisions.push(...result.decisions);
+            partialQuestions+=batch.partialPlans?.size??0;
             queue.shift();
             completed++;
             assessed += batch.candidates.size;
-            if (result.inputTokens != null) {
-                confirmedInput += result.inputTokens;
-                reportedUsage++;
-            }
+            usage.add(result);
             updateJevReport(run, {
                 completedBatches: completed,
+                ...(run.options.partialInjection===true?{partialQuestions}:{}),
+                assessed,
                 unassessed: prepared.candidates.size - assessed,
-                actualInputTokens: reportedUsage ? confirmedInput : undefined,
-                usageReportedBatches: reportedUsage,
+                ...usage.summary(),
             });
         } catch (error) {
             if (!isCurrentJev(run)) return null;
             if (error?.name === 'JevInputLimitError') {
+                // Excerpt questions are optional. Prefer the unchanged base
+                // request over splitting/retrying solely for an excerpt.
+                if(batch.baseBatch){queue[0]=batch.baseBatch;continue;}
                 const smaller = splitJevBatch(batch);
                 if (!smaller.length) throw error;
                 // Only an explicit provider size rejection can cause an
@@ -1088,7 +1459,14 @@ async function decideJevWithRetry(run, prepared, batches) {
             if (!await askJevRetry(run, error)) return null;
         }
     }
-    return queue.length || !isCurrentJev(run) ? null : rankJevDecisions(prepared, decisions);
+    if(queue.length||!isCurrentJev(run))return null;
+    for(const item of decisions)run.metrics.selected.set(item.key,{decision:'include',score:Number.isFinite(item.score)?item.score:null,
+        source:run.candidateSources?.get(item.key)??(run.options.mode==='filtered'?'native':'all')});
+    if(run.options.partialInjection===true){
+        run.excerpts=new Map(decisions.filter(item=>item.excerpt).map(item=>[item.key,item.excerpt]));
+        updateJevReport(run,{partialSelected:run.excerpts.size});
+    }
+    return rankJevDecisions(prepared, decisions);
 }
 
 // The optional filtered mode uses a native dry scan after the existing vector
@@ -1150,27 +1528,51 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
     if (run.preparing || run.selection) return;
     run.preparing = true;
     try {
+        const previewStart=performance.now();
         const preview = run.options.mode === 'filtered'
             ? await collectNativeJevCandidates(run, chat, contextSize, type)
             : null;
-        const entries = preview?.entries ?? await getSortedEntries();
+        if(preview)updateJevReport(run,{previewMs:Math.round(performance.now()-previewStart)});
+        const snapshot=run.adaptiveSnapshot;
+        run.adaptiveSnapshot=null;
+        const entries = preview?.entries ?? snapshot?.entries ?? await getSortedEntries();
         if (!isCurrentJev(run)) { abort(true); return; }
-        const settings = preview?.settings ?? new Map(EXTENSION_STATE.scanWorldSettings);
+        const settings = preview?.settings ?? snapshot?.settings ?? new Map(EXTENSION_STATE.scanWorldSettings);
         const active = new Set(entries.map(entry => entry.world));
         const worlds = new Set([...getJevWorlds(settings, run.characterRecall)].filter(world => active.has(world)));
         const budget = normalizeJevBudget(extension_settings[EXTENSION_NAME]?.jevBudget);
-        const candidateKeys = preview?.candidates ?? null;
+        let candidateKeys = preview?.candidates ?? null;
+        if(run.requestedMode==='adaptive'&&candidateKeys){
+            const scope=JSON.stringify([run.chatId,getJevCharacterAvatar(),getContext().groupId,EXTENSION_STATE.currentSpeakingCharacter]);
+            if(adaptiveCueScope!==scope){adaptiveCueCache.clear();adaptiveCueScope=scope;}
+            const coverage=coverAdaptiveJevCandidates(entries,worlds,candidateKeys,{chatId:run.chatId,messages:chat??getContext().chat??[],cueCache:adaptiveCueCache});
+            const report={adaptiveEligible:coverage.eligibleCount,adaptiveNative:coverage.nativeCount,
+                adaptiveDurable:coverage.durableCount,adaptiveCompact:coverage.compactCount,adaptiveRoles:coverage.roleCount,adaptiveAnchors:coverage.anchorCount,adaptiveRecent:coverage.recentCount};
+            if(!coverage.nativeCount||coverage.candidateKeys.size===coverage.eligibleCount){
+                // Preserve existing zero-hit fallback and vector replay. If
+                // coverage itself reaches the whole set, report it honestly.
+                candidateKeys=null;
+                run.candidateSources=null;
+                updateJevReport(run,{...report,mode:'all',adaptiveReason:coverage.nativeCount?'coverage-all':'empty-filter'});
+            }else{
+                candidateKeys=coverage.candidateKeys;
+                run.candidateSources=coverage.sources;
+                updateJevReport(run,report);
+            }
+        }
         if (!isCurrentJev(run)) { abort(true); return; }
         const messages = chat ?? getContext().chat ?? [];
         const hasCandidate = entries.some(entry => isJevCandidate(entry, worlds) && (!candidateKeys || candidateKeys.has(jevEntryKey(entry))));
         if (hasCandidate && !messages.some(message => !message?.is_system && typeof message?.mes === 'string' && message.mes.trim())) {
             throw Error('No recent dialogue for Jev.');
         }
-        const prepared = prepareJevRecall(entries, worlds, messages, run.options, candidateKeys);
-        updateJevReport(run, { candidates: prepared?.candidates.size ?? 0,
+        const prepared=prepareJevRecall(entries,worlds,messages,run.options,candidateKeys,run.requestedMode==='adaptive'?adaptivePlanCache:null);
+        updateJevReport(run, { eligibleEntries:prepared?.stats.eligibleEntries??run.report.adaptiveEligible,
+            assessed:0, candidates: prepared?.candidates.size ?? 0,
             unassessed: prepared?.candidates.size ?? 0, inputChars: 0, estimatedInputTokens: 0,
             truncatedMessages: prepared?.stats.truncatedMessages ?? 0, truncatedLore: prepared?.stats.truncatedLore ?? 0,
             sharedEntries: prepared?.stats.sharedEntries ?? 0, plannedBatches: 0, completedBatches: 0,
+            ...(run.options.partialInjection===true?{partialQuestions:0,partialSelected:0,partialApplied:0,partialSavedChars:0}:{}),
         });
         if (!prepared) {
             // Empty candidates are a successful zero-selection, not a failure.
@@ -1193,11 +1595,16 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
         }));
         const diagnostics = new Map();
         const accepted = await fitJevRecall(entries, worlds, ranked, {
-            budget, worldInfoBudget: worldInfoBudget || Infinity, bookBudgets, countTokens: getTokenCountAsync,
+            budget, worldInfoBudget: worldInfoBudget || Infinity, bookBudgets, countTokens: getTokenCountAsync, countEntryTokens:countBudgetEntry,
             bookPriorities, diagnostics,
         });
         if (!isCurrentJev(run)) { abort(true); return; }
-        run.selection = { accepted, worlds, budget, contextSize };
+        run.metrics.limits=new Map(bookBudgets);
+        run.metrics.accepted=new Set(accepted.keys());
+        for(const [key,reason] of diagnostics){const item=run.metrics.selected.get(key);if(item)item.budget=reason;}
+        const excerpts=run.excerpts?new Map([...run.excerpts].filter(([key])=>accepted.has(key))):null;
+        run.excerpts=null;
+        run.selection = { accepted, worlds, budget, contextSize, ...(excerpts?.size?{excerpts}:{}) };
         await restoreNativeVectorHits(run);
         const reasons = [...diagnostics.values()];
         updateJevReport(run, { phase: 'ready', selected: ranked.length, accepted: accepted.size,
@@ -1215,14 +1622,17 @@ async function prepareJevGeneration(run, chat, contextSize, abort, type) {
 
 function guardUnpreparedJevReply(_data, dryRun) {
     const run = jevGeneration;
+    if(!dryRun&&run?.metrics?.pending?.keys.size===0&&isCurrentJev(run))publishScanMetrics(run,[],true);
     if (dryRun || !run?.enabled || run.selection || !isCurrentJev(run)) return;
     updateJevReport(run, { phase: 'cancelled', error: translate('Recall preparation did not complete.', 'stlo.jev.vectorMissing') });
     stopGeneration();
     toastr.error(translate('Recall preparation did not complete. The reply was cancelled.', 'stlo.jev.prepareCancelled'), slothToastTitle());
 }
-function recordJevActivated(entries) {
+function recordJevActivated(entries,fromScan=false) {
     const run = jevGeneration;
-    if (!run?.selection || !isCurrentJev(run) || run.preview || !Array.isArray(entries)) return;
+    if (!run || !isCurrentJev(run) || run.preview || !Array.isArray(entries)) return;
+    if(!fromScan)publishScanMetrics(run,entries,true);
+    if(!run.selection)return;
     const keys = new Set(entries.map(jevEntryKey));
     const injected = [...run.selection.accepted.keys()].filter(key => keys.has(key)).length;
     updateJevReport(run, { phase: 'done', injected });
@@ -1446,6 +1856,11 @@ async function openJevSettings() {
                 <div class="stlo-field-heading"><h4 data-i18n="stlo.jev.mode">Jev candidate source</h4>${infoHelp('stlo.jev.modeHelp', 'All: assess every eligible entry instead of ordinary vector recall for Jev books. Filtered: assess only keyword/vector hits. Other vector recall is retained.')}</div>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="all" ${jevOptions.mode === "all" ? "checked" : ""}><span data-i18n="stlo.jev.modeAll">All eligible lorebook entries (default)</span></label>
                 <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="filtered" ${jevOptions.mode === "filtered" ? "checked" : ""}><span data-i18n="stlo.jev.modeFiltered">Vector / keyword search candidates</span></label>
+                <label class="stlo-jev-radio"><input type="radio" name="stlo-jev-mode" value="adaptive" ${jevOptions.mode === "adaptive" ? "checked" : ""}><span data-i18n="stlo.jev.modeAdaptive">Adaptive (experimental)</span></label>
+                <div class="stlo-jev-field" id="stlo-jev-adaptive-field" ${jevOptions.mode==='adaptive'?'':'hidden'}>
+                    <div class="stlo-field-heading"><label for="stlo-jev-adaptive-threshold" data-i18n="stlo.jev.adaptiveThreshold">Full-plan input threshold (estimated tokens)</label>${infoHelp('stlo.jev.adaptiveHelp','Assess all entries below the threshold; above it, supplement native World Info hits with durable-memory cues, concise entries, explicit long-term/NPC records, concrete title/key matches, and recent entries with comparable source positions. Without World Info vectors or eligible hits, assess all. Coverage is experimental, not a recall guarantee. The threshold is an estimate, not an injection budget.')}</div>
+                    <input type="number" id="stlo-jev-adaptive-threshold" class="text_pole textarea_compact" min="1" max="100000000" step="1" value="${jevOptions.adaptiveThreshold??DEFAULT_JEV_ADAPTIVE_THRESHOLD}">
+                </div>
                 </div>
                 <div class="world_entry_form_control stlo-section">
                 <details class="stlo-jev-advanced"><summary data-i18n="stlo.jev.advanced">Advanced Jev settings</summary><div class="stlo-jev-advanced-body">
@@ -1453,6 +1868,7 @@ async function openJevSettings() {
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-recent" data-i18n="stlo.jev.recent">Recent messages</label>${infoHelp('stlo.jev.recentHelp', 'Jev reads this many recent messages in full by default. Default: 20.')}</div><input type="number" id="stlo-jev-recent" class="text_pole textarea_compact" min="1" max="100" step="1" value="${jevOptions.recent}"></div>
                 <div class="stlo-jev-field"><div class="stlo-field-heading"><label for="stlo-jev-preset" data-i18n="stlo.jev.preset">Default selection style</label>${infoHelp('stlo.jev.presetHelp', 'Strict: direct relevance. Balanced: default. Generous: indirect relevance too. Changing this selects the built-in prompt.')}</div><select id="stlo-jev-preset" class="text_pole textarea_compact"><option value="strict" data-i18n="stlo.jev.strict">Strict</option><option value="balanced" data-i18n="stlo.jev.balanced">Balanced</option><option value="generous" data-i18n="stlo.jev.generous">Generous</option></select></div>
                 </div>
+                <div class="stlo-option-line"><label class="checkbox_label stlo-checkrow" for="stlo-jev-partial"><input type="checkbox" id="stlo-jev-partial" ${jevOptions.partialInjection===true?'checked':''}><span class="checkmark"></span><span data-i18n="stlo.jev.partial">Partial injection (experimental)</span></label>${infoHelp('stlo.jev.partialHelp','Only long structured Scene memories, with a built-in prompt and no reading limits. Jev may select a safe excerpt in the same request; uncertainty keeps the full text. Full-text budgets and native activation remain unchanged.')}</div>
                 <details class="stlo-jev-advanced stlo-jev-reading-limits" ${jevOptions.messageLength || jevOptions.loreLength ? 'open' : ''}>
                     <summary class="stlo-reading-summary"><span data-i18n="stlo.jev.readingLimits">Reading limits</span><small id="stlo-jev-reading-status"></small></summary>
                     <div class="stlo-jev-fields stlo-jev-limit-fields">
@@ -1502,13 +1918,15 @@ async function openJevSettings() {
                         const opts = {
                             inputVersion: 2,
                             mode: document.querySelector('input[name="stlo-jev-mode"]:checked')?.value,
+                            adaptiveThreshold: val('stlo-jev-adaptive-threshold'),
+                            partialInjection: document.getElementById('stlo-jev-partial')?.checked===true,
                             recent: val('stlo-jev-recent'),
                             messageLength: val('stlo-jev-message-length'),
                             loreLength: val('stlo-jev-lore-length'),
                             preset: promptState.preset,
                             prompt: promptState.prompt,
                         };
-                        const numeric = [[opts.recent, 1, 100, false], [opts.messageLength, 100, 20000, true], [opts.loreLength, 100, 20000, true]];
+                        const numeric = [[opts.recent, 1, 100, false], [opts.messageLength, 100, 20000, true], [opts.loreLength, 100, 20000, true],[opts.adaptiveThreshold,1,100000000,false]];
                         if (numeric.some(([value, min, max, allowZero]) => !String(value ?? '').trim() || !Number.isSafeInteger(Number(value)) || (!(allowZero && Number(value) === 0) && (Number(value) < min || Number(value) > max)))) {
                             toastr.error(translate('Check the Jev numeric settings and custom prompt.', 'stlo.jev.validation'), slothToastTitle());
                             return false;
@@ -1600,6 +2018,13 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
     }
     const ui = mountJevPromptLibrary({ target, model: promptModel, generosity: preset, Popup, POPUP_TYPE, tr,
         warn: message => toastr.warning(message, slothToastTitle()), isOpen });
+    const adaptiveField=document.getElementById('stlo-jev-adaptive-field');
+    const syncAdaptive=()=>{if(adaptiveField)adaptiveField.hidden=document.querySelector('input[name="stlo-jev-mode"]:checked')?.value!=='adaptive';};
+    for(const input of document.querySelectorAll('input[name="stlo-jev-mode"]')){
+        input.addEventListener('change',syncAdaptive);
+        modalEventListeners.push({element:input,event:'change',handler:syncAdaptive});
+    }
+    syncAdaptive();
     const messageLimit = document.getElementById('stlo-jev-message-length');
     const loreLimit = document.getElementById('stlo-jev-lore-length');
     const readingStatus = document.getElementById('stlo-jev-reading-status');
@@ -1620,6 +2045,10 @@ function setupJevModalBehavior(modalEventListeners, promptModel, tr, isOpen) {
         document.getElementById('stlo-jev-recent').value = String(defaults.recent);
         document.getElementById('stlo-jev-message-length').value = String(defaults.messageLength);
         document.getElementById('stlo-jev-lore-length').value = String(defaults.loreLength);
+        const threshold=document.getElementById('stlo-jev-adaptive-threshold');
+        if(threshold)threshold.value=String(DEFAULT_JEV_ADAPTIVE_THRESHOLD);
+        const partial=document.getElementById('stlo-jev-partial');
+        if(partial)partial.checked=false;
         syncReadingStatus();
         promptModel.chooseBuiltin('balanced');
         ui.render();
@@ -2784,7 +3213,12 @@ function registerPerLoopBudgetTrimmer() {
                 }
                 const entries = args?.activated?.entries;
                 if (!(entries instanceof Map) || entries.size === 0) {
-                    if (run?.selection && args?.state?.next === 0) recordJevActivated([]);
+                    if(run&&isCurrentJev(run)&&args?.state?.next===0&&(run.enabled||EXTENSION_STATE.scanHasExplicitBudgets)){
+                        const total=Number(args?.budget?.current)||calculateTotalWIBudget(run.selection?.contextSize);
+                        for(const [world,settings] of EXTENSION_STATE.scanWorldSettings)run.metrics.limits.set(world,await calculateLorebookBudget(settings,total,run.selection?.contextSize));
+                        stageScanMetrics(run,[],()=>false);
+                    }
+                    if (run?.selection && args?.state?.next === 0) recordJevActivated([],true);
                     return;
                 }
 
@@ -2833,13 +3267,14 @@ function registerPerLoopBudgetTrimmer() {
                     sourceRank.set(key, index);
                 }
                 const countBudgetTokens = async entry => {
-                    const count = await getEntryTokenCountCached(entry);
+                    const count = await countBudgetEntry(entry);
                     if (!Number.isFinite(count) || count < 0 || (count === 0 && String(entry.content ?? '').trim())) return Infinity;
                     return count;
                 };
-                const discard = ({ key, entry }) => {
+                const discard = ({ key, entry },reason) => {
                     if (!entries.has(key)) return;
                     entries.delete(key);
+                    if(run?.metrics&&reason&&isCurrentJev(run))run.metrics.trims.set(jevEntryKey(entry),reason);
                     entry.disable = true; // Keep a dropped entry out of recursion rescans.
                     const original = scanEntries.get(jevEntryKey(entry));
                     if (original) original.disable = true;
@@ -2865,6 +3300,7 @@ function registerPerLoopBudgetTrimmer() {
                         }
                         const settings = settingsCache.get(world) ?? await getLorebookSettings(world);
                         const perBudget = await calculateLorebookBudget(settings, totalBudget, jev?.contextSize);
+                        if(run?.metrics&&isCurrentJev(run))run.metrics.limits.set(world,perBudget);
                         if (!(perBudget > 0)) continue;
 
                         const native = [];
@@ -2892,7 +3328,7 @@ function registerPerLoopBudgetTrimmer() {
                             if (originallyIgnored(item.entry)) continue;
                             const tokens = await countBudgetTokens(item.entry);
                             if (used + tokens <= perBudget) used += tokens;
-                            else discard(item);
+                            else discard(item,'book');
                         }
                     }
                 }
@@ -2910,7 +3346,7 @@ function registerPerLoopBudgetTrimmer() {
                     for (const item of [...constants.sort(nativeOrder), ...native.sort(nativeOrder), ...selected.sort(recallOrder)]) {
                         const tokens = await countBudgetTokens(item.entry);
                         if (used + tokens <= jev.budget) used += tokens;
-                        else discard(item);
+                        else discard(item,'jev');
                     }
                 }
 
@@ -2945,18 +3381,30 @@ function registerPerLoopBudgetTrimmer() {
                         if (originallyIgnored(item.entry)) continue;
                         const tokens = await countBudgetTokens(item.entry);
                         if (used + tokens <= totalBudget) used += tokens;
-                        else discard(item);
+                        else discard(item,'world');
                     }
                 }
 
                 // The core builds the final prompt from activated.entries.
-                // Its recursion buffer was already assembled before this hook,
-                // so editing activated.text would not undo a recursion trigger.
-                // Leave all text untouched rather than deleting a kept entry
-                // or unrelated system instruction that has matching content.
+                // All native activation, recursion and budget decisions used
+                // full text. Only now may the separate opt-in excerpt replace
+                // a generation-local copy; never edit activated.text or books.
+                if(run&&isCurrentJev(run)&&args?.state?.next===0&&(run.enabled||EXTENSION_STATE.scanHasExplicitBudgets||reserved)){
+                    for(const [world,settings] of settingsCache){
+                        if(!run.metrics.limits.has(world)||EXTENSION_STATE.scanBudgetWorlds.has(world))
+                            run.metrics.limits.set(world,await calculateLorebookBudget(settings,totalBudget,jev?.contextSize));
+                    }
+                    stageScanMetrics(run,entries.values(),originallyIgnored);
+                }
                 finishOrder();
                 if (dropped) stloDebug('Trimmed WI entries structurally:', dropped);
-                if (run?.selection && args?.state?.next === 0) recordJevActivated([...entries.values()]);
+                if (run?.selection && args?.state?.next === 0 && isCurrentJev(run)) {
+                    if(jev?.excerpts?.size){
+                        const {applied,savedChars}=applyJevExcerpts(entries,jev.accepted,jev.excerptAppliedKeys,jev.excerpts);
+                        updateJevReport(run,{partialApplied:applied,partialSavedChars:savedChars});
+                    }
+                    recordJevActivated([...entries.values()],true);
+                }
             } catch (e) {
                 console.warn('🦥 STLO', '[STLO] per-loop budget trimmer error:', e);
             }
