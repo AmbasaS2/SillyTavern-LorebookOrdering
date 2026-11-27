@@ -1537,7 +1537,14 @@ function omitJevVectorCollections(data, run) {
 async function handleWorldInfoEntriesLoaded(eventData) {
     try {
         if (!eventData || typeof eventData !== 'object') return;
-        await applyPriorityOrdering(eventData);
+        // Keep the scan tied to the chat, speaker and Jev generation that
+        // supplied its entries, including across asynchronous settings reads.
+        const chatId = getCurrentChatId();
+        const speaker = EXTENSION_STATE.currentSpeakingCharacter;
+        const origin = jevGeneration;
+        const stillCurrent = () => chatId === getCurrentChatId() &&
+            speaker === EXTENSION_STATE.currentSpeakingCharacter && origin === jevGeneration;
+        if (!await applyPriorityOrdering(eventData, stillCurrent) || !stillCurrent()) return;
         const run = jevGeneration;
         if (nativeVectorPasses > 0) {
             if (run?.enabled && isCurrentJev(run)) omitJevVectorCollections(eventData, run);
@@ -3216,9 +3223,9 @@ function getPriorityName(priority) {
  * Apply priority ordering to all entries
  * @param {Object} eventData - Contains globalLore, characterLore, chatLore, personaLore arrays
  */
-async function applyPriorityOrdering(eventData) {
+async function applyPriorityOrdering(eventData, stillCurrent = () => true) {
     try {
-        if (!eventData || typeof eventData !== 'object') return;
+        if (!eventData || typeof eventData !== 'object' || !stillCurrent()) return false;
 
         const gl = Array.isArray(eventData.globalLore) ? eventData.globalLore : (eventData.globalLore = []);
         const cl = Array.isArray(eventData.characterLore) ? eventData.characterLore : (eventData.characterLore = []);
@@ -3246,6 +3253,8 @@ async function applyPriorityOrdering(eventData) {
                 })
             );
         }
+
+        if (!stillCurrent()) return false;
 
         // Reuse these small settings objects during subsequent scan passes.
         // Avoid reading/cloning a lorebook's settings again for every loop.
@@ -3309,7 +3318,7 @@ async function applyPriorityOrdering(eventData) {
         // Only an explicit effective priority/adjustment requests source
         // consolidation. Filtering and budget protection leave native
         // chat/persona/global/character precedence and order intact.
-        if (!customOrder) return;
+        if (!customOrder) return true;
         const processedEntries = arrays.flat();
         for (const entry of processedEntries) {
             const { priority, adjustment } = effective(entry);
@@ -3321,8 +3330,10 @@ async function applyPriorityOrdering(eventData) {
         if (DEBUG_STLO) {
             stloDebug('applyPriorityOrdering summary:', { processed: processedEntries.length, skippedOnlyWhenSpeaking });
         }
+        return true;
     } catch (error) {
         console.error('🦥 STLO', 'Error applying priority ordering:', error);
+        return false;
     }
 }
 
